@@ -7742,6 +7742,351 @@ function setupAdmin() {
     }
   };
 
+
+  const BUILD_STAT_META = {
+    attackFlat:["Atak bazowy",""],
+    attackPct:["Atak","%"],
+    defenseFlat:["Obrona bazowa",""],
+    defensePct:["Obrona","%"],
+    maxHpFlat:["Maks. HP — flat",""],
+    maxHpPct:["Maks. HP","%"],
+    accuracy:["Celność","%"],
+    initiative:["Inicjatywa",""],
+    firstStrike:["Pierwszy cios","%"],
+    critChance:["Szansa na kryt","%"],
+    critDmg:["Obrażenia krytyczne","%"],
+    execute:["Próg egzekucji","%"],
+    lifesteal:["Kradzież życia","%"],
+    armorPen:["Przebicie pancerza","%"],
+    stun:["Ogłuszenie","%"],
+    bleed:["Krwawienie","%"],
+    evasion:["Unik","%"],
+    doubleStrike:["Podwójne uderzenie","%"],
+    counter:["Kontratak","%"],
+    healingReduction:["Redukcja leczenia wroga","%"],
+    damageReduction:["Redukcja obrażeń","%"],
+    critResist:["Odporność na kryt","%"],
+    stunResist:["Odporność na ogłuszenie","%"],
+    bleedResist:["Odporność na krwawienie","%"],
+    hpRegen:["Regeneracja HP / turę",""]
+  };
+
+  const BUILD_STAT_CAPS = {
+    accuracy:140,
+    critChance:65,
+    critDmg:130,
+    execute:18,
+    lifesteal:30,
+    armorPen:50,
+    stun:35,
+    evasion:55,
+    doubleStrike:40,
+    counter:40,
+    healingReduction:50,
+    damageReduction:60,
+    critResist:50,
+    stunResist:60,
+    bleedResist:60,
+    hpRegen:20
+  };
+
+  function buildNewStatBag() {
+    return {
+      attackFlat:0,
+      attackPct:0,
+      defenseFlat:0,
+      defensePct:0,
+      maxHpFlat:0,
+      maxHpPct:0,
+      accuracy:0,
+      initiative:0,
+      firstStrike:0,
+      critChance:0,
+      critDmg:0,
+      execute:0,
+      lifesteal:0,
+      armorPen:0,
+      stun:0,
+      bleed:0,
+      evasion:0,
+      doubleStrike:0,
+      counter:0,
+      healingReduction:0,
+      damageReduction:0,
+      critResist:0,
+      stunResist:0,
+      bleedResist:0,
+      hpRegen:0
+    };
+  }
+
+  function buildStatNumber(value) {
+    const n = Number(value) || 0;
+    return Math.round(n * 100) / 100;
+  }
+
+  function buildCapStat(key,value) {
+    const cap = BUILD_STAT_CAPS[key];
+    return Number.isFinite(cap)
+      ? Math.min(cap,value)
+      : value;
+  }
+
+  function buildEffectNumber(effect,pattern) {
+    const match = String(effect || "").match(pattern);
+    if (!match) return 0;
+    return Number(String(match[1]).replace(",", ".")) || 0;
+  }
+
+  function buildApplyPerkEffect(stats,effect,extras) {
+    const text = String(effect || "").trim();
+    const lower = text.toLocaleLowerCase("pl-PL");
+
+    // Bonusy zależne od HP / tury / specjalnego warunku pokazujemy osobno.
+    if (
+      lower.includes("gdy hp<") ||
+      lower.includes("za turę") ||
+      lower.includes("krytyki mogą")
+    ) {
+      extras.conditional.push(text);
+      return;
+    }
+
+    const add = (key,pattern,transform=value=>value) => {
+      const value = buildEffectNumber(text,pattern);
+      if (value) stats[key] += transform(value);
+    };
+
+    add("attackPct",/([+-]?\d+(?:[.,]\d+)?)%\s*ataku\b/i);
+    add("armorPen",/([+-]?\d+(?:[.,]\d+)?)%\s*przebicia pancerza/i);
+    add("critDmg",/([+-]?\d+(?:[.,]\d+)?)%\s*obrażeń krytycznych/i);
+    add("execute",/([+-]?\d+(?:[.,]\d+)?)%\s*progu egzekucji/i);
+    add("lifesteal",/([+-]?\d+(?:[.,]\d+)?)%\s*kradzieży życia/i);
+
+    // "szansy na podwójne uderzenie" i skrócone "podwójnego uderzenia"
+    let doubleBonus =
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na podwójne uderzenie/i) ||
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*podwójnego uderzenia/i);
+    stats.doubleStrike += doubleBonus;
+
+    let evasionBonus =
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na unik/i) ||
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*uniku\b/i);
+    stats.evasion += evasionBonus;
+
+    add("counter",/([+-]?\d+(?:[.,]\d+)?)%\s*kontrataku/i);
+
+    let critBonus =
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na trafienie krytyczne/i) ||
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na krytyka/i);
+    stats.critChance += critBonus;
+
+    add("accuracy",/([+-]?\d+(?:[.,]\d+)?)%\s*celności/i);
+    add("healingReduction",/([+-]?\d+(?:[.,]\d+)?)%\s*redukcji leczenia wroga/i);
+    add("defensePct",/([+-]?\d+(?:[.,]\d+)?)%\s*obrony\b/i);
+    add("critResist",/([+-]?\d+(?:[.,]\d+)?)%\s*odporności na trafienia krytyczne/i);
+    add("stunResist",/([+-]?\d+(?:[.,]\d+)?)%\s*odporności na ogłuszenie/i);
+    add("bleedResist",/([+-]?\d+(?:[.,]\d+)?)%\s*odporności na krwawienie/i);
+    add("maxHpPct",/([+-]?\d+(?:[.,]\d+)?)%\s*maksymalnego hp/i);
+
+    const allResist =
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*wszystkich odporności/i);
+    if (allResist) {
+      stats.critResist += allResist;
+      stats.stunResist += allResist;
+      stats.bleedResist += allResist;
+    }
+
+    // Ujemne "otrzymywane obrażenia" zamieniamy na dodatnią redukcję obrażeń.
+    const taken =
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*otrzymywanych obrażeń/i);
+    if (taken < 0) stats.damageReduction += Math.abs(taken);
+
+    const regen =
+      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)\s*regeneracji hp/i);
+    if (regen) stats.hpRegen += regen;
+
+    // Zachowujemy nietypowe, nieprzeliczalne opisy jako efekty specjalne.
+    if (
+      lower.includes("krwawienie") &&
+      !/odporności na krwawienie/i.test(text) &&
+      !/otrzymywanych obrażeń/i.test(text)
+    ) {
+      if (!/^\+?\d+(?:[.,]\d+)?%\s*kradzieży życia/i.test(text)) {
+        extras.special.push(text);
+      }
+    }
+  }
+
+  function buildCalculateStats(source) {
+    const attributes = source && source.attributes ? source.attributes : {};
+    const perks = source && source.perks ? source.perks : {};
+
+    const STR = Number(attributes.strength) || 0;
+    const END = Number(attributes.endurance) || 0;
+    const AGI = Number(attributes.agility) || 0;
+    const VIT = Number(attributes.vitality) || 0;
+    const PRC = Number(attributes.precision) || 0;
+
+    const stats = buildNewStatBag();
+    const extras = {
+      conditional:[],
+      special:[]
+    };
+
+    // Mechaniki atrybutów dokładnie według ekranów z gry.
+    stats.attackFlat = STR * 0.5 + AGI * 0.5 + PRC * 0.4;
+    stats.attackPct = STR * 0.45;
+
+    stats.defenseFlat = END * 1.65;
+    stats.defensePct = END * 0.65;
+
+    stats.maxHpFlat = VIT * 1.5;
+    stats.maxHpPct = VIT * 1.1;
+
+    stats.accuracy = 85 + PRC * 0.5;
+    stats.initiative = 3 + PRC * 0.3;
+    stats.firstStrike = PRC * 0.25;
+
+    stats.critChance = 3 + PRC * 0.5 + AGI * 0.3;
+    stats.critDmg = 10 + STR * 0.6 + PRC * 0.5;
+
+    stats.execute = 2 + PRC * 0.15;
+    stats.lifesteal = PRC * 0.15;
+    stats.armorPen = STR * 0.3 + PRC * 0.15;
+
+    stats.stun = PRC * 0.4;
+    stats.bleed = STR * 0.3 + AGI * 0.3 + PRC * 0.2;
+
+    stats.evasion = 2 + AGI * 0.35;
+    stats.doubleStrike = AGI * 0.5;
+    stats.counter = AGI * 0.3;
+    stats.healingReduction = AGI * 0.8;
+
+    stats.damageReduction = END * 0.18 + VIT * 0.3;
+    stats.critResist = END * 0.4;
+    stats.stunResist = END * 0.4;
+    stats.bleedResist = VIT * 0.5;
+
+    stats.hpRegen = VIT * 0.15;
+
+    BUILD_ATTR_ORDER.forEach(attrKey => {
+      const selected = perks[attrKey] || {};
+      const attr = BUILD_ATTRS[attrKey];
+
+      Object.keys(selected).forEach(tierKey => {
+        const tier = Number(tierKey);
+        const choice = selected[tierKey];
+        if (!tier || tier < 1 || tier > 10 || (choice !== "A" && choice !== "B")) return;
+
+        const pair = attr.perks[tier - 1];
+        if (!pair) return;
+
+        const perk = pair[choice === "A" ? 0 : 1];
+        if (!perk) return;
+
+        buildApplyPerkEffect(stats,perk[1],extras);
+      });
+    });
+
+    Object.keys(stats).forEach(key => {
+      stats[key] = buildStatNumber(buildCapStat(key,stats[key]));
+    });
+
+    // Usuń duplikaty opisów warunkowych/specjalnych.
+    extras.conditional = [...new Set(extras.conditional)];
+    extras.special = [...new Set(extras.special)];
+
+    return {stats,extras};
+  }
+
+  function buildFormatStatValue(key,value) {
+    const meta = BUILD_STAT_META[key] || [key,""];
+    const suffix = meta[1] || "";
+    const n = buildStatNumber(value);
+
+    return `${n.toLocaleString("pl-PL",{
+      minimumFractionDigits:Number.isInteger(n) ? 0 : 1,
+      maximumFractionDigits:2
+    })}${suffix}`;
+  }
+
+  function buildStatsHtml(source) {
+    const calculated = buildCalculateStats(source);
+    const stats = calculated.stats;
+    const extras = calculated.extras;
+
+    const groups = [
+      {
+        title:"⚔️ Atak",
+        keys:[
+          "attackFlat","attackPct","accuracy","initiative","firstStrike",
+          "critChance","critDmg","execute","lifesteal","armorPen","stun","bleed"
+        ]
+      },
+      {
+        title:"👟 Mobilność i kontrola",
+        keys:["evasion","doubleStrike","counter","healingReduction"]
+      },
+      {
+        title:"🛡️ Obrona",
+        keys:[
+          "defenseFlat","defensePct","damageReduction",
+          "critResist","stunResist","bleedResist"
+        ]
+      },
+      {
+        title:"❤️ Życie",
+        keys:["maxHpFlat","maxHpPct","hpRegen"]
+      }
+    ];
+
+    const groupsHtml = groups.map(group => `
+      <section class="build-stat-group">
+        <div class="build-stat-group-title">${group.title}</div>
+        <div class="build-stat-grid">
+          ${group.keys.map(key => `
+            <div class="build-stat-row">
+              <span>${escapeHtml(BUILD_STAT_META[key][0])}</span>
+              <strong>${escapeHtml(buildFormatStatValue(key,stats[key]))}</strong>
+            </div>
+          `).join("")}
+        </div>
+      </section>
+    `).join("");
+
+    const conditionalHtml = extras.conditional.length
+      ? `
+        <section class="build-stat-group build-stat-extra">
+          <div class="build-stat-group-title">⚡ Bonusy warunkowe z perków</div>
+          <div class="build-stat-extra-list">
+            ${extras.conditional.map(text=>`<div>• ${escapeHtml(text)}</div>`).join("")}
+          </div>
+        </section>
+      `
+      : "";
+
+    const specialHtml = extras.special.length
+      ? `
+        <section class="build-stat-group build-stat-extra">
+          <div class="build-stat-group-title">✨ Efekty specjalne</div>
+          <div class="build-stat-extra-list">
+            ${extras.special.map(text=>`<div>• ${escapeHtml(text)}</div>`).join("")}
+          </div>
+        </section>
+      `
+      : "";
+
+    return groupsHtml + conditionalHtml + specialHtml;
+  }
+
+  function renderBuildStats() {
+    const host = el("build-stats");
+    if (!host) return;
+    host.innerHTML = buildStatsHtml(buildState);
+  }
+
+
   function buildEmptyState() {
     return {
       id:"",
@@ -7766,6 +8111,7 @@ function setupAdmin() {
   }
 
   let buildState = buildEmptyState();
+  let buildEditingExisting = false;
   let buildActiveAttr = "";
   let buildPublicItems = [];
   let buildMyItems = [];
@@ -7876,6 +8222,7 @@ function setupAdmin() {
     });
 
     if (buildActiveAttr) renderBuildSkillEditor();
+    renderBuildStats();
     renderBuildAccountState();
   }
 
@@ -7955,16 +8302,28 @@ function setupAdmin() {
     });
   }
 
-  function renderBuildAccountState() {
+  function renderBuildAccountState(options={}) {
     const privateButton = el("build-save-private");
+    const publicButton = el("build-share-public");
     const guestRow = el("build-guest-author-row");
     const hint = el("build-account-hint");
-    if (!privateButton || !guestRow || !hint) return;
+    if (!privateButton || !publicButton || !guestRow || !hint) return;
 
+    const checking = Boolean(options.checking);
     const accountNick = cachedAccountNick();
+
+    if (checking) {
+      privateButton.hidden = true;
+      guestRow.hidden = true;
+      publicButton.classList.add("build-full-action");
+      hint.className = "submit-info";
+      hint.innerHTML = "⏳ Sprawdzam zalogowane konto...";
+      return;
+    }
 
     privateButton.hidden = !accountNick;
     guestRow.hidden = Boolean(accountNick);
+    publicButton.classList.toggle("build-full-action",!accountNick);
 
     if (accountNick) {
       hint.className = "submit-info known-recipe";
@@ -7990,7 +8349,7 @@ function setupAdmin() {
       action:"buildSave",
       nonce:makeRecipeNonce(),
       sessionToken:playerAccountSessionToken(),
-      id:buildState.id || "",
+      id:buildEditingExisting ? (buildState.id || "") : "",
       public:Boolean(isPublic),
       authorNick:accountNick || guestAuthor,
       name,
@@ -8058,10 +8417,31 @@ function setupAdmin() {
 
     try {
       const result = await buildPostAction(payload);
-      buildState.id = result.build && result.build.id ? result.build.id : buildState.id;
-      status.textContent = isPublic
-        ? "✅ Build został udostępniony publicznie."
-        : "✅ Build został zapisany prywatnie.";
+
+      if (buildEditingExisting) {
+        buildState.id =
+          result.build && result.build.id
+            ? result.build.id
+            : buildState.id;
+      } else {
+        // Zwykły kreator tworzy nowy rekord przy każdym zapisie.
+        // Edycja istniejącego buildu jest możliwa tylko po wejściu przez
+        // „✏️ Edytuj mój build”.
+        buildState.id = "";
+      }
+
+      status.textContent = buildEditingExisting
+        ? (
+            isPublic
+              ? "✅ Zapisany build został zaktualizowany i jest publiczny."
+              : "✅ Zapisany build został zaktualizowany jako prywatny."
+          )
+        : (
+            isPublic
+              ? "✅ Utworzono nowy publiczny build."
+              : "✅ Utworzono nowy prywatny build."
+          );
+
       await fetchBuildLists(true);
     } catch (err) {
       status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się zapisać buildu.");
@@ -8227,6 +8607,17 @@ function setupAdmin() {
       </div>
       ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
       <div class="build-viewer-attrs">${attrHtml}</div>
+
+      <details class="content-accordion build-stats-accordion" open>
+        <summary>
+          <span>📊 Łączne statystyki buildu</span>
+          <span class="accordion-chevron">⌄</span>
+        </summary>
+        <div class="content-accordion-body">
+          <div class="build-stats">${buildStatsHtml(item)}</div>
+        </div>
+      </details>
+
       <div class="build-viewer-actions">
         <button id="build-copy-to-editor" type="button" class="primary-btn">📋 Użyj jako podstawy</button>
         ${mine ? `<button id="build-edit-own" type="button" class="secondary-btn">✏️ Edytuj mój build</button>` : ""}
@@ -8273,6 +8664,7 @@ function setupAdmin() {
 
   function loadBuildIntoEditor(item,keepId=false) {
     const fresh = buildEmptyState();
+    buildEditingExisting = Boolean(keepId);
     fresh.id = keepId ? String(item.id || "") : "";
     fresh.level = Math.max(1,Number(item.level)||1);
     fresh.name = keepId ? String(item.name||"") : `${String(item.name||"Build")} — kopia`;
@@ -8294,13 +8686,16 @@ function setupAdmin() {
     buildActiveAttr = "";
     el("build-name").value = fresh.name;
     el("build-description").value = fresh.description;
-    el("build-save-status").textContent = keepId ? "Edytujesz zapisany build." : "Skopiowano build do kreatora.";
+    el("build-save-status").textContent = keepId
+      ? "✏️ Tryb edycji: kolejne zapisanie zaktualizuje ten konkretny build."
+      : "📋 Skopiowano build do kreatora. Zapis utworzy nowy build.";
     renderBuildEditor();
     el("build-skill-editor").hidden = true;
   }
 
   function newBuild() {
     buildState = buildEmptyState();
+    buildEditingExisting = false;
     buildActiveAttr = "";
     el("build-name").value = "";
     el("build-description").value = "";
@@ -8309,10 +8704,24 @@ function setupAdmin() {
     renderBuildEditor();
   }
 
-  function openBuildModule() {
+  async function openBuildModule() {
     showToolView("builds-view","builds");
+
+    const hasSession = Boolean(playerAccountSessionToken());
+
+    if (hasSession && !cachedAccountNick()) {
+      renderBuildAccountState({checking:true});
+
+      try {
+        await playerAccountStatus();
+      } catch (err) {
+        // playerAccountStatus sam obsługuje błędy i zachowuje poprawny cache,
+        // jeśli poprzedni stan konta nadal jest ważny.
+      }
+    }
+
     renderBuildAccountState();
-    fetchBuildLists(false);
+    await fetchBuildLists(false);
   }
 
   function setupBuildCreator() {

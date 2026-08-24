@@ -1351,3 +1351,84 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   background: #f5e3df;
   color: #8a3833;
 }
+
+/* v20.41 — pojedyncza akcja publiczna dla użytkownika bez konta */
+.build-save-actions .build-full-action {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+
+/* ============================================================
+   v20.42 — ŁĄCZNE STATYSTYKI BUILDU
+   ============================================================ */
+
+.build-stats-accordion {
+  margin-top: 4px;
+}
+
+.build-stats {
+  display: grid;
+  gap: 10px;
+}
+
+.build-stat-group {
+  border: 1px solid #ddccb0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255,255,255,.42);
+}
+
+.build-stat-group-title {
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 900;
+  background: rgba(220,205,177,.52);
+}
+
+.build-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+}
+
+.build-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 9px;
+  border-top: 1px solid rgba(190,166,130,.24);
+  font-size: 11px;
+}
+
+.build-stat-row:nth-child(odd) {
+  border-right: 1px solid rgba(190,166,130,.24);
+}
+
+.build-stat-row span {
+  color: #715e49;
+}
+
+.build-stat-row strong {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.build-stat-extra-list {
+  padding: 8px 10px;
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #66513c;
+}
+
+@media (max-width: 520px) {
+  .build-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .build-stat-row:nth-child(odd) {
+    border-right: 0;
+  }
+}
