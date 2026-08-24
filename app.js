@@ -3096,7 +3096,8 @@ const MAP_POSITIONS = {
             loadAccountAdminPermissions(),
             loadAdminGangTools(),
             loadAdminPaymentsStatus(),
-            loadAdminSubmissions()
+            loadAdminSubmissions(),
+            loadAdminBuilds()
           ]);
 
         const anyOk =
@@ -5137,6 +5138,148 @@ async function loadAdminGangTools() {
   }
 }
 
+
+async function loadAdminBuilds() {
+  const token = adminToken();
+  const box = el("admin-builds-list");
+  const count = el("admin-builds-count");
+  const status = el("admin-builds-status");
+
+  if (!token || !box) return;
+
+  if (status) status.textContent = "Pobieranie publicznych buildów...";
+
+  try {
+    const payload =
+      await jsonp(
+        "adminBuilds",
+        {token}
+      );
+
+    if (!payload || !payload.ok) {
+      throw new Error(
+        payload && payload.error
+          ? payload.error
+          : "Nie udało się pobrać buildów."
+      );
+    }
+
+    const builds =
+      Array.isArray(payload.builds)
+        ? payload.builds
+        : [];
+
+    if (count) {
+      count.textContent =
+        `Publiczne buildy: ${builds.length}`;
+    }
+
+    box.innerHTML =
+      builds.length
+        ? builds.map(item => `
+            <div class="admin-build-row" data-admin-build-row="${escapeHtml(item.id)}">
+              <div class="admin-build-row-main">
+                <div>
+                  <b>${escapeHtml(item.name || "Bez nazwy")}</b>
+                  <div class="muted">
+                    Autor: ${escapeHtml(item.authorNick || item.ownerNick || "—")}
+                    · poziom ${Number(item.level) || 1}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  class="danger-soft"
+                  data-admin-delete-build="${escapeHtml(item.id)}"
+                  data-admin-build-name="${escapeHtml(item.name || "Bez nazwy")}"
+                  data-admin-build-author="${escapeHtml(item.authorNick || item.ownerNick || "—")}">
+                  🗑 Usuń
+                </button>
+              </div>
+            </div>
+          `).join("")
+        : `<div class="empty">Brak publicznych buildów.</div>`;
+
+    box
+      .querySelectorAll("[data-admin-delete-build]")
+      .forEach(button => {
+        button.onclick = async () => {
+          const id =
+            button.dataset.adminDeleteBuild;
+
+          const name =
+            button.dataset.adminBuildName || "Bez nazwy";
+
+          const author =
+            button.dataset.adminBuildAuthor || "—";
+
+          if (
+            !window.confirm(
+              `Usunąć publiczny build "${name}" autora ${author}?\n\nTa operacja jest trwała.`
+            )
+          ) {
+            return;
+          }
+
+          setActionLoading(
+            button,
+            status,
+            "Usuwanie buildu..."
+          );
+
+          try {
+            await adminPostAction(
+              "adminDeleteBuild",
+              {id}
+            );
+
+            if (status) {
+              status.textContent =
+                `✅ Usunięto build "${name}".`;
+            }
+
+            // Czyścimy lokalny cache listy buildów, żeby publiczna karta
+            // po kolejnym wejściu nie pokazała usuniętego wpisu.
+            buildListsLoaded = false;
+
+            await Promise.allSettled([
+              loadAdminBuilds(),
+              fetchBuildLists(true)
+            ]);
+          } catch (err) {
+            if (status) {
+              status.textContent =
+                "❌ " +
+                (
+                  err && err.message
+                    ? err.message
+                    : "Nie udało się usunąć buildu."
+                );
+            }
+          } finally {
+            clearActionLoading(button);
+          }
+        };
+      });
+
+    if (status && !status.textContent.startsWith("✅")) {
+      status.textContent = "";
+    }
+
+  } catch (err) {
+    if (status) {
+      status.textContent =
+        "❌ " +
+        (
+          err && err.message
+            ? err.message
+            : "Nie udało się pobrać buildów."
+        );
+    }
+  }
+}
+
+
 function showAdminContent() {
 
   el("admin-login").hidden = true;
@@ -5148,6 +5291,7 @@ function showAdminContent() {
   loadAdminPaymentsStatus();
   loadAdminPlayers();
   loadAdminGangTools();
+  loadAdminBuilds();
 }
 
 
@@ -7135,6 +7279,12 @@ function setupAdmin() {
           ['🍺 Panel Admina robi dolewkę, już kończę...','🥫 Szukam ostatniej puszki z uprawnieniami...','🧹 Sprzątam kolejkę requestów...','🥴 Jeszcze tylko jedna rubryka...']
         );
       }
+    );
+
+  el("admin-builds-refresh")
+    ?.addEventListener(
+      "click",
+      loadAdminBuilds
     );
 
   el("admin-payments-preview")

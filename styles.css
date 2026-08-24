@@ -2051,3 +2051,48 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     min-height:62px;
   }
 }
+
+/* ============================================================
+   v20.59 — ADMIN: MODERACJA PUBLICZNYCH BUILDÓW
+   ============================================================ */
+
+.admin-build-row {
+  padding:8px 9px;
+  margin-bottom:6px;
+  border:1px solid #d8c7aa;
+  border-radius:8px;
+  background:#fffdf8;
+}
+
+.admin-build-row-main {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+
+.admin-build-row-main > div {
+  min-width:0;
+}
+
+.admin-build-row-main b {
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.admin-build-row-main .danger-soft {
+  flex:0 0 auto;
+  white-space:nowrap;
+}
+
+@media(max-width:520px) {
+  .admin-build-row-main {
+    align-items:flex-start;
+  }
+
+  .admin-build-row-main .danger-soft {
+    padding:7px 8px;
+  }
+}
