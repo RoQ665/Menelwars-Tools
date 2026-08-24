@@ -8113,7 +8113,8 @@ function setupAdmin() {
       critResist:0,
       stunResist:0,
       bleedResist:0,
-      hpRegen:0
+      hpRegen:0,
+      hpRegenPct:0
     };
   }
 
@@ -8152,7 +8153,6 @@ function setupAdmin() {
     // Bonusy zależne od HP / tury / specjalnego warunku pokazujemy osobno.
     if (
       lower.includes("gdy hp<") ||
-      lower.includes("za turę") ||
       lower.includes("krytyki mogą")
     ) {
       extras.conditional.push(text);
@@ -8209,9 +8209,23 @@ function setupAdmin() {
       buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*otrzymywanych obrażeń/i);
     if (taken < 0) stats.damageReduction += Math.abs(taken);
 
-    const regen =
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)\s*regeneracji hp/i);
-    if (regen) stats.hpRegen += regen;
+    const regenPct =
+      buildEffectNumber(
+        text,
+        /([+-]?\d+(?:[.,]\d+)?)%\s*regeneracji hp/i
+      );
+    if (regenPct) {
+      stats.hpRegenPct += regenPct;
+    }
+
+    const regenFlat =
+      buildEffectNumber(
+        text,
+        /([+-]?\d+(?:[.,]\d+)?)(?!\s*%)\s*regeneracji hp/i
+      );
+    if (regenFlat) {
+      stats.hpRegen += regenFlat;
+    }
 
     // Zachowujemy nietypowe, nieprzeliczalne opisy jako efekty specjalne.
     if (
@@ -8678,10 +8692,18 @@ function setupAdmin() {
         : fallback;
     };
 
+    const cleanNonNegative = (value,fallback=0) => {
+      const number = Number(value);
+      return Number.isFinite(number) && number >= 0
+        ? buildStatNumber(number)
+        : fallback;
+    };
+
     return {
       attack:cleanPositive(profile.attack,1),
       defense:cleanPositive(profile.defense,1),
-      baseHp:cleanPositive(profile.baseHp,100)
+      baseHp:cleanPositive(profile.baseHp,100),
+      petHp:cleanNonNegative(profile.petHp,0)
     };
   }
 
@@ -8709,7 +8731,7 @@ function setupAdmin() {
     stats.defenseFlat = profile.defense + END * 1.65;
     stats.defensePct = END * 0.65;
 
-    stats.maxHpFlat = profile.baseHp + VIT * 1.5;
+    stats.maxHpFlat = profile.baseHp + profile.petHp + VIT * 1.5;
     stats.maxHpPct = VIT * 1.1;
 
     stats.accuracy = 85 + PRC * 0.5;
@@ -8759,6 +8781,22 @@ function setupAdmin() {
 
     buildApplyImportedBonuses(stats,source);
 
+    // Perki typu "+3% regeneracji HP" regenerują procent AKTUALNEGO
+    // maksymalnego HP na turę. Najpierw wyliczamy końcowe HP po bonusie %,
+    // a dopiero potem zamieniamy procent regeneracji na wartość / turę.
+    const maxHpForRegen =
+      buildStatNumber(
+        (Number(stats.maxHpFlat) || 0) *
+        (1 + (Number(stats.maxHpPct) || 0) / 100)
+      );
+
+    if (stats.hpRegenPct) {
+      stats.hpRegen +=
+        maxHpForRegen *
+        stats.hpRegenPct /
+        100;
+    }
+
     const rawStats = {};
     const capInfo = {};
     Object.keys(stats).forEach(key => {
@@ -8806,13 +8844,57 @@ function setupAdmin() {
     return stats;
   }
 
+  function buildFinalPrimaryStats(calculated) {
+    const stats =
+      calculated && calculated.stats
+        ? calculated.stats
+        : buildNewStatBag();
+
+    const attack =
+      buildStatNumber(
+        (Number(stats.attackFlat) || 0) *
+        (1 + (Number(stats.attackPct) || 0) / 100)
+      );
+
+    const defense =
+      buildStatNumber(
+        (Number(stats.defenseFlat) || 0) *
+        (1 + (Number(stats.defensePct) || 0) / 100)
+      );
+
+    const hp =
+      buildStatNumber(
+        (Number(stats.maxHpFlat) || 0) *
+        (1 + (Number(stats.maxHpPct) || 0) / 100)
+      );
+
+    return {
+      attack,
+      defense,
+      hp
+    };
+  }
+
   function buildStatsHtml(source) {
     const calculated = buildCalculateStats(source);
     const extras = calculated.extras;
+    const finalPrimary =
+      buildFinalPrimaryStats(calculated);
 
     // Rozdzielamy wartości bazowe gry, wkład buildu i bonusy z itemów.
     // Razem nadal pokazuje faktyczną wartość po zastosowaniu limitu gry.
-    const buildOnlySource = Object.assign({},source || {},{bonuses:[]});
+    const buildOnlySource = Object.assign(
+      {},
+      source || {},
+      {
+        bonuses:[],
+        profile:Object.assign(
+          {},
+          buildProfileStats(source || {}),
+          {petHp:0}
+        )
+      }
+    );
     const buildOnly = buildCalculateStats(buildOnlySource);
 
     const baseStats = buildBaseStatBag(source);
@@ -8833,9 +8915,14 @@ function setupAdmin() {
       {skipProfileFlat:true}
     );
 
+    const profileForItems = buildProfileStats(source || {});
+    itemStats.maxHpFlat += profileForItems.petHp;
+
     const groups = [
       {
         title:"⚔️ Atak",
+        finalKind:"attack",
+        finalLabel:"Atak po przeliczeniu",
         keys:[
           "attackFlat","attackPct","accuracy","initiative","firstStrike",
           "critChance","critDmg","execute","lifesteal","armorPen","stun","bleed","bleedDamage"
@@ -8847,6 +8934,8 @@ function setupAdmin() {
       },
       {
         title:"🛡️ Obrona",
+        finalKind:"defense",
+        finalLabel:"Obrona po przeliczeniu",
         keys:[
           "defenseFlat","defensePct","damageReduction",
           "critResist","stunResist","bleedResist"
@@ -8854,6 +8943,8 @@ function setupAdmin() {
       },
       {
         title:"❤️ Życie",
+        finalKind:"hp",
+        finalLabel:"HP po przeliczeniu",
         keys:["maxHpFlat","maxHpPct","hpRegen"]
       }
     ];
@@ -8898,31 +8989,89 @@ function setupAdmin() {
       `;
     };
 
-    const groupsHtml = groups.map(group => `
-      <section class="build-stat-group">
-        <div class="build-stat-group-title">${group.title}</div>
+    const finalPrimaryValue = value => {
+      const n = buildStatNumber(value);
 
-        <div class="build-stat-source-head" aria-hidden="true">
-          <span>Statystyka</span>
-          <span>Baza</span>
-          <span>Build</span>
-          <span>Itemy</span>
-          <span>Razem</span>
-        </div>
+      return n.toLocaleString(
+        "pl-PL",
+        {
+          minimumFractionDigits:Number.isInteger(n) ? 0 : 1,
+          maximumFractionDigits:2
+        }
+      );
+    };
 
-        <div class="build-stat-grid">
-          ${group.keys.map(key => `
-            <div class="build-stat-row">
-              <span class="build-stat-name">${escapeHtml(BUILD_STAT_META[key][0])}</span>
-              <span class="build-stat-base">${escapeHtml(sourceValue(key,baseStats[key] || 0,true))}</span>
-              <span class="build-stat-build">${escapeHtml(sourceValue(key,buildContribution[key] || 0))}</span>
-              <span class="build-stat-items">${escapeHtml(sourceValue(key,itemStats[key] || 0,true))}</span>
-              <span class="build-stat-total">${totalValueHtml(key)}</span>
-            </div>
-          `).join("")}
-        </div>
-      </section>
-    `).join("");
+    const groupsHtml = groups.map(group => {
+      const finalRow =
+        group.finalKind
+          ? (() => {
+              const value =
+                finalPrimary[group.finalKind];
+
+              let formula = "";
+
+              if (group.finalKind === "attack") {
+                formula =
+                  `${finalPrimaryValue(calculated.stats.attackFlat)} × ` +
+                  `(1 + ${finalPrimaryValue(calculated.stats.attackPct)}%)`;
+              }
+
+              if (group.finalKind === "defense") {
+                formula =
+                  `${finalPrimaryValue(calculated.stats.defenseFlat)} × ` +
+                  `(1 + ${finalPrimaryValue(calculated.stats.defensePct)}%)`;
+              }
+
+              if (group.finalKind === "hp") {
+                formula =
+                  `${finalPrimaryValue(calculated.stats.maxHpFlat)} × ` +
+                  `(1 + ${finalPrimaryValue(calculated.stats.maxHpPct)}%)`;
+              }
+
+              return `
+                <div class="build-stat-row build-stat-result-row">
+                  <span class="build-stat-name">
+                    ${escapeHtml(group.finalLabel)}
+                    <small>${escapeHtml(formula)}</small>
+                  </span>
+                  <span class="build-stat-base">—</span>
+                  <span class="build-stat-build">—</span>
+                  <span class="build-stat-items">—</span>
+                  <span class="build-stat-total">
+                    <strong>${escapeHtml(finalPrimaryValue(value))}</strong>
+                  </span>
+                </div>
+              `;
+            })()
+          : "";
+
+      return `
+        <section class="build-stat-group">
+          <div class="build-stat-group-title">${group.title}</div>
+
+          <div class="build-stat-source-head" aria-hidden="true">
+            <span>Statystyka</span>
+            <span>Baza</span>
+            <span>Build</span>
+            <span>Itemy</span>
+            <span>Razem</span>
+          </div>
+
+          <div class="build-stat-grid">
+            ${group.keys.map(key => `
+              <div class="build-stat-row">
+                <span class="build-stat-name">${escapeHtml(BUILD_STAT_META[key][0])}</span>
+                <span class="build-stat-base">${escapeHtml(sourceValue(key,baseStats[key] || 0,true))}</span>
+                <span class="build-stat-build">${escapeHtml(sourceValue(key,buildContribution[key] || 0))}</span>
+                <span class="build-stat-items">${escapeHtml(sourceValue(key,itemStats[key] || 0,true))}</span>
+                <span class="build-stat-total">${totalValueHtml(key)}</span>
+              </div>
+            `).join("")}
+            ${finalRow}
+          </div>
+        </section>
+      `;
+    }).join("");
 
     const conditionalHtml = extras.conditional.length
       ? `
@@ -8979,7 +9128,8 @@ function setupAdmin() {
       profile:{
         attack:1,
         defense:1,
-        baseHp:100
+        baseHp:100,
+        petHp:0
       },
       bonuses:[],
       bonusText:""
@@ -9220,10 +9370,17 @@ function setupAdmin() {
         : fallback;
     };
 
+    const petHpValue =
+      Number(el("build-profile-pet-hp")?.value);
+
     buildState.profile = {
       attack:readPositive("build-profile-attack",1),
       defense:readPositive("build-profile-defense",1),
-      baseHp:readPositive("build-profile-hp",100)
+      baseHp:readPositive("build-profile-hp",100),
+      petHp:
+        Number.isFinite(petHpValue) && petHpValue >= 0
+          ? buildStatNumber(petHpValue)
+          : 0
     };
 
     return buildState.profile;
@@ -9242,6 +9399,10 @@ function setupAdmin() {
 
     if (el("build-profile-hp")) {
       el("build-profile-hp").value = clean.baseHp;
+    }
+
+    if (el("build-profile-pet-hp")) {
+      el("build-profile-pet-hp").value = clean.petHp;
     }
   }
 
@@ -9803,7 +9964,8 @@ function setupAdmin() {
         : {
             attack:1,
             defense:1,
-            baseHp:100
+            baseHp:100,
+            petHp:0
           };
 
     fresh.bonuses =
@@ -9837,7 +9999,7 @@ function setupAdmin() {
       : (
           includeBonuses
             ? "📦 Skopiowano build razem z itemami. Zapis utworzy nowy build."
-            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój Atak, Obronę, Bazowe HP i wklej własne bonusy."
+            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój Atak, Obronę, Bazowe HP, HP z pancerza peta i wklej własne bonusy."
         );
     renderBuildEditor();
     el("build-skill-editor").hidden = true;
@@ -9907,7 +10069,8 @@ function setupAdmin() {
     [
       "build-profile-attack",
       "build-profile-defense",
-      "build-profile-hp"
+      "build-profile-hp",
+      "build-profile-pet-hp"
     ].forEach(id => {
       el(id)?.addEventListener("input",()=>{
         buildReadProfileInputs();

@@ -2166,3 +2166,147 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     grid-template-columns:1fr;
   }
 }
+
+/* ============================================================
+   v20.61 — HP Z PANCERZA PETA
+   ============================================================ */
+
+.build-profile-stats-grid {
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+
+@media(max-width:760px) {
+  .build-profile-stats-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:520px) {
+  .build-profile-stats-grid {
+    grid-template-columns:1fr;
+  }
+}
+
+/* ============================================================
+   v20.62 — ATK / DEF / HP PO WZMOCNIENIU %
+   ============================================================ */
+
+.build-final-primary {
+  margin-bottom:9px;
+  padding:9px;
+  border:1px solid #cfb486;
+  border-radius:10px;
+  background:rgba(255,255,255,.48);
+}
+
+.build-final-primary-head {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:8px;
+}
+
+.build-final-primary-head > strong {
+  font-size:11.5px;
+}
+
+.build-final-primary-head > span {
+  color:#7a654e;
+  font-size:8.5px;
+  font-weight:700;
+}
+
+.build-final-primary-grid {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+}
+
+.build-final-primary-grid > div {
+  display:grid;
+  gap:2px;
+  padding:8px;
+  border:1px solid #ddc8a7;
+  border-radius:8px;
+  background:rgba(255,255,255,.58);
+  text-align:center;
+}
+
+.build-final-primary-grid span {
+  font-size:9.5px;
+  font-weight:800;
+  color:#705a43;
+}
+
+.build-final-primary-grid strong {
+  font-size:17px;
+  line-height:1.1;
+}
+
+.build-final-primary-grid small {
+  color:#8a745b;
+  font-size:8px;
+}
+
+@media(max-width:520px) {
+  .build-final-primary-grid {
+    grid-template-columns:1fr;
+  }
+
+  .build-final-primary-grid > div {
+    grid-template-columns:1fr auto;
+    align-items:center;
+    text-align:left;
+  }
+
+  .build-final-primary-grid strong {
+    grid-row:1 / 3;
+    grid-column:2;
+    font-size:16px;
+  }
+}
+
+/* ============================================================
+   v20.63 — WYNIK KOŃCOWY W TABELI + REGEN % MAKS. HP
+   ============================================================ */
+
+.build-stat-result-row {
+  border-top:2px solid rgba(138,103,62,.34);
+  background:rgba(226,211,181,.32);
+}
+
+.build-stat-result-row .build-stat-name {
+  font-weight:900;
+}
+
+.build-stat-result-row .build-stat-name small {
+  display:block;
+  margin-top:2px;
+  font-size:7.5px;
+  font-weight:700;
+  color:#8a745b;
+  line-height:1.2;
+}
+
+.build-stat-result-row .build-stat-base,
+.build-stat-result-row .build-stat-build,
+.build-stat-result-row .build-stat-items {
+  opacity:.45;
+}
+
+.build-stat-result-row .build-stat-total strong {
+  font-size:12px;
+  font-weight:950;
+}
+
+@media(max-width:520px) {
+  .build-stat-result-row .build-stat-name small {
+    font-size:7px;
+  }
+
+  .build-stat-result-row .build-stat-total strong {
+    font-size:11px;
+  }
+}
