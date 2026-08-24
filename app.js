@@ -9190,6 +9190,10 @@ function setupAdmin() {
       normalizedPlayerNick(item.ownerNick) === normalizedPlayerNick(cachedAccountNick())
     );
 
+    const hasImportedBonuses =
+      Array.isArray(item.bonuses) &&
+      item.bonuses.length > 0;
+
     host.hidden = false;
     host.innerHTML = `
       <div class="build-skill-head">
@@ -9216,6 +9220,11 @@ function setupAdmin() {
 
       <div class="build-viewer-actions">
         <button id="build-copy-to-editor" type="button" class="primary-btn">📋 Użyj jako podstawy</button>
+        ${
+          hasImportedBonuses
+            ? `<button id="build-copy-with-items" type="button" class="secondary-btn">📦 Kopiuj razem z itemami</button>`
+            : ""
+        }
         ${mine ? `<button id="build-edit-own" type="button" class="secondary-btn">✏️ Edytuj mój build</button>` : ""}
         ${mine ? `<button id="build-delete-own" type="button" class="danger-soft">🗑 Usuń</button>` : ""}
       </div>
@@ -9225,13 +9234,31 @@ function setupAdmin() {
     el("build-viewer-close")?.addEventListener("click",()=>{ host.hidden=true; });
 
     el("build-copy-to-editor")?.addEventListener("click",()=>{
-      loadBuildIntoEditor(item,false);
+      loadBuildIntoEditor(
+        item,
+        false,
+        false
+      );
+      host.hidden = true;
+      el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
+    });
+
+    el("build-copy-with-items")?.addEventListener("click",()=>{
+      loadBuildIntoEditor(
+        item,
+        false,
+        true
+      );
       host.hidden = true;
       el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
     });
 
     el("build-edit-own")?.addEventListener("click",()=>{
-      loadBuildIntoEditor(item,true);
+      loadBuildIntoEditor(
+        item,
+        true,
+        true
+      );
       host.hidden = true;
       el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
     });
@@ -9258,16 +9285,22 @@ function setupAdmin() {
     });
   }
 
-  function loadBuildIntoEditor(item,keepId=false) {
+  function loadBuildIntoEditor(
+    item,
+    keepId=false,
+    includeBonuses=true
+  ) {
     const fresh = buildEmptyState();
     buildEditingExisting = Boolean(keepId);
     fresh.id = keepId ? String(item.id || "") : "";
     fresh.level = Math.max(1,Number(item.level)||1);
     fresh.name = keepId ? String(item.name||"") : `${String(item.name||"Build")} — kopia`;
     fresh.description = String(item.description||"");
-    fresh.bonuses = Array.isArray(item.bonuses)
-      ? item.bonuses.map(entry=>Object.assign({},entry))
-      : [];
+    fresh.bonuses =
+      includeBonuses &&
+      Array.isArray(item.bonuses)
+        ? item.bonuses.map(entry=>Object.assign({},entry))
+        : [];
     fresh.bonusText = "";
 
     BUILD_ATTR_ORDER.forEach(attrKey=>{
@@ -9290,7 +9323,11 @@ function setupAdmin() {
     buildRenderBonusPreview();
     el("build-save-status").textContent = keepId
       ? "✏️ Tryb edycji: kolejne zapisanie zaktualizuje ten konkretny build."
-      : "📋 Skopiowano build do kreatora. Zapis utworzy nowy build.";
+      : (
+          includeBonuses
+            ? "📦 Skopiowano build razem z itemami. Zapis utworzy nowy build."
+            : "📋 Skopiowano atrybuty i perki bez itemów autora. Wklej własne bonusy i zapisz jako nowy build."
+        );
     renderBuildEditor();
     el("build-skill-editor").hidden = true;
   }
