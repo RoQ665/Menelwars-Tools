@@ -7966,44 +7966,63 @@ function setupAdmin() {
     const entries = [];
     const unknown = [];
 
-    String(text || "")
+    const lines = String(text || "")
       .replace(/\r/g,"")
       .split("\n")
       .map(line => line.replace(/\*\*/g,"").replace(/\*/g,"").replace(/\u00a0/g," ").trim())
       .filter(Boolean)
-      .forEach(line => {
-        if (/powyższe atrybuty/i.test(line)) return;
+      .filter(line => !/powyższe atrybuty/i.test(line));
 
-        const match = line.match(/^(Set|Akcesoria|Gang\s*[—-]\s*[^+]+)\s+(.+?)\s*\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*$/i);
-        if (!match) {
-          unknown.push(line);
-          return;
-        }
+    const addEntry = (labelLine,valueLine) => {
+      const match = String(labelLine || "").match(/^(Set|Akcesoria|Gang\s*[—–-]\s*.+?)\s+(.+?)\s*$/i);
+      const valueMatch = String(valueLine || "").match(/^\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*$/);
 
-        const sourceName = match[1].replace(/\s+/g," ").trim();
-        const statName = match[2].replace(/\s+/g," ").trim();
-        const value = Number(match[3].replace(",","."));
-        const isPercent = Boolean(match[4]);
-        const def = BUILD_BONUS_LABELS[buildNormalizeBonusName(statName)];
+      if (!match || !valueMatch) return false;
 
-        if (!def || !Number.isFinite(value)) {
-          unknown.push(line);
-          return;
-        }
+      const sourceName = match[1].replace(/\s+/g," ").trim();
+      const statName = match[2].replace(/\s+/g," ").trim();
+      const value = Number(valueMatch[1].replace(",","."));
+      const isPercent = Boolean(valueMatch[2]);
+      const def = BUILD_BONUS_LABELS[buildNormalizeBonusName(statName)];
 
-        let key = def.key;
-        if (key === "attackAuto") key = isPercent ? "attackPct" : "attackFlat";
-        if (key === "defenseAuto") key = isPercent ? "defensePct" : "defenseFlat";
-        if (def.key === "maxHpFlat" && isPercent) key = "maxHpPct";
+      if (!def || !Number.isFinite(value)) return false;
 
-        entries.push({
-          source:sourceName,
-          name:statName,
-          key,
-          value:buildStatNumber(value),
-          percent:isPercent
-        });
+      let key = def.key;
+      if (key === "attackAuto") key = isPercent ? "attackPct" : "attackFlat";
+      if (key === "defenseAuto") key = isPercent ? "defensePct" : "defenseFlat";
+      if (def.key === "maxHpFlat" && isPercent) key = "maxHpPct";
+
+      entries.push({
+        source:sourceName,
+        name:statName,
+        key,
+        value:buildStatNumber(value),
+        percent:isPercent
       });
+      return true;
+    };
+
+    for (let i=0; i<lines.length; i++) {
+      const line = lines[i];
+
+      // Format 1: gra kopiuje nazwę bonusu i wartość w dwóch osobnych liniach:
+      // Gang – Piwnica Atak
+      // +14
+      if (i+1 < lines.length && addEntry(line,lines[i+1])) {
+        i++;
+        continue;
+      }
+
+      // Format 2: obsługa również wersji jednowierszowej.
+      const oneLine = line.match(/^(.*\S)\s+(\+\s*[0-9]+(?:[.,][0-9]+)?%?)\s*$/);
+      if (oneLine && addEntry(oneLine[1],oneLine[2])) {
+        continue;
+      }
+
+      // Samotnej wartości nie raportujemy drugi raz jako osobnego błędu.
+      if (/^\+\s*[0-9]+(?:[.,][0-9]+)?%?\s*$/.test(line)) continue;
+      unknown.push(line);
+    }
 
     return {entries,unknown};
   }
