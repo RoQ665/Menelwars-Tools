@@ -976,3 +976,378 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     margin-top:2px;
   }
 }
+
+
+/* ============================================================
+   BUILDY PvP
+   ============================================================ */
+
+.build-panel .panel-body {
+  display: grid;
+  gap: 14px;
+}
+
+.build-intro,
+.build-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.build-intro {
+  padding: 12px;
+  border: 1px solid #d9c6a4;
+  border-radius: 12px;
+  background: rgba(255,255,255,.42);
+}
+
+.build-level-control {
+  min-width: 150px;
+}
+
+.build-level-control span,
+.build-meta-form label > span {
+  display: block;
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+
+.build-level-control input,
+.build-meta-form input,
+.build-meta-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.build-points-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(86px,1fr));
+  gap: 8px;
+  flex: 1;
+}
+
+.build-points-grid > div {
+  border: 1px solid #d9c6a4;
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: center;
+  background: rgba(255,255,255,.5);
+}
+
+.build-points-grid span {
+  display: block;
+  font-size: 11px;
+  color: #806a50;
+}
+
+.build-points-grid strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 18px;
+}
+
+.build-attributes {
+  display: grid;
+  gap: 8px;
+}
+
+.build-attr-card {
+  border: 1px solid #d3bea0;
+  border-radius: 11px;
+  background: rgba(255,255,255,.48);
+  overflow: hidden;
+}
+
+.build-attr-main {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  cursor: pointer;
+}
+
+.build-attr-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.build-attr-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  font-size: 22px;
+  background: rgba(255,255,255,.65);
+  border: 1px solid rgba(110,80,50,.16);
+}
+
+.build-attr-name {
+  font-weight: 800;
+}
+
+.build-attr-sub {
+  font-size: 12px;
+  color: #806a50;
+  margin-top: 2px;
+}
+
+.build-attr-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.build-step-btn {
+  min-width: 36px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #bba27f;
+  background: #f7efdf;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.build-step-btn:disabled {
+  opacity: .35;
+  cursor: default;
+}
+
+.build-attr-value {
+  min-width: 28px;
+  text-align: center;
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.build-attr-card[data-attr="strength"] { border-left: 4px solid #c8594e; }
+.build-attr-card[data-attr="endurance"] { border-left: 4px solid #71878b; }
+.build-attr-card[data-attr="agility"] { border-left: 4px solid #55a871; }
+.build-attr-card[data-attr="vitality"] { border-left: 4px solid #e06658; }
+.build-attr-card[data-attr="precision"] { border-left: 4px solid #d69a39; }
+
+.build-skill-editor {
+  border: 1px solid #d8c6a8;
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255,255,255,.34);
+}
+
+.build-skill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.build-skill-head button {
+  flex: 0 0 auto;
+}
+
+.build-tier-grid {
+  display: grid;
+  gap: 7px;
+}
+
+.build-tier-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 1fr;
+  gap: 7px;
+  align-items: stretch;
+}
+
+.build-tier-number {
+  border: 1px solid #d9c6a4;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 5px;
+  font-size: 11px;
+  background: rgba(255,255,255,.45);
+}
+
+.build-perk {
+  border: 1px solid #c7ae88;
+  border-radius: 9px;
+  padding: 8px;
+  background: rgba(255,255,255,.48);
+  cursor: pointer;
+  text-align: left;
+}
+
+.build-perk strong {
+  display: block;
+  font-size: 12px;
+}
+
+.build-perk small {
+  display: block;
+  margin-top: 4px;
+  color: #806a50;
+  line-height: 1.25;
+}
+
+.build-perk.selected {
+  border-color: #5b9b59;
+  background: rgba(214,238,205,.68);
+  box-shadow: inset 0 0 0 1px rgba(69,130,66,.18);
+}
+
+.build-perk.locked {
+  opacity: .35;
+  cursor: default;
+}
+
+.build-tier-row.locked .build-tier-number {
+  opacity: .42;
+}
+
+.build-meta-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.build-save-actions {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 8px;
+}
+
+.build-save-actions > button:only-child {
+  grid-column: 1 / -1;
+}
+
+.build-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.build-card {
+  border: 1px solid #d8c5a5;
+  border-radius: 11px;
+  padding: 10px;
+  background: rgba(255,255,255,.5);
+  cursor: pointer;
+}
+
+.build-card:hover {
+  background: rgba(255,255,255,.72);
+}
+
+.build-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.build-card-name {
+  font-weight: 900;
+}
+
+.build-card-meta,
+.build-card-desc {
+  margin-top: 4px;
+  color: #806a50;
+  font-size: 12px;
+}
+
+.build-card-attrs {
+  display: grid;
+  grid-template-columns: repeat(5,minmax(0,1fr));
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.build-card-attrs span {
+  border-radius: 7px;
+  background: rgba(224,211,186,.55);
+  padding: 5px 4px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.build-viewer {
+  border: 1px solid #cdb38d;
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,.54);
+}
+
+.build-viewer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.build-viewer-attrs {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.build-viewer-attr {
+  border: 1px solid #d8c5a5;
+  border-radius: 9px;
+  padding: 8px;
+}
+
+.build-viewer-perks {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #6f5c46;
+}
+
+@media (max-width: 620px) {
+  .build-points-grid {
+    width: 100%;
+  }
+
+  .build-tier-row {
+    grid-template-columns: 42px 1fr 1fr;
+    gap: 5px;
+  }
+
+  .build-perk {
+    padding: 7px 6px;
+  }
+
+  .build-save-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .build-card-attrs {
+    grid-template-columns: repeat(5,1fr);
+  }
+}
+
+
+.build-panel .secondary-btn,
+.build-panel .danger-soft {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.build-panel .secondary-btn {
+  border: 1px solid #b99f78;
+  background: #f3ead9;
+  color: #604b34;
+}
+
+.build-panel .danger-soft {
+  border: 1px solid #b86f69;
+  background: #f5e3df;
+  color: #8a3833;
+}

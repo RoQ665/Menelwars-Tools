@@ -7641,6 +7641,691 @@ function setupAdmin() {
 
   // v20.8 — osobne logowanie Admina nie jest już używane.
 }
+
+  // ============================================================
+  // BUILDY PvP
+  // ============================================================
+
+  const BUILD_ATTR_ORDER = [
+    "strength",
+    "endurance",
+    "agility",
+    "vitality",
+    "precision"
+  ];
+
+  const BUILD_ATTRS = {
+    strength: {
+      name:"Siła",
+      icon:"✊",
+      description:"Atak, przebicie pancerza, obrażenia krytyczne, krwawienie",
+      perks:[
+        [["Brutalny Buc","+3% przebicia pancerza"],["Ciężka Łapa","+8% ataku"]],
+        [["Kat Żulików","+2% progu egzekucji"],["Wściekły Pijak","+5% ataku gdy HP<30%"]],
+        [["Łamacz Kości","+10% obrażeń krytycznych"],["Niszczyciel","+5% przebicia pancerza"]],
+        [["Krwiopijca","+2% kradzieży życia"],["Nabrany Rozpęd","+2% ataku za turę"]],
+        [["Szał Bitewny","+12% ataku"],["Roztrzaskiwacz","+7% przebicia pancerza"]],
+        [["Herszt Bójki","+12% obrażeń krytycznych"],["Uścisk Tytana","+3% progu egzekucji"]],
+        [["Dzika Furia","+8% ataku gdy HP<50%"],["Nieustępliwy Drań","+3% szansy na podwójne uderzenie"]],
+        [["Bóg Mordobicia","+15% ataku"],["Totalna Zagłada","+15% obrażeń krytycznych"]],
+        [["Kataklizm","+10% przebicia pancerza"],["Wcielona Furia","+10% ataku gdy HP<40%"]],
+        [["Armagedon","+18% ataku, +20% obrażeń krytycznych"],["Ostateczna Zagłada","+4% progu egzekucji, +10% przebicia pancerza"]]
+      ]
+    },
+    endurance: {
+      name:"Wytrzymałość",
+      icon:"🛡️",
+      description:"Obrona, redukcja obrażeń, odporności",
+      perks:[
+        [["Skóra jak Beton","+8% obrony"],["Gruba Skóra","-5% otrzymywanych obrażeń"]],
+        [["Trudny do Zbicia","+6% odporności na trafienia krytyczne"],["Łeb jak Mur","+8% odporności na ogłuszenie"]],
+        [["Ostatni Bastion","-8% otrzymywanych obrażeń gdy HP<30%"],["Nie do Złamania","-6% otrzymywanych obrażeń"]],
+        [["Żywa Barykada","+10% obrony"],["Jak Skała","+2% regeneracji HP"]],
+        [["Tarcza Menela","+8% odporności na trafienia krytyczne"],["Nieporuszony","-8% otrzymywanych obrażeń"]],
+        [["Strażnik Ulicy","+12% obrony"],["Kuloodporny","+10% odporności na ogłuszenie i krwawienie"]],
+        [["Forteca","-10% otrzymywanych obrażeń gdy HP<40%"],["Mur nie do Przebicia","+12% obrony"]],
+        [["Pancerna Skóra","-10% otrzymywanych obrażeń"],["Niezłomny Kozak","+10% odporności na trafienia krytyczne"]],
+        [["Nieśmiertelna Skorupa","+14% obrony, +3% regeneracji HP"],["Wieczna Straż","-12% otrzymywanych obrażeń gdy HP<50%"]],
+        [["Niezwyciężony","+10% obrony, -5% otrzymywanych obrażeń"],["Boska Tarcza","+12% wszystkich odporności"]]
+      ]
+    },
+    agility: {
+      name:"Zręczność",
+      icon:"👟",
+      description:"Uniki, podwójne uderzenia, kontrataki, redukcja leczenia",
+      perks:[
+        [["Zwinny","+2% szansy na podwójne uderzenie"],["Nieuchwytny Cień","+4% szansy na unik"]],
+        [["Oportunista","+3% kontrataku, +2% szansy na krytyka"],["Gotowy na Odwet","+5% szansy na kontratak"]],
+        [["Grad Ciosów","+3% szansy na podwójne uderzenie"],["Cichociemny","+4% uniku, +4% redukcji leczenia wroga"]],
+        [["Refleks Kota","+4% kontrataku, +4% uniku"],["Duch Ulicy","+5% szansy na unik"]],
+        [["Taniec Ostrzy","+3% podwójnego uderzenia, +2% kontrataku"],["Znak Zabójcy","+6% redukcji leczenia wroga"]],
+        [["Niewidzialny","+6% szansy na unik"],["Taniec Śmierci","+3% podwójnego uderzenia, +2% szansy na krytyka"]],
+        [["Miraż","+4% uniku, +5% kontrataku"],["Mistrz Riposty","+5% kontrataku, +3% podwójnego uderzenia"]],
+        [["Nie do Złapania","+6% szansy na unik"],["Mistrzowskie Cięcie","+4% podwójnego uderzenia, +3% szansy na krytyka"]],
+        [["Transcendencja","+6% uniku, +5% kontrataku"],["Zakrzywienie Czasu","+5% podwójnego uderzenia, +3% kontrataku"]],
+        [["Boska Szybkość","+7% uniku, +6% kontrataku"],["Wszechuderzenie","+6% podwójnego uderzenia, +4% kontrataku, +5% szansy na krytyka"]]
+      ]
+    },
+    vitality: {
+      name:"Żywotność",
+      icon:"📜",
+      description:"HP, regeneracja, wytrzymałość",
+      perks:[
+        [["Żyłka Życia","+3% maksymalnego HP"],["Regenerator","+1 regeneracji HP za turę"]],
+        [["Gęsta Krew","+12% odporności na krwawienie"],["Drugi Oddech","+2 regeneracji HP gdy HP<35%"]],
+        [["Wiecznie Żywy","+3% maksymalnego HP"],["Wyssany Sok","+1% kradzieży życia"]],
+        [["Siła Życia","+4% maksymalnego HP"],["Szybka Regeneracja","+2 regeneracji HP za turę"]],
+        [["Twarde Ciało","+4% maksymalnego HP, +5% odporności na krwawienie"],["Syfon","+2% kradzieży życia"]],
+        [["Krew Tytana","+6% maksymalnego HP"],["Pijawka","+2% kradzieży życia"]],
+        [["Feniks","+5 regeneracji HP gdy HP<40%"],["Pakt Krwi","+3% kradzieży życia, +3% maksymalnego HP"]],
+        [["Nieśmiertelny Wigor","+14% maksymalnego HP"],["Wysysacz Dusz","+6% kradzieży życia"]],
+        [["Wieczny Płomień","+18% maksymalnego HP, +4 regeneracji HP"],["Drenaż Esencji","+6% kradzieży życia, +10% maksymalnego HP"]],
+        [["Nieumarły","+22% maksymalnego HP, +6 regeneracji HP gdy HP<50%"],["Bóg Życia","+7% kradzieży życia, +14% maksymalnego HP, +8% odporności na krwawienie"]]
+      ]
+    },
+    precision: {
+      name:"Precyzja",
+      icon:"👓",
+      description:"Celność, szansa na kryt, obrażenia krytyczne, egzekucja, ogłuszenie",
+      perks:[
+        [["Bystre Oko","+2% szansy na trafienie krytyczne"],["Pewna Ręka","+2% celności, +3% obrażeń krytycznych"]],
+        [["Wampiryzm","+1% kradzieży życia"],["Naznaczony Śmiercią","+1% progu egzekucji"]],
+        [["Śmiertelny Cios","+3% szansy na trafienie krytyczne"],["Krwotok","+5% obrażeń krytycznych"]],
+        [["Snajper","+3% szansy na krytyka, +2% celności"],["Rozpruwacz","+7% obrażeń krytycznych"]],
+        [["Drapieżnik","+1% progu egzekucji, +2% szansy na krytyka"],["Słaby Punkt","+2% kradzieży życia, +6% obrażeń krytycznych"]],
+        [["Znak Łowcy","+1% progu egzekucji"],["Skrytobójstwo","+6% szansy na trafienie krytyczne"]],
+        [["Perfekcyjny Cel","+7% szansy na krytyka, +3% celności"],["Mistrz Krwawienia","+12% obrażeń krytycznych; krytyki mogą nałożyć krwawienie"]],
+        [["Oko Kata","+2% progu egzekucji, +6% szansy na krytyka"],["Szkarłatne Ostrze","+4% kradzieży życia, +15% obrażeń krytycznych"]],
+        [["Oko Śmierci","+10% szansy na krytyka, +3% progu egzekucji"],["Wykrwawienie","+4% kradzieży życia, +18% obrażeń krytycznych"]],
+        [["Jeden Strzał","+12% szansy na krytyka, +3% progu egzekucji, +25% obrażeń krytycznych"],["Bóg Krwi","+5% kradzieży życia, +25% obrażeń krytycznych, +7% szansy na krytyka"]]
+      ]
+    }
+  };
+
+  function buildEmptyState() {
+    return {
+      id:"",
+      level:1,
+      attributes:{
+        strength:0,
+        endurance:0,
+        agility:0,
+        vitality:0,
+        precision:0
+      },
+      perks:{
+        strength:{},
+        endurance:{},
+        agility:{},
+        vitality:{},
+        precision:{}
+      },
+      name:"",
+      description:""
+    };
+  }
+
+  let buildState = buildEmptyState();
+  let buildActiveAttr = "";
+  let buildPublicItems = [];
+  let buildMyItems = [];
+  let buildListsLoaded = false;
+
+  function buildPointsUsed() {
+    return BUILD_ATTR_ORDER.reduce(
+      (sum,keyName) => sum + (Number(buildState.attributes[keyName]) || 0),
+      0
+    );
+  }
+
+  function buildRequiredLevel() {
+    return Math.max(1,Math.ceil(buildPointsUsed()/2));
+  }
+
+  function buildAvailableTierCount(attrKey) {
+    return Math.min(
+      10,
+      Math.floor((Number(buildState.attributes[attrKey]) || 0) / 5)
+    );
+  }
+
+  function buildSelectedSkillCount(attrKey) {
+    const perks = buildState.perks[attrKey] || {};
+    return Object.keys(perks).filter(
+      tier => perks[tier] === "A" || perks[tier] === "B"
+    ).length;
+  }
+
+  function buildCleanLockedPerks(attrKey) {
+    const available = buildAvailableTierCount(attrKey);
+    const perks = buildState.perks[attrKey] || {};
+    Object.keys(perks).forEach(tier => {
+      if (Number(tier) > available) delete perks[tier];
+    });
+  }
+
+  function buildSetAttribute(attrKey,nextValue) {
+    const current = Number(buildState.attributes[attrKey]) || 0;
+    let next = Math.max(0,Math.min(50,Number(nextValue) || 0));
+
+    buildState.attributes[attrKey] = next;
+    buildCleanLockedPerks(attrKey);
+    renderBuildEditor();
+  }
+
+  function renderBuildEditor() {
+    const host = el("build-attributes");
+    if (!host) return;
+
+    const used = buildPointsUsed();
+    buildState.level = buildRequiredLevel();
+
+    el("build-points-used").textContent = used;
+    el("build-required-level").textContent = buildState.level;
+
+
+    host.innerHTML = BUILD_ATTR_ORDER.map(attrKey => {
+      const attr = BUILD_ATTRS[attrKey];
+      const value = Number(buildState.attributes[attrKey]) || 0;
+      const available = Math.min(10,Math.floor(value/5));
+      const selected = buildSelectedSkillCount(attrKey);
+
+      return `
+        <article class="build-attr-card" data-attr="${attrKey}">
+          <div class="build-attr-main" data-build-open-attr="${attrKey}">
+            <div class="build-attr-title">
+              <div class="build-attr-icon">${attr.icon}</div>
+              <div>
+                <div class="build-attr-name">${escapeHtml(attr.name)}</div>
+                <div class="build-attr-sub">
+                  ${escapeHtml(attr.description)} · Skille ${selected}/${available}
+                </div>
+              </div>
+            </div>
+            <div class="build-attr-controls">
+              <button class="build-step-btn" type="button" data-build-minus="${attrKey}" ${value<=0?"disabled":""}>−</button>
+              <span class="build-attr-value">${value}</span>
+              <button class="build-step-btn" type="button" data-build-plus="${attrKey}" ${value>=50?"disabled":""}>＋</button>
+            </div>
+          </div>
+        </article>
+      `;
+    }).join("");
+
+    host.querySelectorAll("[data-build-minus]").forEach(button=>{
+      button.addEventListener("click",event=>{
+        event.stopPropagation();
+        const attrKey = button.dataset.buildMinus;
+        buildSetAttribute(attrKey,(Number(buildState.attributes[attrKey])||0)-1);
+      });
+    });
+
+    host.querySelectorAll("[data-build-plus]").forEach(button=>{
+      button.addEventListener("click",event=>{
+        event.stopPropagation();
+        const attrKey = button.dataset.buildPlus;
+        buildSetAttribute(attrKey,(Number(buildState.attributes[attrKey])||0)+1);
+      });
+    });
+
+    host.querySelectorAll("[data-build-open-attr]").forEach(card=>{
+      card.addEventListener("click",()=>{
+        buildActiveAttr = card.dataset.buildOpenAttr;
+        renderBuildSkillEditor();
+      });
+    });
+
+    if (buildActiveAttr) renderBuildSkillEditor();
+    renderBuildAccountState();
+  }
+
+  function renderBuildSkillEditor() {
+    const host = el("build-skill-editor");
+    if (!host || !buildActiveAttr || !BUILD_ATTRS[buildActiveAttr]) {
+      if (host) host.hidden = true;
+      return;
+    }
+
+    const attrKey = buildActiveAttr;
+    const attr = BUILD_ATTRS[attrKey];
+    const value = Number(buildState.attributes[attrKey]) || 0;
+    const available = buildAvailableTierCount(attrKey);
+    const selected = buildSelectedSkillCount(attrKey);
+
+    host.hidden = false;
+    host.innerHTML = `
+      <div class="build-skill-head">
+        <div>
+          <strong>${attr.icon} ${escapeHtml(attr.name)}</strong>
+          <div class="muted">Poziom ${value} · Skille ${selected}/${available}</div>
+        </div>
+        <button id="build-close-skills" type="button" class="secondary-btn">← Wróć do atrybutów</button>
+      </div>
+
+      <div class="build-tier-grid">
+        ${attr.perks.map((pair,index)=>{
+          const tier = index + 1;
+          const required = tier * 5;
+          const unlocked = value >= required;
+          const current = (buildState.perks[attrKey] || {})[tier] || "";
+          const optionA = pair[0];
+          const optionB = pair[1];
+
+          const perkButton = (letter,perk)=>`
+            <button
+              type="button"
+              class="build-perk ${current===letter?"selected":""} ${unlocked?"":"locked"}"
+              data-build-perk-tier="${tier}"
+              data-build-perk-choice="${letter}"
+              ${unlocked?"":"disabled"}
+            >
+              <strong>${letter} · ${escapeHtml(perk[0])}</strong>
+              <small>${escapeHtml(perk[1])}</small>
+            </button>
+          `;
+
+          return `
+            <div class="build-tier-row ${unlocked?"":"locked"}">
+              <div class="build-tier-number"><b>${tier}</b><span>Lvl ${required}</span></div>
+              ${perkButton("A",optionA)}
+              ${perkButton("B",optionB)}
+            </div>
+          `;
+        }).join("")}
+      </div>
+    `;
+
+    el("build-close-skills")?.addEventListener("click",()=>{
+      buildActiveAttr = "";
+      host.hidden = true;
+    });
+
+    host.querySelectorAll("[data-build-perk-tier]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        const tier = Number(button.dataset.buildPerkTier);
+        const choice = button.dataset.buildPerkChoice;
+        if ((Number(buildState.attributes[attrKey])||0) < tier*5) return;
+
+        const perks = buildState.perks[attrKey];
+        perks[tier] = perks[tier] === choice ? "" : choice;
+        if (!perks[tier]) delete perks[tier];
+
+        renderBuildEditor();
+      });
+    });
+  }
+
+  function renderBuildAccountState() {
+    const privateButton = el("build-save-private");
+    const guestRow = el("build-guest-author-row");
+    const hint = el("build-account-hint");
+    if (!privateButton || !guestRow || !hint) return;
+
+    const accountNick = cachedAccountNick();
+
+    privateButton.hidden = !accountNick;
+    guestRow.hidden = Boolean(accountNick);
+
+    if (accountNick) {
+      hint.className = "submit-info known-recipe";
+      hint.innerHTML =
+        `👤 Zalogowano jako <b>${escapeHtml(accountNick)}</b>. Możesz zapisać build prywatnie albo go udostępnić.`;
+    } else {
+      hint.className = "submit-info unknown-recipe";
+      hint.innerHTML =
+        `🌍 Kreator działa bez konta. Bez logowania możesz udostępnić build publicznie. Prywatny zapis jest dostępny po zalogowaniu.`;
+    }
+  }
+
+  function buildPayload(isPublic) {
+    const accountNick = cachedAccountNick();
+    const guestAuthor = el("build-guest-author")?.value.trim() || "";
+    const name = el("build-name")?.value.trim() || "";
+    const description = el("build-description")?.value.trim() || "";
+
+    buildState.name = name;
+    buildState.description = description;
+
+    return {
+      action:"buildSave",
+      nonce:makeRecipeNonce(),
+      sessionToken:playerAccountSessionToken(),
+      id:buildState.id || "",
+      public:Boolean(isPublic),
+      authorNick:accountNick || guestAuthor,
+      name,
+      description,
+      level:buildRequiredLevel(),
+      attributes:buildState.attributes,
+      perks:buildState.perks
+    };
+  }
+
+  async function buildPostAction(payload) {
+    if (!backendConfigured()) throw new Error("Backend nie jest skonfigurowany.");
+
+    await fetch(BACKEND_URL,{
+      method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"text/plain;charset=UTF-8"},
+      body:JSON.stringify(payload)
+    });
+
+    let result = null;
+    for (let attempt=0; attempt<20; attempt++) {
+      if (attempt) await new Promise(resolve=>setTimeout(resolve,350));
+      result = await jsonp("buildActionResult",{nonce:payload.nonce});
+      if (result && !result.pending) break;
+    }
+
+    if (!result || result.pending) throw new Error("Serwer nie zwrócił wyniku operacji.");
+    if (!result.ok) throw new Error(result.error || "Nie udało się zapisać buildu.");
+    return result;
+  }
+
+  function buildValidateBeforeSave(isPublic) {
+    const status = el("build-save-status");
+    const name = el("build-name")?.value.trim() || "";
+    const accountNick = cachedAccountNick();
+    const guestAuthor = el("build-guest-author")?.value.trim() || "";
+
+    if (!name) {
+      status.textContent = "Podaj nazwę buildu.";
+      return false;
+    }
+
+    if (!isPublic && !accountNick) {
+      status.textContent = "Prywatny build wymaga zalogowanego konta.";
+      return false;
+    }
+
+    if (isPublic && !accountNick && !guestAuthor) {
+      status.textContent = "Podaj nick autora przed udostępnieniem buildu.";
+      return false;
+    }
+
+    return true;
+  }
+
+  async function saveBuild(isPublic) {
+    const status = el("build-save-status");
+    const button = isPublic ? el("build-share-public") : el("build-save-private");
+    if (!buildValidateBeforeSave(isPublic)) return;
+
+    const payload = buildPayload(isPublic);
+    button.disabled = true;
+    status.textContent = isPublic ? "Udostępniam build..." : "Zapisuję build prywatnie...";
+
+    try {
+      const result = await buildPostAction(payload);
+      buildState.id = result.build && result.build.id ? result.build.id : buildState.id;
+      status.textContent = isPublic
+        ? "✅ Build został udostępniony publicznie."
+        : "✅ Build został zapisany prywatnie.";
+      await fetchBuildLists(true);
+    } catch (err) {
+      status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się zapisać buildu.");
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function buildNormalizeServerItem(item) {
+    return {
+      id:String(item && item.id || ""),
+      name:String(item && item.name || ""),
+      description:String(item && item.description || ""),
+      authorNick:String(item && item.authorNick || ""),
+      ownerNick:String(item && item.ownerNick || ""),
+      public:Boolean(item && item.public),
+      level:Math.max(1,Number(item && item.level) || 1),
+      attributes:Object.assign(buildEmptyState().attributes,item && item.attributes || {}),
+      perks:Object.assign(buildEmptyState().perks,item && item.perks || {}),
+      updatedAt:String(item && item.updatedAt || "")
+    };
+  }
+
+  async function fetchBuildLists(force=false) {
+    if (buildListsLoaded && !force) {
+      renderBuildLists();
+      return;
+    }
+
+    const publicHost = el("build-public-list");
+    if (publicHost) publicHost.innerHTML = `<div class="empty">Ładowanie buildów...</div>`;
+
+    try {
+      const result = await jsonp("builds",{
+        sessionToken:playerAccountSessionToken()
+      });
+
+      if (!result || !result.ok) {
+        throw new Error(result && result.error ? result.error : "Nie udało się pobrać buildów.");
+      }
+
+      buildPublicItems = Array.isArray(result.publicBuilds)
+        ? result.publicBuilds.map(buildNormalizeServerItem)
+        : [];
+      buildMyItems = Array.isArray(result.myBuilds)
+        ? result.myBuilds.map(buildNormalizeServerItem)
+        : [];
+      buildListsLoaded = true;
+      renderBuildLists();
+      renderBuildAccountState();
+    } catch (err) {
+      if (publicHost) {
+        publicHost.innerHTML =
+          `<div class="empty">❌ ${escapeHtml(err && err.message ? err.message : "Nie udało się pobrać buildów.")}</div>`;
+      }
+    }
+  }
+
+  function buildCardHtml(item,isMine=false) {
+    const attrs = item.attributes || {};
+    const perkCount = BUILD_ATTR_ORDER.reduce((sum,keyName)=>{
+      const perks = item.perks && item.perks[keyName] ? item.perks[keyName] : {};
+      return sum + Object.keys(perks).filter(tier=>perks[tier]==="A" || perks[tier]==="B").length;
+    },0);
+
+    return `
+      <article class="build-card" data-build-open="${escapeHtml(item.id)}" data-build-scope="${isMine?"mine":"public"}">
+        <div class="build-card-head">
+          <div>
+            <div class="build-card-name">${escapeHtml(item.name || "Bez nazwy")}</div>
+            <div class="build-card-meta">
+              👤 ${escapeHtml(item.authorNick || "Anonim")} · lvl ${item.level} · ${perkCount} perków
+              ${item.public ? " · 🌍 Publiczny" : " · 🔒 Prywatny"}
+            </div>
+          </div>
+          <span>›</span>
+        </div>
+        ${item.description ? `<div class="build-card-desc">${escapeHtml(item.description)}</div>` : ""}
+        <div class="build-card-attrs">
+          <span>✊ ${Number(attrs.strength)||0}</span>
+          <span>🛡️ ${Number(attrs.endurance)||0}</span>
+          <span>👟 ${Number(attrs.agility)||0}</span>
+          <span>📜 ${Number(attrs.vitality)||0}</span>
+          <span>👓 ${Number(attrs.precision)||0}</span>
+        </div>
+      </article>
+    `;
+  }
+
+  function renderBuildLists() {
+    const publicHost = el("build-public-list");
+    const myHost = el("build-my-list");
+    const mySection = el("build-my-section");
+
+    if (publicHost) {
+      publicHost.innerHTML = buildPublicItems.length
+        ? `<div class="build-card-list">${buildPublicItems.map(item=>buildCardHtml(item,false)).join("")}</div>`
+        : `<div class="empty">Nie ma jeszcze publicznych buildów. Możesz dodać pierwszy.</div>`;
+    }
+
+    const accountNick = cachedAccountNick();
+    if (mySection) mySection.hidden = !accountNick;
+
+    if (myHost && accountNick) {
+      myHost.innerHTML = buildMyItems.length
+        ? `<div class="build-card-list">${buildMyItems.map(item=>buildCardHtml(item,true)).join("")}</div>`
+        : `<div class="empty">Nie masz jeszcze zapisanych buildów.</div>`;
+    }
+
+    document.querySelectorAll("[data-build-open]").forEach(card=>{
+      card.addEventListener("click",()=>{
+        const id = card.dataset.buildOpen;
+        const source = card.dataset.buildScope === "mine" ? buildMyItems : buildPublicItems;
+        const item = source.find(entry=>entry.id===id);
+        if (item) showBuildViewer(item);
+      });
+    });
+  }
+
+  function showBuildViewer(item) {
+    const host = el("build-viewer");
+    if (!host) return;
+
+    const attrHtml = BUILD_ATTR_ORDER.map(attrKey=>{
+      const attr = BUILD_ATTRS[attrKey];
+      const value = Number(item.attributes && item.attributes[attrKey]) || 0;
+      const perks = item.perks && item.perks[attrKey] ? item.perks[attrKey] : {};
+      const picked = Object.keys(perks)
+        .map(Number)
+        .sort((a,b)=>a-b)
+        .filter(tier=>perks[tier]==="A" || perks[tier]==="B")
+        .map(tier=>{
+          const choice = perks[tier];
+          const perk = attr.perks[tier-1][choice==="A"?0:1];
+          return `T${tier}${choice}: ${perk[0]}`;
+        });
+
+      return `
+        <div class="build-viewer-attr">
+          <strong>${attr.icon} ${escapeHtml(attr.name)} — ${value}</strong>
+          <div class="build-viewer-perks">
+            ${picked.length ? escapeHtml(picked.join(" · ")) : "Brak wybranych perków"}
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    const mine = Boolean(
+      cachedAccountNick() &&
+      normalizedPlayerNick(item.ownerNick) === normalizedPlayerNick(cachedAccountNick())
+    );
+
+    host.hidden = false;
+    host.innerHTML = `
+      <div class="build-skill-head">
+        <div>
+          <strong>🛠 ${escapeHtml(item.name)}</strong>
+          <div class="muted">
+            👤 ${escapeHtml(item.authorNick || "Anonim")} · lvl ${item.level} · ${item.public ? "🌍 Publiczny" : "🔒 Prywatny"}
+          </div>
+        </div>
+        <button id="build-viewer-close" type="button" class="secondary-btn">✕ Zamknij</button>
+      </div>
+      ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
+      <div class="build-viewer-attrs">${attrHtml}</div>
+      <div class="build-viewer-actions">
+        <button id="build-copy-to-editor" type="button" class="primary-btn">📋 Użyj jako podstawy</button>
+        ${mine ? `<button id="build-edit-own" type="button" class="secondary-btn">✏️ Edytuj mój build</button>` : ""}
+        ${mine ? `<button id="build-delete-own" type="button" class="danger-soft">🗑 Usuń</button>` : ""}
+      </div>
+      <div id="build-viewer-status" class="submit-status"></div>
+    `;
+
+    el("build-viewer-close")?.addEventListener("click",()=>{ host.hidden=true; });
+
+    el("build-copy-to-editor")?.addEventListener("click",()=>{
+      loadBuildIntoEditor(item,false);
+      host.hidden = true;
+      el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
+    });
+
+    el("build-edit-own")?.addEventListener("click",()=>{
+      loadBuildIntoEditor(item,true);
+      host.hidden = true;
+      el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
+    });
+
+    el("build-delete-own")?.addEventListener("click",async()=>{
+      if (!window.confirm(`Usunąć build „${item.name}”?`)) return;
+      const status = el("build-viewer-status");
+      const payload = {
+        action:"buildDelete",
+        nonce:makeRecipeNonce(),
+        sessionToken:playerAccountSessionToken(),
+        id:item.id
+      };
+      status.textContent = "Usuwanie...";
+      try {
+        await buildPostAction(payload);
+        status.textContent = "✅ Build został usunięty.";
+        host.hidden = true;
+        buildListsLoaded = false;
+        await fetchBuildLists(true);
+      } catch(err) {
+        status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się usunąć buildu.");
+      }
+    });
+  }
+
+  function loadBuildIntoEditor(item,keepId=false) {
+    const fresh = buildEmptyState();
+    fresh.id = keepId ? String(item.id || "") : "";
+    fresh.level = Math.max(1,Number(item.level)||1);
+    fresh.name = keepId ? String(item.name||"") : `${String(item.name||"Build")} — kopia`;
+    fresh.description = String(item.description||"");
+
+    BUILD_ATTR_ORDER.forEach(attrKey=>{
+      fresh.attributes[attrKey] = Math.max(0,Math.min(50,Number(item.attributes && item.attributes[attrKey])||0));
+      const srcPerks = item.perks && item.perks[attrKey] ? item.perks[attrKey] : {};
+      fresh.perks[attrKey] = {};
+      Object.keys(srcPerks).forEach(tier=>{
+        const choice = srcPerks[tier];
+        if ((choice==="A" || choice==="B") && Number(tier)<=10) {
+          fresh.perks[attrKey][tier] = choice;
+        }
+      });
+    });
+
+    buildState = fresh;
+    buildActiveAttr = "";
+    el("build-name").value = fresh.name;
+    el("build-description").value = fresh.description;
+    el("build-save-status").textContent = keepId ? "Edytujesz zapisany build." : "Skopiowano build do kreatora.";
+    renderBuildEditor();
+    el("build-skill-editor").hidden = true;
+  }
+
+  function newBuild() {
+    buildState = buildEmptyState();
+    buildActiveAttr = "";
+    el("build-name").value = "";
+    el("build-description").value = "";
+    el("build-save-status").textContent = "";
+    el("build-skill-editor").hidden = true;
+    renderBuildEditor();
+  }
+
+  function openBuildModule() {
+    showToolView("builds-view","builds");
+    renderBuildAccountState();
+    fetchBuildLists(false);
+  }
+
+  function setupBuildCreator() {
+    if (!el("build-attributes")) return;
+
+    el("build-new")?.addEventListener("click",newBuild);
+    el("build-save-private")?.addEventListener("click",()=>saveBuild(false));
+    el("build-share-public")?.addEventListener("click",()=>saveBuild(true));
+
+    renderBuildEditor();
+  }
+
+
   // ============================================================
   // NAWIGACJA MODUŁOWA
   // ============================================================
@@ -8105,6 +8790,7 @@ function setupAdmin() {
       const moduleName=button.dataset.module;
       if (moduleName === "distillery") showToolView("optimizer-view","distillery");
       else if (moduleName === "gang") openGangModule("payments-view");
+      else if (moduleName === "builds") openBuildModule();
       else if (moduleName === "map") showToolView("map-view","map");
       else if (moduleName === "account") {
         showToolView("account-view","account");
@@ -8711,6 +9397,7 @@ function setupAdmin() {
 renderMap();
 setupSubmissionForm();
 setupRecipeBatchImport();
+setupBuildCreator();
 setupPayments();
 renderAll();
 fetchApprovedRecipes();

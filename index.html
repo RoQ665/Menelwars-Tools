@@ -706,6 +706,7 @@
   <nav class="tabs main-tabs" id="main-tabs">
     <button class="active" data-module="distillery">⚗ Destylarnia</button>
     <button data-module="gang">👥 Gang</button>
+    <button data-module="builds">🛠 Buildy</button>
     <button data-module="map">🗺 Mapa</button>
     <button data-module="account">👤 Konto</button>
   </nav>
@@ -985,6 +986,88 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
         <div id="gang-announcements-content">
           <div class="muted">Pobieranie ogłoszeń...</div>
         </div>
+      </div>
+    </div>
+  </section>
+
+
+  <section id="builds-view" class="view" hidden>
+    <div class="panel build-panel">
+      <div class="panel-head">🛠 Buildy PvP</div>
+      <div class="panel-body">
+
+        <div class="build-intro">
+          <div>
+            <strong>Stwórz własny build</strong>
+            <div class="muted">
+              Każdy poziom postaci daje 2 punkty atrybutów. Rozdaj punkty dowolnie — wymagany poziom liczymy automatycznie. Kolejne tiery perków
+              odblokowują się przy 5 / 10 / 15 / 20 / 25 / 30 / 35 / 40 / 45 / 50 pkt.
+            </div>
+          </div>
+          <button id="build-new" type="button" class="primary-btn">＋ Nowy build</button>
+        </div>
+
+        <div id="build-editor">
+          <div class="build-editor-head">
+            <div class="build-points-grid">
+              <div><span>Rozdano</span><strong id="build-points-used">0</strong></div>
+              <div><span>Wymagany poziom</span><strong id="build-required-level">1</strong></div>
+              <div><span>Limit atrybutu</span><strong>50</strong></div>
+            </div>
+          </div>
+
+          <div id="build-attributes" class="build-attributes"></div>
+
+          <div id="build-skill-editor" class="build-skill-editor" hidden></div>
+
+          <div class="build-meta-form">
+            <label>
+              <span>Nazwa buildu</span>
+              <input id="build-name" type="text" maxlength="60" placeholder="np. Tank PvP">
+            </label>
+
+            <label>
+              <span>Opis (opcjonalnie)</span>
+              <textarea id="build-description" rows="3" maxlength="300" placeholder="Krótko opisz przeznaczenie buildu"></textarea>
+            </label>
+
+            <label id="build-guest-author-row">
+              <span>Nick autora</span>
+              <input id="build-guest-author" type="text" maxlength="40" placeholder="Twój nick">
+            </label>
+          </div>
+
+          <div id="build-account-hint" class="submit-info"></div>
+
+          <div class="build-save-actions">
+            <button id="build-save-private" class="primary-btn" type="button" hidden>🔒 Zapisz prywatnie</button>
+            <button id="build-share-public" class="primary-btn" type="button">🌍 Udostępnij build</button>
+          </div>
+
+          <div id="build-save-status" class="submit-status"></div>
+        </div>
+
+        <details class="content-accordion" open>
+          <summary>
+            <span>🌍 Publiczne buildy graczy</span>
+            <span class="accordion-chevron">⌄</span>
+          </summary>
+          <div class="content-accordion-body">
+            <div id="build-public-list"><div class="empty">Kliknij zakładkę Buildy, aby pobrać publiczne buildy.</div></div>
+          </div>
+        </details>
+
+        <details id="build-my-section" class="content-accordion" hidden>
+          <summary>
+            <span>🔒 Moje buildy</span>
+            <span class="accordion-chevron">⌄</span>
+          </summary>
+          <div class="content-accordion-body">
+            <div id="build-my-list"></div>
+          </div>
+        </details>
+
+        <div id="build-viewer" class="build-viewer" hidden></div>
       </div>
     </div>
   </section>
