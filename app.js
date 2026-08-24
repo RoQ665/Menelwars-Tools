@@ -7759,7 +7759,8 @@ function setupAdmin() {
     lifesteal:["Kradzież życia","%"],
     armorPen:["Przebicie pancerza","%"],
     stun:["Ogłuszenie","%"],
-    bleed:["Krwawienie","%"],
+    bleed:["Szansa krwawienia","%"],
+    bleedDamage:["Obrażenia krwawienia","%"],
     evasion:["Unik","%"],
     doubleStrike:["Podwójne uderzenie","%"],
     counter:["Kontratak","%"],
@@ -7808,6 +7809,7 @@ function setupAdmin() {
       armorPen:0,
       stun:0,
       bleed:0,
+      bleedDamage:0,
       evasion:0,
       doubleStrike:0,
       counter:0,
@@ -7825,11 +7827,21 @@ function setupAdmin() {
     return Math.round(n * 100) / 100;
   }
 
-  function buildCapStat(key,value) {
+  function buildCapInfo(key,value) {
+    const raw = buildStatNumber(value);
     const cap = BUILD_STAT_CAPS[key];
-    return Number.isFinite(cap)
-      ? Math.min(cap,value)
-      : value;
+    const effective = Number.isFinite(cap)
+      ? buildStatNumber(Math.min(cap,raw))
+      : raw;
+    const over = Number.isFinite(cap)
+      ? buildStatNumber(Math.max(0,raw-cap))
+      : 0;
+
+    return {raw,effective,cap:Number.isFinite(cap) ? cap : null,over};
+  }
+
+  function buildCapStat(key,value) {
+    return buildCapInfo(key,value).effective;
   }
 
   function buildEffectNumber(effect,pattern) {
@@ -7918,6 +7930,152 @@ function setupAdmin() {
     }
   }
 
+
+  const BUILD_BONUS_LABELS = {
+    "max hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
+    "maks. hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
+    "max hp (%)":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
+    "atak":{key:"attackAuto",label:"Atak",unit:"auto"},
+    "obrona":{key:"defenseAuto",label:"Obrona",unit:"auto"},
+    "celność":{key:"accuracy",label:"Celność",unit:"pct"},
+    "pierwszy cios":{key:"firstStrike",label:"Pierwszy cios",unit:"pct"},
+    "próg egzekucji":{key:"execute",label:"Próg egzekucji",unit:"pct"},
+    "kradzież życia":{key:"lifesteal",label:"Kradzież życia",unit:"pct"},
+    "przebicie pancerza":{key:"armorPen",label:"Przebicie pancerza",unit:"pct"},
+    "szansa ogłuszenia":{key:"stun",label:"Szansa ogłuszenia",unit:"pct"},
+    "szansa na kryt":{key:"critChance",label:"Szansa na kryt",unit:"pct"},
+    "szansa krwawienia":{key:"bleed",label:"Szansa krwawienia",unit:"pct"},
+    "obrazenia krwawienia":{key:"bleedDamage",label:"Obrażenia krwawienia",unit:"pct"},
+    "obrażenia krwawienia":{key:"bleedDamage",label:"Obrażenia krwawienia",unit:"pct"},
+    "redukcja leczenia wroga":{key:"healingReduction",label:"Redukcja leczenia wroga",unit:"pct"},
+    "odp. na kryt (szansa)":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
+    "odp. na ogłuszenie":{key:"stunResist",label:"Odporność na ogłuszenie",unit:"pct"},
+    "podwójne uderzenie":{key:"doubleStrike",label:"Podwójne uderzenie",unit:"pct"},
+    "kontratak":{key:"counter",label:"Kontratak",unit:"pct"}
+  };
+
+  function buildNormalizeBonusName(value) {
+    return String(value || "")
+      .replace(/\u00a0/g," ")
+      .replace(/\s+/g," ")
+      .trim()
+      .toLocaleLowerCase("pl-PL");
+  }
+
+  function buildParseBonusText(text) {
+    const entries = [];
+    const unknown = [];
+
+    String(text || "")
+      .replace(/\r/g,"")
+      .split("\n")
+      .map(line => line.replace(/\*\*/g,"").replace(/\*/g,"").replace(/\u00a0/g," ").trim())
+      .filter(Boolean)
+      .forEach(line => {
+        if (/powyższe atrybuty/i.test(line)) return;
+
+        const match = line.match(/^(Set|Akcesoria|Gang\s*[—-]\s*[^+]+)\s+(.+?)\s*\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*$/i);
+        if (!match) {
+          unknown.push(line);
+          return;
+        }
+
+        const sourceName = match[1].replace(/\s+/g," ").trim();
+        const statName = match[2].replace(/\s+/g," ").trim();
+        const value = Number(match[3].replace(",","."));
+        const isPercent = Boolean(match[4]);
+        const def = BUILD_BONUS_LABELS[buildNormalizeBonusName(statName)];
+
+        if (!def || !Number.isFinite(value)) {
+          unknown.push(line);
+          return;
+        }
+
+        let key = def.key;
+        if (key === "attackAuto") key = isPercent ? "attackPct" : "attackFlat";
+        if (key === "defenseAuto") key = isPercent ? "defensePct" : "defenseFlat";
+        if (def.key === "maxHpFlat" && isPercent) key = "maxHpPct";
+
+        entries.push({
+          source:sourceName,
+          name:statName,
+          key,
+          value:buildStatNumber(value),
+          percent:isPercent
+        });
+      });
+
+    return {entries,unknown};
+  }
+
+  function buildApplyImportedBonuses(stats,source) {
+    const entries = Array.isArray(source && source.bonuses) ? source.bonuses : [];
+    entries.forEach(entry => {
+      const key = String(entry && entry.key || "");
+      const value = Number(entry && entry.value);
+      if (!Object.prototype.hasOwnProperty.call(stats,key) || !Number.isFinite(value)) return;
+      stats[key] += value;
+    });
+  }
+
+  function buildRenderBonusPreview() {
+    const host = el("build-bonus-preview");
+    if (!host) return;
+
+    const entries = Array.isArray(buildState.bonuses) ? buildState.bonuses : [];
+    if (!entries.length) {
+      host.innerHTML = `<div class="muted">Brak wczytanych bonusów dodatkowych.</div>`;
+      return;
+    }
+
+    host.innerHTML = entries.map(entry => `
+      <div class="build-bonus-row">
+        <span><b>${escapeHtml(entry.source)}</b> · ${escapeHtml(entry.name)}</span>
+        <strong>+${escapeHtml(buildFormatPlainNumber(entry.value))}${entry.percent ? "%" : ""}</strong>
+      </div>
+    `).join("");
+  }
+
+  function buildFormatPlainNumber(value) {
+    const n = buildStatNumber(value);
+    return n.toLocaleString("pl-PL",{
+      minimumFractionDigits:Number.isInteger(n) ? 0 : 1,
+      maximumFractionDigits:2
+    });
+  }
+
+  function buildImportBonuses() {
+    const text = el("build-bonus-text")?.value || "";
+    const status = el("build-bonus-status");
+    const parsed = buildParseBonusText(text);
+
+    buildState.bonuses = parsed.entries;
+    buildState.bonusText = text;
+
+    if (!parsed.entries.length) {
+      status.textContent = parsed.unknown.length
+        ? "❌ Nie rozpoznałem żadnego bonusu z wklejonego tekstu."
+        : "Wklej bonusy z gry.";
+    } else {
+      status.textContent =
+        `✅ Wczytano ${parsed.entries.length} bonusów.` +
+        (parsed.unknown.length ? ` ⚠️ Pominięto ${parsed.unknown.length} nierozpoznanych wierszy.` : "");
+    }
+
+    buildRenderBonusPreview();
+    renderBuildStats();
+  }
+
+  function buildClearBonuses() {
+    buildState.bonuses = [];
+    buildState.bonusText = "";
+    if (el("build-bonus-text")) el("build-bonus-text").value = "";
+    if (el("build-bonus-status")) el("build-bonus-status").textContent = "Bonusy dodatkowe zostały wyczyszczone.";
+    buildRenderBonusPreview();
+    renderBuildStats();
+  }
+
+
   function buildCalculateStats(source) {
     const attributes = source && source.attributes ? source.attributes : {};
     const perks = source && source.perks ? source.perks : {};
@@ -7989,15 +8147,22 @@ function setupAdmin() {
       });
     });
 
+    buildApplyImportedBonuses(stats,source);
+
+    const rawStats = {};
+    const capInfo = {};
     Object.keys(stats).forEach(key => {
-      stats[key] = buildStatNumber(buildCapStat(key,stats[key]));
+      const info = buildCapInfo(key,stats[key]);
+      rawStats[key] = info.raw;
+      capInfo[key] = info;
+      stats[key] = info.effective;
     });
 
     // Usuń duplikaty opisów warunkowych/specjalnych.
     extras.conditional = [...new Set(extras.conditional)];
     extras.special = [...new Set(extras.special)];
 
-    return {stats,extras};
+    return {stats,rawStats,capInfo,extras};
   }
 
   function buildFormatStatValue(key,value) {
@@ -8021,7 +8186,7 @@ function setupAdmin() {
         title:"⚔️ Atak",
         keys:[
           "attackFlat","attackPct","accuracy","initiative","firstStrike",
-          "critChance","critDmg","execute","lifesteal","armorPen","stun","bleed"
+          "critChance","critDmg","execute","lifesteal","armorPen","stun","bleed","bleedDamage"
         ]
       },
       {
@@ -8048,7 +8213,22 @@ function setupAdmin() {
           ${group.keys.map(key => `
             <div class="build-stat-row">
               <span>${escapeHtml(BUILD_STAT_META[key][0])}</span>
-              <strong>${escapeHtml(buildFormatStatValue(key,stats[key]))}</strong>
+              <strong class="${calculated.capInfo[key] && calculated.capInfo[key].over > 0 ? "build-stat-capped" : ""}">
+                ${escapeHtml(buildFormatStatValue(key,stats[key]))}
+                ${
+                  calculated.capInfo[key] && calculated.capInfo[key].cap !== null
+                    ? (
+                        calculated.capInfo[key].over > 0
+                          ? `<small>MAX (+${escapeHtml(buildFormatPlainNumber(calculated.capInfo[key].over))}${BUILD_STAT_META[key][1] || ""} ponad)</small>`
+                          : (
+                              calculated.capInfo[key].effective === calculated.capInfo[key].cap
+                                ? `<small>MAX</small>`
+                                : `<small>/ ${escapeHtml(buildFormatPlainNumber(calculated.capInfo[key].cap))}${BUILD_STAT_META[key][1] || ""} max</small>`
+                            )
+                      )
+                    : ""
+                }
+              </strong>
             </div>
           `).join("")}
         </div>
@@ -8106,7 +8286,9 @@ function setupAdmin() {
         precision:{}
       },
       name:"",
-      description:""
+      description:"",
+      bonuses:[],
+      bonusText:""
     };
   }
 
@@ -8356,7 +8538,8 @@ function setupAdmin() {
       description,
       level:buildRequiredLevel(),
       attributes:buildState.attributes,
-      perks:buildState.perks
+      perks:buildState.perks,
+      bonuses:Array.isArray(buildState.bonuses) ? buildState.bonuses : []
     };
   }
 
@@ -8461,6 +8644,7 @@ function setupAdmin() {
       level:Math.max(1,Number(item && item.level) || 1),
       attributes:Object.assign(buildEmptyState().attributes,item && item.attributes || {}),
       perks:Object.assign(buildEmptyState().perks,item && item.perks || {}),
+      bonuses:Array.isArray(item && item.bonuses) ? item.bonuses : [],
       updatedAt:String(item && item.updatedAt || "")
     };
   }
@@ -8669,6 +8853,10 @@ function setupAdmin() {
     fresh.level = Math.max(1,Number(item.level)||1);
     fresh.name = keepId ? String(item.name||"") : `${String(item.name||"Build")} — kopia`;
     fresh.description = String(item.description||"");
+    fresh.bonuses = Array.isArray(item.bonuses)
+      ? item.bonuses.map(entry=>Object.assign({},entry))
+      : [];
+    fresh.bonusText = "";
 
     BUILD_ATTR_ORDER.forEach(attrKey=>{
       fresh.attributes[attrKey] = Math.max(0,Math.min(50,Number(item.attributes && item.attributes[attrKey])||0));
@@ -8686,6 +8874,8 @@ function setupAdmin() {
     buildActiveAttr = "";
     el("build-name").value = fresh.name;
     el("build-description").value = fresh.description;
+    if (el("build-bonus-text")) el("build-bonus-text").value = "";
+    buildRenderBonusPreview();
     el("build-save-status").textContent = keepId
       ? "✏️ Tryb edycji: kolejne zapisanie zaktualizuje ten konkretny build."
       : "📋 Skopiowano build do kreatora. Zapis utworzy nowy build.";
@@ -8699,6 +8889,9 @@ function setupAdmin() {
     buildActiveAttr = "";
     el("build-name").value = "";
     el("build-description").value = "";
+    if (el("build-bonus-text")) el("build-bonus-text").value = "";
+    if (el("build-bonus-status")) el("build-bonus-status").textContent = "";
+    buildRenderBonusPreview();
     el("build-save-status").textContent = "";
     el("build-skill-editor").hidden = true;
     renderBuildEditor();
@@ -8728,6 +8921,8 @@ function setupAdmin() {
     if (!el("build-attributes")) return;
 
     el("build-new")?.addEventListener("click",newBuild);
+    el("build-bonus-import")?.addEventListener("click",buildImportBonuses);
+    el("build-bonus-clear")?.addEventListener("click",buildClearBonuses);
     el("build-save-private")?.addEventListener("click",()=>saveBuild(false));
     el("build-share-public")?.addEventListener("click",()=>saveBuild(true));
 

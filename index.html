@@ -1020,6 +1020,23 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
           <div id="build-skill-editor" class="build-skill-editor" hidden></div>
 
+          <details class="content-accordion build-bonus-import">
+            <summary>
+              <span>🎒 Bonusy dodatkowe z gry</span>
+              <span class="accordion-chevron">⌄</span>
+            </summary>
+            <div class="content-accordion-body">
+              <p class="muted build-bonus-help">Wklej cały blok zaczynający się od „Powyższe atrybuty zostały powiększone...”. Rozpoznam bonusy z Setu, Akcesoriów i Gangu.</p>
+              <textarea id="build-bonus-text" rows="7" placeholder="Wklej tutaj bonusy skopiowane z gry..."></textarea>
+              <div class="build-bonus-actions">
+                <button id="build-bonus-import" type="button" class="secondary-btn">📋 Wczytaj bonusy</button>
+                <button id="build-bonus-clear" type="button" class="secondary-btn">🧹 Wyczyść bonusy</button>
+              </div>
+              <div id="build-bonus-status" class="submit-status"></div>
+              <div id="build-bonus-preview" class="build-bonus-preview"></div>
+            </div>
+          </details>
+
           <details class="content-accordion build-stats-accordion" open>
             <summary>
               <span>📊 Łączne statystyki buildu</span>

@@ -1432,3 +1432,63 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     border-right: 0;
   }
 }
+
+/* ============================================================
+   v20.44 — IMPORT BONUSÓW + INFORMACJA O CAPACH
+   ============================================================ */
+.build-bonus-import {
+  margin-top: 8px;
+}
+.build-bonus-help {
+  margin: 0 0 7px;
+}
+#build-bonus-text {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 110px;
+}
+.build-bonus-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 7px;
+}
+.build-bonus-preview {
+  display: grid;
+  gap: 4px;
+  margin-top: 7px;
+}
+.build-bonus-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid rgba(190,166,130,.32);
+  border-radius: 7px;
+  padding: 5px 7px;
+  font-size: 10.5px;
+  background: rgba(255,255,255,.38);
+}
+.build-bonus-row strong {
+  white-space: nowrap;
+}
+.build-stat-row strong {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.build-stat-row strong small {
+  font-size: 8.5px;
+  font-weight: 800;
+  opacity: .68;
+}
+.build-stat-row strong.build-stat-capped small {
+  opacity: 1;
+}
+@media (max-width:520px) {
+  .build-bonus-actions {
+    grid-template-columns: 1fr;
+  }
+}
