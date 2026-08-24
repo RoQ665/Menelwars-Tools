@@ -2524,3 +2524,25 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .admin-company-salary-section.correct-section .admin-company-salary-row { opacity:.82; }
 .admin-company-instruction.waiver-change { background:rgba(184,70,58,.13); }
 .admin-company-instruction.waiver-change span { color:#8f3029; }
+
+/* ============================================================
+   v20.68 — PUSTE SEKCJE GANGU + NATYCHMIASTOWE ODŚWIEŻENIE SPÓŁKI
+   ============================================================ */
+
+.gang-menu-grid button:disabled,
+.gang-menu-grid button.gang-option-empty {
+  cursor:not-allowed;
+  opacity:.48;
+  filter:grayscale(.35);
+  background:rgba(220,214,202,.38);
+}
+
+.gang-menu-grid button:disabled:hover {
+  background:rgba(220,214,202,.38);
+}
+
+[data-subtab][data-group="gang"]:disabled,
+[data-subtab][data-group="gang"].gang-option-empty {
+  cursor:not-allowed;
+  opacity:.42;
+}

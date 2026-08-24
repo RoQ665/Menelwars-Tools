@@ -4105,7 +4105,10 @@ const MAP_POSITIONS = {
         status.textContent =
           "✅ Zapisano w planie proponowanym. Zmiana zacznie obowiązywać po ustawieniu pensji w grze przez Administrację.";
 
-        await loadPayments({background:true});
+        await loadPayments({
+          background:true,
+          force:true
+        });
       } catch (err) {
         status.textContent = err.message || "Nie udało się zapisać decyzji.";
       } finally {
@@ -4392,11 +4395,25 @@ const goal = payload && payload.goal;
   let paymentsLoadInFlight = null;
 
   async function loadPayments(options={}) {
+    const force =
+      Boolean(options.force);
+
     if (paymentsLoadInFlight) {
-      if (latestGangPayload) {
-        renderGangPayload(latestGangPayload);
+      if (force) {
+        // Czekamy aż poprzednie pobranie się skończy i wykonujemy
+        // jeszcze jedno świeże pobranie. To ważne m.in. po zmianie
+        // zrzeczenia pensji, aby użytkownik od razu zobaczył nowy stan.
+        try {
+          await paymentsLoadInFlight;
+        } catch (err) {
+          // Kolejny request poniżej i tak pobierze świeży stan.
+        }
+      } else {
+        if (latestGangPayload) {
+          renderGangPayload(latestGangPayload);
+        }
+        return paymentsLoadInFlight;
       }
-      return paymentsLoadInFlight;
     }
 
     paymentsLoadInFlight = (async () => {
@@ -10275,8 +10292,12 @@ function setupAdmin() {
 
     document.querySelectorAll("[data-gang-menu-target]").forEach(button=>{
     button.addEventListener("click",async ()=>{
+      if (button.disabled) {
+        return;
+      }
+
       if (!playerAccountSessionToken()) {
-        openGangLanding();
+        await openGangLanding();
         return;
       }
 
@@ -10446,7 +10467,165 @@ function setupAdmin() {
   }
 
 
-  function openGangLanding() {
+  let gangMenuStatusInFlight = null;
+
+  function setGangOptionalButtonState(
+    target,
+    enabled,
+    emptyText
+  ) {
+    const selectors = [
+      `[data-gang-menu-target="${target}"]`,
+      `[data-subtab="${target}"][data-group="gang"]`
+    ];
+
+    selectors.forEach(selector => {
+      document
+        .querySelectorAll(selector)
+        .forEach(button => {
+          button.disabled = !enabled;
+          button.classList.toggle(
+            "gang-option-empty",
+            !enabled
+          );
+
+          if (
+            button.matches("[data-gang-menu-target]")
+          ) {
+            const small =
+              button.querySelector("small");
+
+            if (small) {
+              if (!small.dataset.defaultText) {
+                small.dataset.defaultText =
+                  small.textContent || "";
+              }
+
+              small.textContent =
+                enabled
+                  ? small.dataset.defaultText
+                  : emptyText;
+            }
+          }
+
+          button.title =
+            enabled
+              ? ""
+              : emptyText;
+        });
+    });
+  }
+
+
+  function setGangOptionalButtonsChecking() {
+    [
+      ["polls-view","Sprawdzam, czy są ankiety..."],
+      ["goals-view","Sprawdzam, czy jest aktywny cel..."],
+      ["announcements-view","Sprawdzam, czy są ogłoszenia..."]
+    ].forEach(([target,text]) => {
+      setGangOptionalButtonState(
+        target,
+        false,
+        text
+      );
+    });
+  }
+
+
+  function applyGangMenuStatus(payload) {
+    const pollsCount =
+      Math.max(
+        0,
+        Number(payload && payload.pollsCount) || 0
+      );
+
+    const announcementsCount =
+      Math.max(
+        0,
+        Number(payload && payload.announcementsCount) || 0
+      );
+
+    const hasGoal =
+      Boolean(payload && payload.hasGoal);
+
+    setGangOptionalButtonState(
+      "polls-view",
+      pollsCount > 0,
+      "Brak ankiet."
+    );
+
+    setGangOptionalButtonState(
+      "goals-view",
+      hasGoal,
+      "Brak aktywnego celu."
+    );
+
+    setGangOptionalButtonState(
+      "announcements-view",
+      announcementsCount > 0,
+      "Brak ogłoszeń."
+    );
+  }
+
+
+  async function loadGangMenuStatus() {
+    if (gangMenuStatusInFlight) {
+      return gangMenuStatusInFlight;
+    }
+
+    gangMenuStatusInFlight = (async () => {
+      const token =
+        playerAccountSessionToken();
+
+      if (!token) {
+        return null;
+      }
+
+      try {
+        const payload =
+          await jsonp(
+            "gangMenuStatus",
+            {sessionToken:token}
+          );
+
+        if (
+          !payload ||
+          !payload.ok
+        ) {
+          if (
+            payload &&
+            payload.authRequired
+          ) {
+            setPlayerAccountSessionToken("");
+          }
+
+          return null;
+        }
+
+        applyGangMenuStatus(payload);
+        return payload;
+
+      } catch (err) {
+        console.warn(
+          "[MenelWars Tools] Status menu Gangu:",
+          err
+        );
+
+        // Przy błędzie nie blokujemy funkcji na stałe.
+        // Użytkownik może spróbować ponownie wejść do Gangu.
+        return null;
+      }
+    })();
+
+    try {
+      return await gangMenuStatusInFlight;
+    } finally {
+      gangMenuStatusInFlight = null;
+    }
+  }
+
+
+  async function openGangLanding() {
     if (!playerAccountSessionToken()) {
       if (el("gang-tabs")) {
         el("gang-tabs").hidden = true;
@@ -10467,6 +10646,21 @@ function setupAdmin() {
       "gang-menu-view",
       "gang"
     );
+
+    setGangOptionalButtonsChecking();
+
+    await loadGangMenuStatus();
+
+    if (!playerAccountSessionToken()) {
+      if (el("gang-tabs")) {
+        el("gang-tabs").hidden = true;
+      }
+
+      showToolView(
+        "gang-gate-view",
+        "gang"
+      );
+    }
   }
 
 
@@ -10541,7 +10735,7 @@ function setupAdmin() {
       }
 
       if (moduleName === "gang") {
-        openGangLanding();
+        await openGangLanding();
         return;
       }
 
@@ -10573,6 +10767,10 @@ function setupAdmin() {
 
   document.querySelectorAll("[data-subtab]").forEach(button=>{
     button.addEventListener("click",async ()=>{
+      if (button.disabled) {
+        return;
+      }
+
       const viewId=button.dataset.subtab;
       const group=button.dataset.group;
 
