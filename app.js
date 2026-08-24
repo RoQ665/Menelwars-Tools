@@ -8746,6 +8746,186 @@ function setupAdmin() {
     }
   }
 
+
+  const BUILD_PUBLIC_FILTER_INPUT_IDS = [
+    "build-filter-query",
+    "build-filter-level-min",
+    "build-filter-level-max",
+    "build-filter-sort",
+    "build-filter-strength",
+    "build-filter-endurance",
+    "build-filter-agility",
+    "build-filter-vitality",
+    "build-filter-precision",
+    "build-filter-attack",
+    "build-filter-defense",
+    "build-filter-hp",
+    "build-filter-crit",
+    "build-filter-armorpen",
+    "build-filter-evasion",
+    "build-filter-lifesteal",
+    "build-filter-execute"
+  ];
+
+  function buildFilterNumber(id) {
+    const raw = el(id)?.value;
+    if (raw === undefined || raw === null || String(raw).trim() === "") return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function buildPublicFilterState() {
+    return {
+      query:String(el("build-filter-query")?.value || "").trim().toLocaleLowerCase("pl-PL"),
+      levelMin:buildFilterNumber("build-filter-level-min"),
+      levelMax:buildFilterNumber("build-filter-level-max"),
+      sort:String(el("build-filter-sort")?.value || "newest"),
+      attrs:{
+        strength:buildFilterNumber("build-filter-strength"),
+        endurance:buildFilterNumber("build-filter-endurance"),
+        agility:buildFilterNumber("build-filter-agility"),
+        vitality:buildFilterNumber("build-filter-vitality"),
+        precision:buildFilterNumber("build-filter-precision")
+      },
+      stats:{
+        attackPct:buildFilterNumber("build-filter-attack"),
+        defensePct:buildFilterNumber("build-filter-defense"),
+        maxHpPct:buildFilterNumber("build-filter-hp"),
+        critChance:buildFilterNumber("build-filter-crit"),
+        armorPen:buildFilterNumber("build-filter-armorpen"),
+        evasion:buildFilterNumber("build-filter-evasion"),
+        lifesteal:buildFilterNumber("build-filter-lifesteal"),
+        execute:buildFilterNumber("build-filter-execute")
+      }
+    };
+  }
+
+  function buildItemFilterStats(item) {
+    // buildCalculateStats zwraca wartości efektywne po capie
+    // i uwzględnia atrybuty, perki oraz zapisane bonusy dodatkowe.
+    return buildCalculateStats(item).stats;
+  }
+
+  function buildFilteredPublicItems() {
+    const filter = buildPublicFilterState();
+
+    let result = buildPublicItems.filter(item => {
+      if (filter.query) {
+        const haystack =
+          `${item.name || ""} ${item.authorNick || ""} ${item.description || ""}`
+            .toLocaleLowerCase("pl-PL");
+        if (!haystack.includes(filter.query)) return false;
+      }
+
+      const level = Number(item.level) || 1;
+      if (filter.levelMin !== null && level < filter.levelMin) return false;
+      if (filter.levelMax !== null && level > filter.levelMax) return false;
+
+      const attrs = item.attributes || {};
+      for (const [key,minValue] of Object.entries(filter.attrs)) {
+        if (minValue !== null && (Number(attrs[key]) || 0) < minValue) return false;
+      }
+
+      const needsStats = Object.values(filter.stats).some(value => value !== null);
+      if (needsStats) {
+        const stats = buildItemFilterStats(item);
+        for (const [key,minValue] of Object.entries(filter.stats)) {
+          if (minValue !== null && (Number(stats[key]) || 0) < minValue) return false;
+        }
+      }
+
+      return true;
+    });
+
+    const statForSort = item => buildItemFilterStats(item);
+
+    result.sort((a,b) => {
+      switch (filter.sort) {
+        case "levelAsc":
+          return (Number(a.level)||1) - (Number(b.level)||1) ||
+            String(a.name||"").localeCompare(String(b.name||""),"pl");
+        case "levelDesc":
+          return (Number(b.level)||1) - (Number(a.level)||1) ||
+            String(a.name||"").localeCompare(String(b.name||""),"pl");
+        case "attack":
+          return (statForSort(b).attackPct||0) - (statForSort(a).attackPct||0);
+        case "defense":
+          return (statForSort(b).defensePct||0) - (statForSort(a).defensePct||0);
+        case "hp":
+          return (statForSort(b).maxHpPct||0) - (statForSort(a).maxHpPct||0);
+        case "crit":
+          return (statForSort(b).critChance||0) - (statForSort(a).critChance||0);
+        case "evasion":
+          return (statForSort(b).evasion||0) - (statForSort(a).evasion||0);
+        case "newest":
+        default:
+          return String(b.updatedAt||"").localeCompare(String(a.updatedAt||""));
+      }
+    });
+
+    return result;
+  }
+
+  function renderPublicBuildList() {
+    const publicHost = el("build-public-list");
+    if (!publicHost) return;
+
+    const filtered = buildFilteredPublicItems();
+    const count = el("build-filter-count");
+
+    if (count) {
+      count.textContent =
+        `Pokazano ${filtered.length} z ${buildPublicItems.length} publicznych buildów.`;
+    }
+
+    if (!buildPublicItems.length) {
+      publicHost.innerHTML =
+        `<div class="empty">Nie ma jeszcze publicznych buildów. Możesz dodać pierwszy.</div>`;
+      return;
+    }
+
+    if (!filtered.length) {
+      publicHost.innerHTML =
+        `<div class="empty">🔎 Żaden publiczny build nie spełnia wybranych filtrów.</div>`;
+      return;
+    }
+
+    publicHost.innerHTML =
+      `<div class="build-card-list">${filtered.map(item=>buildCardHtml(item,false)).join("")}</div>`;
+
+    publicHost.querySelectorAll("[data-build-open]").forEach(card=>{
+      card.addEventListener("click",()=>{
+        const id = card.dataset.buildOpen;
+        const item = buildPublicItems.find(entry=>entry.id===id);
+        if (item) showBuildViewer(item);
+      });
+    });
+  }
+
+  function clearBuildPublicFilters() {
+    BUILD_PUBLIC_FILTER_INPUT_IDS.forEach(id=>{
+      const input = el(id);
+      if (!input) return;
+      if (id === "build-filter-sort") input.value = "newest";
+      else input.value = "";
+    });
+    renderPublicBuildList();
+  }
+
+  function setupBuildPublicFilters() {
+    BUILD_PUBLIC_FILTER_INPUT_IDS.forEach(id=>{
+      const input = el(id);
+      if (!input) return;
+      input.addEventListener(
+        id === "build-filter-sort" ? "change" : "input",
+        renderPublicBuildList
+      );
+    });
+
+    el("build-filter-clear")?.addEventListener("click",clearBuildPublicFilters);
+  }
+
+
   function buildCardHtml(item,isMine=false) {
     const attrs = item.attributes || {};
     const perkCount = BUILD_ATTR_ORDER.reduce((sum,keyName)=>{
@@ -8783,9 +8963,7 @@ function setupAdmin() {
     const mySection = el("build-my-section");
 
     if (publicHost) {
-      publicHost.innerHTML = buildPublicItems.length
-        ? `<div class="build-card-list">${buildPublicItems.map(item=>buildCardHtml(item,false)).join("")}</div>`
-        : `<div class="empty">Nie ma jeszcze publicznych buildów. Możesz dodać pierwszy.</div>`;
+      renderPublicBuildList();
     }
 
     const accountNick = cachedAccountNick();
@@ -8797,14 +8975,15 @@ function setupAdmin() {
         : `<div class="empty">Nie masz jeszcze zapisanych buildów.</div>`;
     }
 
-    document.querySelectorAll("[data-build-open]").forEach(card=>{
-      card.addEventListener("click",()=>{
-        const id = card.dataset.buildOpen;
-        const source = card.dataset.buildScope === "mine" ? buildMyItems : buildPublicItems;
-        const item = source.find(entry=>entry.id===id);
-        if (item) showBuildViewer(item);
+    if (myHost) {
+      myHost.querySelectorAll("[data-build-open]").forEach(card=>{
+        card.addEventListener("click",()=>{
+          const id = card.dataset.buildOpen;
+          const item = buildMyItems.find(entry=>entry.id===id);
+          if (item) showBuildViewer(item);
+        });
       });
-    });
+    }
   }
 
   function showBuildViewer(item) {
@@ -8983,6 +9162,7 @@ function setupAdmin() {
     if (!el("build-attributes")) return;
 
     el("build-new")?.addEventListener("click",newBuild);
+    setupBuildPublicFilters();
     el("build-bonus-import")?.addEventListener("click",buildImportBonuses);
     el("build-bonus-clear")?.addEventListener("click",buildClearBonuses);
     el("build-save-private")?.addEventListener("click",()=>saveBuild(false));

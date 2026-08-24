@@ -1080,6 +1080,74 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             <span class="accordion-chevron">⌄</span>
           </summary>
           <div class="content-accordion-body">
+
+            <div class="build-search-box">
+              <div class="build-search-main">
+                <label class="build-search-query">
+                  <span>🔎 Szukaj</span>
+                  <input id="build-filter-query" type="search" placeholder="Nazwa buildu lub nick autora">
+                </label>
+
+                <label>
+                  <span>Poziom od</span>
+                  <input id="build-filter-level-min" type="number" min="1" inputmode="numeric" placeholder="—">
+                </label>
+
+                <label>
+                  <span>do</span>
+                  <input id="build-filter-level-max" type="number" min="1" inputmode="numeric" placeholder="—">
+                </label>
+
+                <label class="build-search-sort">
+                  <span>Sortuj</span>
+                  <select id="build-filter-sort">
+                    <option value="newest">Najnowsze</option>
+                    <option value="levelAsc">Najniższy poziom</option>
+                    <option value="levelDesc">Najwyższy poziom</option>
+                    <option value="attack">Najwyższy Atak %</option>
+                    <option value="defense">Najwyższa Obrona %</option>
+                    <option value="hp">Najwyższe Maks. HP %</option>
+                    <option value="crit">Najwyższy Crit</option>
+                    <option value="evasion">Najwyższy Unik</option>
+                  </select>
+                </label>
+              </div>
+
+              <details id="build-more-filters" class="build-filter-details">
+                <summary>⚙️ Więcej filtrów</summary>
+
+                <div class="build-filter-section">
+                  <strong>Minimalne punkty atrybutów</strong>
+                  <div class="build-filter-grid build-filter-attrs">
+                    <label><span>✊ Siła</span><input id="build-filter-strength" type="number" min="0" max="50" placeholder="0"></label>
+                    <label><span>🛡️ Wytrzymałość</span><input id="build-filter-endurance" type="number" min="0" max="50" placeholder="0"></label>
+                    <label><span>👟 Zręczność</span><input id="build-filter-agility" type="number" min="0" max="50" placeholder="0"></label>
+                    <label><span>📜 Żywotność</span><input id="build-filter-vitality" type="number" min="0" max="50" placeholder="0"></label>
+                    <label><span>👓 Precyzja</span><input id="build-filter-precision" type="number" min="0" max="50" placeholder="0"></label>
+                  </div>
+                </div>
+
+                <div class="build-filter-section">
+                  <strong>Minimalne statystyki końcowe</strong>
+                  <div class="build-filter-grid">
+                    <label><span>Atak %</span><input id="build-filter-attack" type="number" min="0" step="0.1" placeholder="0"></label>
+                    <label><span>Obrona %</span><input id="build-filter-defense" type="number" min="0" step="0.1" placeholder="0"></label>
+                    <label><span>Maks. HP %</span><input id="build-filter-hp" type="number" min="0" step="0.1" placeholder="0"></label>
+                    <label><span>Crit %</span><input id="build-filter-crit" type="number" min="0" step="0.1" placeholder="0"></label>
+                    <label><span>Przebicie %</span><input id="build-filter-armorpen" type="number" min="0" step="0.1" placeholder="0"></label>
+                    <label><span>Unik %</span><input id="build-filter-evasion" type="number" min="0" step="0.1" placeholder="0"></label>
+                    <label><span>Kradzież życia %</span><input id="build-filter-lifesteal" type="number" min="0" step="0.1" placeholder="0"></label>
+                    <label><span>Egzekucja %</span><input id="build-filter-execute" type="number" min="0" step="0.1" placeholder="0"></label>
+                  </div>
+                </div>
+              </details>
+
+              <div class="build-filter-foot">
+                <span id="build-filter-count" class="muted">Publiczne buildy: —</span>
+                <button id="build-filter-clear" type="button" class="secondary-btn">🧹 Wyczyść filtry</button>
+              </div>
+            </div>
+
             <div id="build-public-list"><div class="empty">Kliknij zakładkę Buildy, aby pobrać publiczne buildy.</div></div>
           </div>
         </details>
