@@ -2140,88 +2140,221 @@ const MAP_POSITIONS = {
   // JSONP omija ograniczenia CORS Apps Script.
   // ============================================================
 
-  function fetchApprovedRecipes() {
+  let approvedRecipesInFlight = null;
+  let distilleryDataLoaded = false;
+  let mapModuleLoaded = false;
 
-    if (!backendConfigured()) {
+  const moduleOpenInFlight = {
+    distillery:null,
+    gang:null,
+    builds:null,
+    map:null,
+    account:null
+  };
+
+  function showModuleLoading(moduleName,title,text="Pobieram potrzebne dane...") {
+    const titleEl = el("module-loading-title");
+    const textEl = el("module-loading-text");
+
+    if (titleEl) titleEl.textContent = title || "Ładowanie modułu...";
+    if (textEl) textEl.textContent = text;
+
+    showToolView("module-loading-view",moduleName);
+  }
+
+  function updateHomeAccountState(account) {
+    const box = el("home-account-state");
+    if (!box) return;
+
+    if (account && account.nick) {
+      box.className = "submit-info known-recipe";
+      box.innerHTML =
+        `✅ Konto <b>${escapeHtml(account.nick)}</b> gotowe${account.admin ? " · 🛠 Administrator" : ""}.`;
+    } else if (playerAccountSessionToken()) {
+      box.className = "submit-info unknown-recipe";
+      box.textContent = "⚠️ Nie udało się potwierdzić zapisanej sesji.";
+    } else {
+      box.className = "submit-info";
+      box.textContent = "👤 Nie jesteś zalogowany. Moduły publiczne działają bez konta.";
+    }
+  }
+
+  async function openDistilleryModule(target="optimizer-view") {
+    if (distilleryDataLoaded) {
+      showToolView(target,"distillery");
       return;
     }
 
-    const callbackName =
-      "roqApproved_" +
-      Date.now() +
-      "_" +
-      Math.floor(Math.random()*100000);
+    if (moduleOpenInFlight.distillery) {
+      await moduleOpenInFlight.distillery;
+      showToolView(target,"distillery");
+      return;
+    }
 
-    const script =
-      document.createElement("script");
+    showModuleLoading(
+      "distillery",
+      "⚗ Ładowanie Destylarni...",
+      "Pobieram aktualne receptury i rezerwacje."
+    );
 
-    const cleanup = () => {
+    moduleOpenInFlight.distillery = (async () => {
+      await fetchApprovedRecipes({force:true});
+      renderAll();
+      distilleryDataLoaded = true;
+    })();
 
-      try {
-        delete window[callbackName];
-      } catch {}
+    try {
+      await moduleOpenInFlight.distillery;
+    } finally {
+      moduleOpenInFlight.distillery = null;
+    }
 
-      script.remove();
-    };
+    showToolView(target,"distillery");
+  }
 
-    window[callbackName] =
-      payload => {
+  async function openMapModule() {
+    if (mapModuleLoaded) {
+      showToolView("map-view","map");
+      return;
+    }
+
+    showModuleLoading(
+      "map",
+      "🗺 Ładowanie mapy...",
+      "Przygotowuję mapę i oznaczenia dzielnic."
+    );
+
+    if (!moduleOpenInFlight.map) {
+      moduleOpenInFlight.map = (async () => {
+        renderMap();
+
+        const image = el("map-list")?.querySelector("img");
+
+        if (image && !image.complete) {
+          await Promise.race([
+            new Promise(resolve => {
+              image.addEventListener("load",resolve,{once:true});
+              image.addEventListener("error",resolve,{once:true});
+            }),
+            new Promise(resolve => setTimeout(resolve,4000))
+          ]);
+        }
+
+        mapModuleLoaded = true;
+      })();
+    }
+
+    try {
+      await moduleOpenInFlight.map;
+    } finally {
+      moduleOpenInFlight.map = null;
+    }
+
+    showToolView("map-view","map");
+  }
+
+  function fetchApprovedRecipes(options={}) {
+    if (!backendConfigured()) {
+      renderAll();
+      distilleryDataLoaded = true;
+      return Promise.resolve(false);
+    }
+
+    if (approvedRecipesInFlight && !options.force) {
+      return approvedRecipesInFlight;
+    }
+
+    approvedRecipesInFlight = new Promise(resolve => {
+      const callbackName =
+        "roqApproved_" +
+        Date.now() +
+        "_" +
+        Math.floor(Math.random()*100000);
+
+      const script =
+        document.createElement("script");
+
+      let finished = false;
+
+      const finish = result => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
 
         try {
+          delete window[callbackName];
+        } catch {}
 
-          if (
-            payload &&
-            payload.ok &&
-            payload.recipes &&
-            typeof payload.recipes === "object"
-          ) {
-
-            remoteApproved =
-              payload.recipes;
-
-            recipeReservations =
-              payload.reservations && typeof payload.reservations === "object"
-                ? payload.reservations
-                : {};
-
-            recipeRanking =
-              Array.isArray(payload.ranking)
-                ? payload.ranking
-                : [];
-
-            localStorage.setItem(
-              REMOTE_KEY,
-              JSON.stringify(remoteApproved)
-            );
-
-            renderAll();
-
-            // Po pobraniu zatwierdzonych recept z backendu
-            // odśwież także komunikat w formularzu „Dodaj”.
-            // Bez tego formularz mógł pozostać ze stanem „nieodkryta”
-            // policzonym jeszcze przed załadowaniem remoteApproved.
-            updateSubmissionInfo();
-          }
-
-        } finally {
-          cleanup();
-        }
+        script.remove();
+        resolve(result);
       };
 
-    script.onerror =
-      cleanup;
+      const timeout =
+        setTimeout(
+          () => {
+            renderAll();
+            distilleryDataLoaded = true;
+            finish(false);
+          },
+          12000
+        );
 
-    script.src =
-      BACKEND_URL +
-      "?action=approved" +
-      "&callback=" +
-      encodeURIComponent(callbackName) +
-      "&_=" +
-      Date.now();
+      window[callbackName] =
+        payload => {
+          try {
+            if (
+              payload &&
+              payload.ok &&
+              payload.recipes &&
+              typeof payload.recipes === "object"
+            ) {
+              remoteApproved = payload.recipes;
 
-    document.head.appendChild(
-      script
-    );
+              recipeReservations =
+                payload.reservations && typeof payload.reservations === "object"
+                  ? payload.reservations
+                  : {};
+
+              recipeRanking =
+                Array.isArray(payload.ranking)
+                  ? payload.ranking
+                  : [];
+
+              localStorage.setItem(
+                REMOTE_KEY,
+                JSON.stringify(remoteApproved)
+              );
+            }
+          } catch (err) {
+            console.warn("[MenelWars Tools] Destylarnia:",err);
+          }
+
+          renderAll();
+          updateSubmissionInfo();
+          distilleryDataLoaded = true;
+          finish(true);
+        };
+
+      script.onerror = () => {
+        renderAll();
+        distilleryDataLoaded = true;
+        finish(false);
+      };
+
+      script.src =
+        BACKEND_URL +
+        "?action=approved" +
+        "&callback=" +
+        encodeURIComponent(callbackName) +
+        "&_=" +
+        Date.now();
+
+      document.head.appendChild(script);
+    });
+
+    return approvedRecipesInFlight.finally(() => {
+      approvedRecipesInFlight = null;
+    });
   }
 
 
@@ -9139,23 +9272,43 @@ function setupAdmin() {
   }
 
   async function openBuildModule() {
-    showToolView("builds-view","builds");
-
-    const hasSession = Boolean(playerAccountSessionToken());
-
-    if (hasSession && !cachedAccountNick()) {
-      renderBuildAccountState({checking:true});
-
-      try {
-        await playerAccountStatus();
-      } catch (err) {
-        // playerAccountStatus sam obsługuje błędy i zachowuje poprawny cache,
-        // jeśli poprzedni stan konta nadal jest ważny.
-      }
+    if (buildListsLoaded) {
+      showToolView("builds-view","builds");
+      renderBuildAccountState();
+      renderBuildLists();
+      return;
     }
 
+    showModuleLoading(
+      "builds",
+      "🛠 Ładowanie Buildów...",
+      "Pobieram publiczne buildy i sprawdzam Twoje konto."
+    );
+
+    if (!moduleOpenInFlight.builds) {
+      moduleOpenInFlight.builds = (async () => {
+        const hasSession = Boolean(playerAccountSessionToken());
+
+        if (hasSession && !cachedAccountNick()) {
+          try {
+            await playerAccountStatus();
+          } catch (err) {}
+        }
+
+        renderBuildAccountState();
+        await fetchBuildLists(false);
+      })();
+    }
+
+    try {
+      await moduleOpenInFlight.builds;
+    } finally {
+      moduleOpenInFlight.builds = null;
+    }
+
+    showToolView("builds-view","builds");
     renderBuildAccountState();
-    await fetchBuildLists(false);
+    renderBuildLists();
   }
 
   function setupBuildCreator() {
@@ -9187,8 +9340,23 @@ function setupAdmin() {
 
     const distilleryTabs=el("distillery-tabs");
     const gangTabs=el("gang-tabs");
-    distilleryTabs.hidden = moduleName !== "distillery";
-    gangTabs.hidden = moduleName !== "gang" || !playerAccountSessionToken() || viewId === "gang-gate-view";
+    const transientView =
+      viewId === "home-view" ||
+      viewId === "module-loading-view";
+
+    if (distilleryTabs) {
+      distilleryTabs.hidden =
+        moduleName !== "distillery" ||
+        transientView;
+    }
+
+    if (gangTabs) {
+      gangTabs.hidden =
+        moduleName !== "gang" ||
+        !playerAccountSessionToken() ||
+        viewId === "gang-gate-view" ||
+        transientView;
+    }
 
     document.querySelectorAll("[data-subtab]").forEach(button=>{
       button.classList.toggle("active",button.dataset.subtab===viewId);
@@ -9524,125 +9692,98 @@ function setupAdmin() {
   }
 
 
-  function openGangModule(
+  async function openGangModule(
     target="payments-view"
   ) {
-    if (
-      !playerAccountSessionToken()
-    ) {
+    if (!playerAccountSessionToken()) {
       el("gang-tabs").hidden = true;
-
-      showToolView(
-        "gang-gate-view",
-        "gang"
-      );
-
+      showToolView("gang-gate-view","gang");
       return;
-    }
-
-    el("gang-tabs").hidden = false;
-
-    showToolView(
-      target,
-      "gang"
-    );
-
-    if (latestGangPayload) {
-      renderGangPayload(
-        latestGangPayload
-      );
     }
 
     const dataIsStale =
       !latestGangPayload ||
-      (
-        Date.now() -
-        latestGangPayloadAt >
-        30000
-      );
+      Date.now() - latestGangPayloadAt > 30000;
 
     const requests = [];
 
     if (dataIsStale) {
-      requests.push(
-        loadPayments({
-          background:true
-        })
-      );
+      requests.push(loadPayments({background:true}));
     }
 
-    // Ankiety mają osobny endpoint.
-    // Jeśli użytkownik wchodzi w Ankiety, ten request również
-    // jest objęty wspólnym paskiem.
-    if (
-      target ===
-      "polls-view"
-    ) {
-      requests.push(
-        loadGangPolls()
-      );
+    if (target === "polls-view") {
+      requests.push(loadGangPolls());
     }
 
     if (requests.length) {
       const labels = {
-        "payments-view":
-          [
-            "💰 Odświeżam wpłaty...",
-            "🪙 Liczę drobniaki pod kanapą serwera..."
-          ],
-        "company-view":
-          [
-            "🏢 Odświeżam Spółkę...",
-            ['💸 Księgowy zgubił kalkulator, już szukam...','🧮 Kalkulator chyba poszedł na przerwę...','🥫 Liczę fundusz na puszkach...','🍺 Zarząd obiecuje, że to już chwila...']
-          ],
-        "polls-view":
-          [
-            "📊 Odświeżam ankiety...",
-            ['🗳️ Liczę głosy, nawet te oddane po pijaku...','📋 Komisja sprawdza ostatnią kartkę...','🥫 Głosy schowały się między puszkami...','🍺 Ankieta zaraz odzyska pion...']
-          ],
-        "goals-view":
-          [
-            "🎯 Odświeżam cele gangu...",
-            ['🥫 Zbieram puszki na realizację celu...','🎯 Cel ucieka, ale już go doganiam...','📏 Mierzę postęp linijką z magazynu...','🍺 Motywacja jeszcze się ładuje...']
-          ],
-        "announcements-view":
-          [
-            "📢 Odświeżam ogłoszenia...",
-            ['📯 Wołam gońca, chyba zasnął po drodze...','📌 Szukam pinezki do ogłoszenia...','🥫 Kartka utknęła pod puszką...','🍺 Goniec twierdzi, że był tylko na chwilę...']
-          ]
+        "payments-view":"💰 Ładowanie Wpłat...",
+        "company-view":"🏢 Ładowanie Spółki...",
+        "polls-view":"📊 Ładowanie Ankiet...",
+        "goals-view":"🎯 Ładowanie Celów...",
+        "announcements-view":"📢 Ładowanie Ogłoszeń..."
       };
 
-      const pair =
-        labels[target] ||
-        [
-          "⏳ Odświeżam dane Gangu...",
-          "🥫 Serwer szuka ostatniej puszki..."
-        ];
-
-      withRuntimeLoader(
-        () => Promise.allSettled(
-          requests
-        ),
-        pair[0],
-        pair[1]
+      showModuleLoading(
+        "gang",
+        labels[target] || "👥 Ładowanie Gangu...",
+        "Pobieram aktualne dane tego modułu."
       );
+
+      if (!moduleOpenInFlight.gang) {
+        moduleOpenInFlight.gang =
+          Promise.allSettled(requests);
+      }
+
+      try {
+        await moduleOpenInFlight.gang;
+      } finally {
+        moduleOpenInFlight.gang = null;
+      }
+
+      if (!playerAccountSessionToken()) {
+        el("gang-tabs").hidden = true;
+        showToolView("gang-gate-view","gang");
+        return;
+      }
+    }
+
+    el("gang-tabs").hidden = false;
+    showToolView(target,"gang");
+
+    if (latestGangPayload) {
+      renderGangPayload(latestGangPayload);
     }
 
     validateGangSessionInBackground();
   }
 
   document.querySelectorAll("[data-module]").forEach(button=>{
-    button.addEventListener("click",()=>{
+    button.addEventListener("click",async ()=>{
       const moduleName=button.dataset.module;
-      if (moduleName === "distillery") showToolView("optimizer-view","distillery");
-      else if (moduleName === "gang") openGangModule("payments-view");
-      else if (moduleName === "builds") openBuildModule();
-      else if (moduleName === "map") showToolView("map-view","map");
-      else if (moduleName === "account") {
-        showToolView("account-view","account");
 
-        const token =
-          playerAccountSessionToken();
+      if (moduleName === "distillery") {
+        await openDistilleryModule("optimizer-view");
+        return;
+      }
+
+      if (moduleName === "gang") {
+        await openGangModule("payments-view");
+        return;
+      }
+
+      if (moduleName === "builds") {
+        await openBuildModule();
+        return;
+      }
+
+      if (moduleName === "map") {
+        await openMapModule();
+        return;
+      }
+
+      if (moduleName === "account") {
+        const token = playerAccountSessionToken();
 
         const accountNeedsRequest =
           Boolean(
@@ -9655,32 +9796,35 @@ function setupAdmin() {
           );
 
         if (accountNeedsRequest) {
-          withRuntimeLoader(
-            () => renderAccountView(),
-            "👤 Odświeżam konto...",
-            ['🔑 Szukam kluczy do konta, ktoś je znowu przełożył...','📱 Sprawdzam, czy telefon nie schował sesji...','🥫 Token wpadł między puszki...','🍺 Konto zaraz się otrząśnie...']
+          showModuleLoading(
+            "account",
+            "👤 Ładowanie Konta...",
+            "Sprawdzam sesję i uprawnienia."
           );
-        } else {
-          renderAccountView();
         }
+
+        await renderAccountView();
+        showToolView("account-view","account");
       }
     });
   });
 
   document.querySelectorAll("[data-subtab]").forEach(button=>{
-    button.addEventListener("click",()=>{
+    button.addEventListener("click",async ()=>{
       const viewId=button.dataset.subtab;
       const group=button.dataset.group;
-      if (group === "gang") { openGangModule(viewId); return; }
-      showToolView(viewId,"distillery");
+
+      if (group === "gang") {
+        await openGangModule(viewId);
+        return;
+      }
+
+      await openDistilleryModule(viewId);
     });
   });
 
-  el("gang-go-account")?.addEventListener("click",()=>{
-    showToolView("account-view","account");
-
-    const token =
-      playerAccountSessionToken();
+  el("gang-go-account")?.addEventListener("click",async ()=>{
+    const token = playerAccountSessionToken();
 
     const accountNeedsRequest =
       Boolean(
@@ -9693,15 +9837,17 @@ function setupAdmin() {
       );
 
     if (accountNeedsRequest) {
-      withRuntimeLoader(
-        () => renderAccountView(),
-        "👤 Odświeżam konto...",
-        ['🔑 Szukam kluczy do konta, ktoś je znowu przełożył...','📱 Sprawdzam, czy telefon nie schował sesji...','🥫 Token wpadł między puszki...','🍺 Konto zaraz się otrząśnie...']
+      showModuleLoading(
+        "account",
+        "👤 Ładowanie Konta...",
+        "Sprawdzam sesję i uprawnienia."
       );
-    } else {
-      renderAccountView();
     }
+
+    await renderAccountView();
+    showToolView("account-view","account");
   });
+
 // ============================================================
   // GLOBALNY PRELOAD / PASEK POSTĘPU
   // ============================================================
@@ -9994,245 +10140,37 @@ function setupAdmin() {
 
 
   async function preloadApplicationData() {
-    if (
-      !playerAccountSessionToken()
-    ) {
-      appBootSetText(
-        "✅ Strona gotowa"
-      );
-
-      await appBootFinishSmooth();
-      return;
-    }
+    appBootReach(
+      18,
+      "🔐 Sprawdzam konto i sesję..."
+    );
 
     let account = null;
-    let finished = 0;
-    let expected = 2;
-
-    const visualSteps = [
-      {
-        after:0,
-        target:8,
-        text:"🔐 Sprawdzam konto i sesję..."
-      },
-      {
-        after:550,
-        target:16,
-        text:"🔑 Szukam kluczy do gangu..."
-      },
-      {
-        after:650,
-        target:26,
-        text:"🔥 Rozgrzewam serwer..."
-      },
-      {
-        after:800,
-        target:38,
-        text:"💰 Liczę drobniaki w kasie gangu..."
-      },
-      {
-        after:950,
-        target:50,
-        text:"🥫 Zbieram puszki z serwera..."
-      },
-      {
-        after:1050,
-        target:62,
-        text:"🧪 Szukam zagubionych recept..."
-      },
-      {
-        after:1100,
-        target:72,
-        text:"📊 Przeglądam ankiety..."
-      },
-      {
-        after:1150,
-        target:82,
-        text:"🛠️ Odkurzam panel Admina..."
-      },
-      {
-        after:1200,
-        target:88,
-        text:"🍺 Popijam coś mocniejszego, serwer jeszcze pracuje..."
-      },
-      {
-        after:1250,
-        target:92,
-        text:"🥴 Jeszcze chwila, serwer też ma kaca..."
-      }
-    ];
-
-    let visualCancelled = false;
-
-    const runVisualSteps =
-      async () => {
-        for (
-          const step of
-          visualSteps
-        ) {
-          if (
-            visualCancelled ||
-            appBootFinished
-          ) {
-            return;
-          }
-
-          await new Promise(
-            resolve =>
-              setTimeout(
-                resolve,
-                step.after
-              )
-          );
-
-          if (
-            visualCancelled ||
-            appBootFinished
-          ) {
-            return;
-          }
-
-          appBootReach(
-            step.target,
-            step.text
-          );
-        }
-      };
-
-    const visualPromise =
-      runVisualSteps();
-
-    const finishOne =
-      (label) => {
-        finished += 1;
-
-        // Realny postęp może podbić pasek,
-        // ale nie wymusza pokazania wszystkich etapów.
-        const target =
-          34 +
-          (
-            finished /
-            expected
-          ) *
-          54;
-
-        appBootReach(
-          Math.min(
-            92,
-            target
-          ),
-          label
-        );
-      };
 
     try {
-      account =
-        await playerAccountStatus();
-
-      // Nick konta jest już w cache. Odświeżamy lokalnie
-      // oznaczenia "Twoja rezerwacja" bez dodatkowego requestu.
-      if (account) {
-        renderAll();
+      if (playerAccountSessionToken()) {
+        account =
+          await playerAccountStatus({
+            force:true
+          });
       }
-
-      if (
-        account &&
-        account.admin
-      ) {
-        expected = 3;
-      }
-
-      const tasks = [
-        loadPayments({
-          background:true
-        })
-          .then(
-            () => finishOne(
-              "💰 Wpłaty i Spółka gotowe"
-            )
-          )
-          .catch(
-            err => {
-              console.warn(
-                "[MenelWars Tools] Gang preload:",
-                err
-              );
-
-              finishOne(
-                "💰 Wpłaty sprawdzone"
-              );
-            }
-          ),
-
-        loadGangPolls()
-          .then(
-            () => finishOne(
-              "📊 Ankiety sprawdzone"
-            )
-          )
-          .catch(
-            err => {
-              console.warn(
-                "[MenelWars Tools] Poll preload:",
-                err
-              );
-
-              finishOne(
-                "📊 Ankiety sprawdzone"
-              );
-            }
-          )
-      ];
-
-      if (
-        account &&
-        account.admin
-      ) {
-        tasks.push(
-          warmAdminData({
-            silent:true
-          })
-            .then(
-              () => finishOne(
-                "🛠 Panel Admina gotowy"
-              )
-            )
-            .catch(
-              err => {
-                console.warn(
-                  "[MenelWars Tools] Admin preload:",
-                  err
-                );
-
-                finishOne(
-                  "🛠 Panel Admina sprawdzony"
-                );
-              }
-            )
-        );
-      }
-
-      await Promise.allSettled(
-        tasks
-      );
-
     } catch (err) {
       console.warn(
-        "[MenelWars Tools] Preload:",
+        "[MenelWars Tools] Preload konta:",
         err
       );
     }
 
-    visualCancelled = true;
+    updateHomeAccountState(account);
 
-    // Nie czekamy na dokończenie "historii" tekstów.
-    // Dane są gotowe -> płynne domknięcie do 100%.
+    appBootReach(
+      92,
+      account
+        ? "✅ Konto gotowe"
+        : "✅ Aplikacja gotowa"
+    );
+
     await appBootFinishSmooth();
-
-    // Sprzątamy asynchroniczny narrator, jeśli jeszcze kończy timeout.
-    Promise.resolve(
-      visualPromise
-    ).catch(() => {});
   }
 
 
@@ -10240,24 +10178,26 @@ function setupAdmin() {
   // START
   // ============================================================
 
-renderMap();
 setupSubmissionForm();
 setupRecipeBatchImport();
 setupBuildCreator();
 setupPayments();
-renderAll();
-fetchApprovedRecipes();
 setupAdmin();
-showToolView("optimizer-view", "distillery");
+
+showToolView("home-view", "");
 if (el("admin-view")) el("admin-view").hidden = true;
 
 appBootStart();
 preloadApplicationData();
 
 
-  // Pobieramy nowe zatwierdzone dane także co 5 minut.
+  // Destylarnia odświeża się cyklicznie dopiero po pierwszym otwarciu.
   setInterval(
-    fetchApprovedRecipes,
+    () => {
+      if (distilleryDataLoaded) {
+        fetchApprovedRecipes();
+      }
+    },
     5 * 60 * 1000
   );
 

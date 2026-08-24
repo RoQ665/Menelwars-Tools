@@ -703,15 +703,20 @@
     <p>Destylarnia, prywatne narzędzia gangu i szybka ściąga mapy — wszystko w jednym miejscu.</p>
 </section>
 
-  <nav class="tabs main-tabs" id="main-tabs">
-    <button class="active" data-module="distillery">⚗ Destylarnia</button>
-    <button data-module="gang">👥 Gang</button>
-    <button data-module="builds">🛠 Buildy</button>
-    <button data-module="map">🗺 Mapa</button>
-    <button data-module="account">👤 Konto</button>
-  </nav>
+  <div id="main-tabs" class="main-nav-groups">
+    <nav class="tabs main-tabs main-tabs-public" aria-label="Moduły publiczne">
+      <button data-module="distillery">⚗ Destylarnia</button>
+      <button data-module="builds">🛠 Buildy</button>
+      <button data-module="map">🗺 Mapa</button>
+    </nav>
 
-  <nav class="tabs sub-tabs" id="distillery-tabs">
+    <nav class="tabs main-tabs main-tabs-account" aria-label="Moduły konta">
+      <button data-module="gang">👥 Gang</button>
+      <button data-module="account">👤 Konto</button>
+    </nav>
+  </div>
+
+  <nav class="tabs sub-tabs" id="distillery-tabs" hidden>
     <button class="active" data-subtab="optimizer-view" data-group="distillery">📖 Dostępne recepty</button>
     <button data-subtab="unknown-view" data-group="distillery">🔬 Nieodkryte</button>
     <button data-subtab="submit-view" data-group="distillery">➕ Dodaj</button>
@@ -726,7 +731,28 @@
     <button data-subtab="announcements-view" data-group="gang">📢 Ogłoszenia</button>
   </nav>
 
-  <section id="optimizer-view" class="view">
+  <section id="home-view" class="view">
+    <div class="panel module-home-panel">
+      <div class="panel-head">🏠 MenelWars Tools</div>
+      <div class="panel-body">
+        <div class="module-home-card">
+          <strong>Wybierz moduł powyżej</strong>
+          <p>Przy starcie sprawdzamy tylko konto. Dane pozostałych modułów pobieramy dopiero wtedy, gdy ich potrzebujesz.</p>
+          <div id="home-account-state" class="submit-info">⏳ Sprawdzam konto...</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="module-loading-view" class="view" hidden>
+    <div class="module-page-loading">
+      <div class="module-page-spinner" aria-hidden="true"></div>
+      <strong id="module-loading-title">Ładowanie modułu...</strong>
+      <span id="module-loading-text">Pobieram potrzebne dane.</span>
+    </div>
+  </section>
+
+  <section id="optimizer-view" class="view" hidden>
 
     <div class="submit-info known-recipe" style="margin-bottom:10px">
       📋 Masz własne wyniki z gry? W zakładce <b>➕ Dodaj</b> możesz wkleić cały zestaw z
