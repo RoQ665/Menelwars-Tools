@@ -8197,8 +8197,16 @@ function setupAdmin() {
 
   function buildStatsHtml(source) {
     const calculated = buildCalculateStats(source);
-    const stats = calculated.stats;
     const extras = calculated.extras;
+
+    // Osobno liczymy "czysty" build, bez importowanych bonusów.
+    // Używamy rawStats, żeby kolumny Build + Itemy dawały pełną wartość
+    // przed zastosowaniem limitu gry.
+    const buildOnlySource = Object.assign({},source || {},{bonuses:[]});
+    const buildOnly = buildCalculateStats(buildOnlySource);
+
+    const itemStats = buildNewStatBag();
+    buildApplyImportedBonuses(itemStats,source || {});
 
     const groups = [
       {
@@ -8225,29 +8233,64 @@ function setupAdmin() {
       }
     ];
 
+    const sourceValue = (key,value,emptyAsDash=false) => {
+      const n = buildStatNumber(value);
+      if (emptyAsDash && n === 0) return "—";
+      return buildFormatStatValue(key,n);
+    };
+
+    const totalValueHtml = key => {
+      const info = calculated.capInfo[key];
+      const value = calculated.stats[key];
+
+      if (!info || info.cap === null) {
+        return `<strong>${escapeHtml(buildFormatStatValue(key,value))}</strong>`;
+      }
+
+      if (info.over > 0) {
+        return `
+          <strong class="build-stat-capped">
+            ${escapeHtml(buildFormatStatValue(key,value))}
+            <small>MAX (+${escapeHtml(buildFormatPlainNumber(info.over))}${BUILD_STAT_META[key][1] || ""} ponad)</small>
+          </strong>
+        `;
+      }
+
+      if (info.effective === info.cap) {
+        return `
+          <strong class="build-stat-capped">
+            ${escapeHtml(buildFormatStatValue(key,value))}
+            <small>MAX</small>
+          </strong>
+        `;
+      }
+
+      return `
+        <strong>
+          ${escapeHtml(buildFormatStatValue(key,value))}
+          <small>/ ${escapeHtml(buildFormatPlainNumber(info.cap))}${BUILD_STAT_META[key][1] || ""} max</small>
+        </strong>
+      `;
+    };
+
     const groupsHtml = groups.map(group => `
       <section class="build-stat-group">
         <div class="build-stat-group-title">${group.title}</div>
+
+        <div class="build-stat-source-head" aria-hidden="true">
+          <span>Statystyka</span>
+          <span>Build</span>
+          <span>Itemy</span>
+          <span>Razem</span>
+        </div>
+
         <div class="build-stat-grid">
           ${group.keys.map(key => `
             <div class="build-stat-row">
-              <span>${escapeHtml(BUILD_STAT_META[key][0])}</span>
-              <strong class="${calculated.capInfo[key] && calculated.capInfo[key].over > 0 ? "build-stat-capped" : ""}">
-                ${escapeHtml(buildFormatStatValue(key,stats[key]))}
-                ${
-                  calculated.capInfo[key] && calculated.capInfo[key].cap !== null
-                    ? (
-                        calculated.capInfo[key].over > 0
-                          ? `<small>MAX (+${escapeHtml(buildFormatPlainNumber(calculated.capInfo[key].over))}${BUILD_STAT_META[key][1] || ""} ponad)</small>`
-                          : (
-                              calculated.capInfo[key].effective === calculated.capInfo[key].cap
-                                ? `<small>MAX</small>`
-                                : `<small>/ ${escapeHtml(buildFormatPlainNumber(calculated.capInfo[key].cap))}${BUILD_STAT_META[key][1] || ""} max</small>`
-                            )
-                      )
-                    : ""
-                }
-              </strong>
+              <span class="build-stat-name">${escapeHtml(BUILD_STAT_META[key][0])}</span>
+              <span class="build-stat-build">${escapeHtml(sourceValue(key,buildOnly.rawStats[key] || 0))}</span>
+              <span class="build-stat-items">${escapeHtml(sourceValue(key,itemStats[key] || 0,true))}</span>
+              <span class="build-stat-total">${totalValueHtml(key)}</span>
             </div>
           `).join("")}
         </div>

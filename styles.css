@@ -1492,3 +1492,106 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   v20.46 — STATYSTYKI: BUILD / ITEMY / RAZEM
+   ============================================================ */
+
+.build-stat-source-head,
+.build-stat-row {
+  display: grid;
+  grid-template-columns: minmax(120px,1.45fr) minmax(58px,.72fr) minmax(58px,.72fr) minmax(105px,1.18fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.build-stat-source-head {
+  padding: 5px 9px;
+  border-top: 1px solid rgba(190,166,130,.24);
+  background: rgba(245,237,220,.62);
+  font-size: 9px;
+  font-weight: 900;
+  color: #806a50;
+}
+
+.build-stat-source-head span:not(:first-child) {
+  text-align: right;
+}
+
+.build-stat-grid {
+  display: block;
+}
+
+.build-stat-row {
+  padding: 6px 9px;
+  border-top: 1px solid rgba(190,166,130,.24);
+  font-size: 10.5px;
+}
+
+.build-stat-row:nth-child(odd) {
+  border-right: 0;
+}
+
+.build-stat-name {
+  color: #715e49;
+}
+
+.build-stat-build,
+.build-stat-items,
+.build-stat-total {
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.build-stat-items {
+  color: #9a5f18;
+}
+
+.build-stat-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.build-stat-total strong {
+  display: inline-flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.build-stat-total small {
+  font-size: 8px;
+  font-weight: 800;
+  opacity: .7;
+}
+
+.build-stat-total .build-stat-capped small {
+  opacity: 1;
+}
+
+@media (max-width:520px) {
+  .build-stat-source-head,
+  .build-stat-row {
+    grid-template-columns: minmax(96px,1.35fr) minmax(46px,.65fr) minmax(46px,.65fr) minmax(88px,1.12fr);
+    gap: 4px;
+  }
+
+  .build-stat-source-head {
+    padding: 5px 6px;
+    font-size: 8px;
+  }
+
+  .build-stat-row {
+    padding: 6px;
+    font-size: 9.5px;
+  }
+
+  .build-stat-total small {
+    font-size: 7.5px;
+  }
+}
