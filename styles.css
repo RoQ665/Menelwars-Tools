@@ -1931,3 +1931,51 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     grid-template-columns:1fr;
   }
 }
+
+/* ============================================================
+   v20.52 — STATYSTYKI: BAZA / BUILD / ITEMY / RAZEM
+   ============================================================ */
+
+.build-stat-source-head,
+.build-stat-row {
+  grid-template-columns:
+    minmax(112px,1.42fr)
+    minmax(48px,.58fr)
+    minmax(52px,.64fr)
+    minmax(52px,.64fr)
+    minmax(102px,1.18fr);
+}
+
+.build-stat-base,
+.build-stat-build,
+.build-stat-items,
+.build-stat-total {
+  text-align:right;
+  white-space:nowrap;
+  font-weight:800;
+}
+
+.build-stat-base {
+  color:#6e6a61;
+}
+
+@media (max-width:520px) {
+  .build-stat-source-head,
+  .build-stat-row {
+    grid-template-columns:
+      minmax(90px,1.30fr)
+      minmax(40px,.54fr)
+      minmax(42px,.58fr)
+      minmax(42px,.58fr)
+      minmax(82px,1.08fr);
+    gap:3px;
+  }
+
+  .build-stat-source-head {
+    font-size:7.5px;
+  }
+
+  .build-stat-row {
+    font-size:9px;
+  }
+}

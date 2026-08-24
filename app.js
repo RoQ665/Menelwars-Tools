@@ -876,7 +876,7 @@ const MAP_POSITIONS = {
         "success"
       );
 
-      fetchApprovedRecipes();
+      await fetchApprovedRecipes({force:true});
 
     } catch (err) {
       const message =
@@ -1051,7 +1051,7 @@ const MAP_POSITIONS = {
       );
 
       // Tak jak w stabilnym v20: po zapisie pobieramy pełny stan.
-      fetchApprovedRecipes();
+      await fetchApprovedRecipes({force:true});
 
     } catch (err) {
       const message =
@@ -2119,7 +2119,7 @@ const MAP_POSITIONS = {
       el("recipe-batch-text").value = "";
       recipeBatchPreviewRows = [];
       renderRecipeBatchPreview();
-      fetchApprovedRecipes();
+      await fetchApprovedRecipes({force:true});
 
     } catch (err) {
       status.textContent = err && err.message
@@ -2179,8 +2179,17 @@ const MAP_POSITIONS = {
     }
   }
 
-  async function openDistilleryModule(target="optimizer-view") {
-    if (distilleryDataLoaded) {
+  async function openDistilleryModule(
+    target="optimizer-view",
+    options={}
+  ) {
+    const forceRefresh =
+      Boolean(options.forceRefresh);
+
+    if (
+      distilleryDataLoaded &&
+      !forceRefresh
+    ) {
       showToolView(target,"distillery");
       return;
     }
@@ -2213,11 +2222,6 @@ const MAP_POSITIONS = {
   }
 
   async function openMapModule() {
-    if (mapModuleLoaded) {
-      showToolView("map-view","map");
-      return;
-    }
-
     showModuleLoading(
       "map",
       "🗺 Ładowanie mapy...",
@@ -2260,7 +2264,7 @@ const MAP_POSITIONS = {
       return Promise.resolve(false);
     }
 
-    if (approvedRecipesInFlight && !options.force) {
+    if (approvedRecipesInFlight) {
       return approvedRecipesInFlight;
     }
 
@@ -2715,7 +2719,10 @@ const MAP_POSITIONS = {
 
   let accountViewRenderInFlight = null;
 
-  async function renderAccountView() {
+  async function renderAccountView(options={}) {
+    const forceRefresh =
+      Boolean(options.force);
+
     const box = el("account-content");
     const status = el("account-status");
     const adminHost = el("account-admin-host");
@@ -2744,7 +2751,10 @@ const MAP_POSITIONS = {
       }
     }
 
-    const account = await playerAccountStatus();
+    const account =
+      await playerAccountStatus({
+        force:forceRefresh
+      });
 
     if (!account) {
       box.innerHTML = `
@@ -4943,7 +4953,7 @@ function renderAdminGangTools(payload) {
               "✅ Rezerwacja została zwolniona.";
 
             await loadAdminGangTools();
-            fetchApprovedRecipes();
+            await fetchApprovedRecipes({force:true});
 
             await runtimeLoaderFinish(
               "✅ Rezerwacja zwolniona"
@@ -5457,7 +5467,7 @@ async function setAdminSubmissionStatus(
     // Zatwierdzona receptura ma od razu trafić
     // również do wspólnej bazy widocznej w PWA.
     if (isApprove) {
-      fetchApprovedRecipes();
+      await fetchApprovedRecipes({force:true});
     }
 
 
@@ -7302,7 +7312,7 @@ function setupAdmin() {
             "✅ Rezerwacje zostały wyczyszczone.";
 
           await loadAdminGangTools();
-          fetchApprovedRecipes();
+          await fetchApprovedRecipes({force:true});
 
           await runtimeLoaderFinish(
             "✅ Rezerwacje wyczyszczone"
@@ -8330,15 +8340,39 @@ function setupAdmin() {
     })}${suffix}`;
   }
 
+  function buildBaseStatBag() {
+    const stats = buildNewStatBag();
+
+    // Bazowe wartości mechanik gry przy 0 pkt atrybutów.
+    stats.accuracy = 85;
+    stats.initiative = 3;
+    stats.critChance = 3;
+    stats.critDmg = 10;
+    stats.execute = 2;
+    stats.evasion = 2;
+
+    return stats;
+  }
+
   function buildStatsHtml(source) {
     const calculated = buildCalculateStats(source);
     const extras = calculated.extras;
 
-    // Osobno liczymy "czysty" build, bez importowanych bonusów.
-    // Używamy rawStats, żeby kolumny Build + Itemy dawały pełną wartość
-    // przed zastosowaniem limitu gry.
+    // Rozdzielamy wartości bazowe gry, wkład buildu i bonusy z itemów.
+    // Razem nadal pokazuje faktyczną wartość po zastosowaniu limitu gry.
     const buildOnlySource = Object.assign({},source || {},{bonuses:[]});
     const buildOnly = buildCalculateStats(buildOnlySource);
+
+    const baseStats = buildBaseStatBag();
+    const buildContribution = buildNewStatBag();
+
+    Object.keys(buildContribution).forEach(key => {
+      buildContribution[key] =
+        buildStatNumber(
+          (Number(buildOnly.rawStats[key]) || 0) -
+          (Number(baseStats[key]) || 0)
+        );
+    });
 
     const itemStats = buildNewStatBag();
     buildApplyImportedBonuses(itemStats,source || {});
@@ -8414,6 +8448,7 @@ function setupAdmin() {
 
         <div class="build-stat-source-head" aria-hidden="true">
           <span>Statystyka</span>
+          <span>Baza</span>
           <span>Build</span>
           <span>Itemy</span>
           <span>Razem</span>
@@ -8423,7 +8458,8 @@ function setupAdmin() {
           ${group.keys.map(key => `
             <div class="build-stat-row">
               <span class="build-stat-name">${escapeHtml(BUILD_STAT_META[key][0])}</span>
-              <span class="build-stat-build">${escapeHtml(sourceValue(key,buildOnly.rawStats[key] || 0))}</span>
+              <span class="build-stat-base">${escapeHtml(sourceValue(key,baseStats[key] || 0,true))}</span>
+              <span class="build-stat-build">${escapeHtml(sourceValue(key,buildContribution[key] || 0))}</span>
               <span class="build-stat-items">${escapeHtml(sourceValue(key,itemStats[key] || 0,true))}</span>
               <span class="build-stat-total">${totalValueHtml(key)}</span>
             </div>
@@ -9274,31 +9310,29 @@ function setupAdmin() {
   }
 
   async function openBuildModule() {
-    if (buildListsLoaded) {
-      showToolView("builds-view","builds");
-      renderBuildAccountState();
-      renderBuildLists();
-      return;
-    }
-
     showModuleLoading(
       "builds",
       "🛠 Ładowanie Buildów...",
-      "Pobieram publiczne buildy i sprawdzam Twoje konto."
+      "Pobieram aktualne publiczne buildy i dane Twojego konta."
     );
 
     if (!moduleOpenInFlight.builds) {
       moduleOpenInFlight.builds = (async () => {
-        const hasSession = Boolean(playerAccountSessionToken());
+        const hasSession =
+          Boolean(playerAccountSessionToken());
 
-        if (hasSession && !cachedAccountNick()) {
+        if (hasSession) {
           try {
-            await playerAccountStatus();
+            await playerAccountStatus({
+              force:true
+            });
           } catch (err) {}
         }
 
         renderBuildAccountState();
-        await fetchBuildLists(false);
+
+        // Przy świadomym wejściu do modułu nie używamy starej listy.
+        await fetchBuildLists(true);
       })();
     }
 
@@ -9331,6 +9365,8 @@ function setupAdmin() {
   // NAWIGACJA MODUŁOWA
   // ============================================================
 
+  let activeToolModule = "";
+
   function showToolView(viewId,moduleName) {
     document.querySelectorAll(".view").forEach(view=>{
       view.hidden = view.id !== viewId;
@@ -9345,6 +9381,11 @@ function setupAdmin() {
     const transientView =
       viewId === "home-view" ||
       viewId === "module-loading-view";
+
+    activeToolModule =
+      transientView
+        ? ""
+        : String(moduleName || "");
 
     if (distilleryTabs) {
       distilleryTabs.hidden =
@@ -9583,7 +9624,10 @@ function setupAdmin() {
       const moduleName=button.dataset.module;
 
       if (moduleName === "distillery") {
-        await openDistilleryModule("optimizer-view");
+        await openDistilleryModule(
+          "optimizer-view",
+          {forceRefresh:true}
+        );
         return;
       }
 
@@ -9603,27 +9647,16 @@ function setupAdmin() {
       }
 
       if (moduleName === "account") {
-        const token = playerAccountSessionToken();
+        showModuleLoading(
+          "account",
+          "👤 Ładowanie Konta...",
+          "Pobieram aktualny stan konta i uprawnienia."
+        );
 
-        const accountNeedsRequest =
-          Boolean(
-            token &&
-            (
-              !cachedAccountStatus ||
-              cachedAccountStatusToken !== token ||
-              Date.now() - cachedAccountStatusAt >= 60000
-            )
-          );
+        await renderAccountView({
+          force:true
+        });
 
-        if (accountNeedsRequest) {
-          showModuleLoading(
-            "account",
-            "👤 Ładowanie Konta...",
-            "Sprawdzam sesję i uprawnienia."
-          );
-        }
-
-        await renderAccountView();
         showToolView("account-view","account");
       }
     });
@@ -9644,27 +9677,16 @@ function setupAdmin() {
   });
 
   el("gang-go-account")?.addEventListener("click",async ()=>{
-    const token = playerAccountSessionToken();
+    showModuleLoading(
+      "account",
+      "👤 Ładowanie Konta...",
+      "Pobieram aktualny stan konta i uprawnienia."
+    );
 
-    const accountNeedsRequest =
-      Boolean(
-        token &&
-        (
-          !cachedAccountStatus ||
-          cachedAccountStatusToken !== token ||
-          Date.now() - cachedAccountStatusAt >= 60000
-        )
-      );
+    await renderAccountView({
+      force:true
+    });
 
-    if (accountNeedsRequest) {
-      showModuleLoading(
-        "account",
-        "👤 Ładowanie Konta...",
-        "Sprawdzam sesję i uprawnienia."
-      );
-    }
-
-    await renderAccountView();
     showToolView("account-view","account");
   });
 
@@ -9709,14 +9731,49 @@ if (el("admin-view")) el("admin-view").hidden = true;
 preloadApplicationData();
 
 
-  // Destylarnia odświeża się cyklicznie dopiero po pierwszym otwarciu.
+  // Destylarnia: aktualne rezerwacje również wtedy,
+  // gdy użytkownik już ma moduł otwarty.
+  const DISTILLERY_LIVE_REFRESH_MS =
+    20 * 1000;
+
+  async function refreshActiveDistilleryInBackground() {
+    if (
+      activeToolModule !== "distillery" ||
+      document.visibilityState !== "visible" ||
+      !distilleryDataLoaded ||
+      !backendConfigured() ||
+      approvedRecipesInFlight
+    ) {
+      return;
+    }
+
+    try {
+      await fetchApprovedRecipes({
+        force:true
+      });
+    } catch (err) {
+      console.warn(
+        "[MenelWars Tools] Odświeżanie Destylarni w tle:",
+        err
+      );
+    }
+  }
+
   setInterval(
+    refreshActiveDistilleryInBackground,
+    DISTILLERY_LIVE_REFRESH_MS
+  );
+
+  document.addEventListener(
+    "visibilitychange",
     () => {
-      if (distilleryDataLoaded) {
-        fetchApprovedRecipes();
+      if (
+        document.visibilityState === "visible" &&
+        activeToolModule === "distillery"
+      ) {
+        refreshActiveDistilleryInBackground();
       }
-    },
-    5 * 60 * 1000
+    }
   );
 
 
