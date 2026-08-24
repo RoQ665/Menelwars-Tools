@@ -6403,46 +6403,138 @@ function renderAdminCompanyPlan(
   const rowsHtml =
     plan.rows.length
       ? plan.rows
-          .map(player => `
-            <div style="
-              display:grid;
-              grid-template-columns:minmax(0,1fr) auto auto;
-              gap:8px;
-              align-items:center;
-              padding:6px 7px;
-              margin-top:4px;
-              border:1px solid #d8c7aa;
-              border-radius:7px;
-              background:#fffdf8;
-              font-size:12px;
-            ">
-              <div>
-                <strong>
-                  ${escapeHtml(player.nick)}
-                  ${player.salaryWaived ? " 💚" : ""}
-                </strong>
-                <div class="muted">
-                  Wkład: ${companyMoney(player.contribution)} zł
-                  · należna: ${companyMoney(player.salary)} zł
+          .map(player => {
+            const proposed =
+              Math.max(
+                0,
+                Number(player.payoutSalary) || 0
+              );
+
+            const activeExists =
+              Boolean(player.activePlanExists);
+
+            const active =
+              activeExists
+                ? Math.max(
+                    0,
+                    Number(player.activePayoutSalary) || 0
+                  )
+                : null;
+
+            const requestedWaiver =
+              Boolean(
+                player.requestedSalaryWaived ??
+                player.salaryWaived
+              );
+
+            const activeWaiver =
+              Boolean(player.activeSalaryWaived);
+
+            const waiverPending =
+              Boolean(player.waiverPending);
+
+            const salaryChanged =
+              !activeExists ||
+              active === null ||
+              Math.abs(active - proposed) > 0.009;
+
+            const needsAction =
+              salaryChanged ||
+              waiverPending ||
+              Boolean(player.planPending);
+
+            let waiverHtml = "";
+
+            if (
+              requestedWaiver &&
+              waiverPending
+            ) {
+              waiverHtml = `
+                <span class="admin-company-waiver pending">
+                  💚 Zrzeczenie od kolejnego
+                </span>
+              `;
+            } else if (
+              !requestedWaiver &&
+              waiverPending &&
+              activeWaiver
+            ) {
+              waiverHtml = `
+                <span class="admin-company-waiver pending-off">
+                  ↩️ Zrzeczenie wycofane
+                </span>
+              `;
+            } else if (requestedWaiver) {
+              waiverHtml = `
+                <span class="admin-company-waiver active">
+                  💚 Zrzeczenie aktywne
+                </span>
+              `;
+            }
+
+            const instruction =
+              needsAction
+                ? `
+                  <div class="admin-company-instruction change">
+                    <span>🟡 USTAW</span>
+                    <strong>${companyMoney(proposed)} zł</strong>
+                  </div>
+                `
+                : `
+                  <div class="admin-company-instruction keep">
+                    <span>🟢 ZOSTAW</span>
+                    <strong>${companyMoney(proposed)} zł</strong>
+                  </div>
+                `;
+
+            return `
+              <div class="admin-company-salary-row ${needsAction ? "needs-change" : "no-change"}">
+                <div class="admin-company-salary-player">
+                  <div class="admin-company-player-name">
+                    <strong>${escapeHtml(player.nick)}</strong>
+                    ${waiverHtml}
+                  </div>
+
+                  <div class="muted">
+                    Wkład: ${companyMoney(player.contribution)} zł
+                    · należna: ${companyMoney(player.salary)} zł
+                    · udział:
+                    ${(Number(player.share)*100)
+                      .toFixed(2)
+                      .replace(".",",")}%
+                  </div>
+
+                  <div class="admin-company-current-salary">
+                    ${
+                      activeExists
+                        ? `
+                          Aktualnie ustawione:
+                          <strong>${companyMoney(active)} zł</strong>
+                        `
+                        : `
+                          <strong>Brak potwierdzonego poprzedniego planu.</strong>
+                        `
+                    }
+                  </div>
+
+                  ${
+                    requestedWaiver
+                      ? `
+                        <div class="muted">
+                          Pełna należna:
+                          ${companyMoney(player.fullGameSalary)} zł
+                          · do Funduszu:
+                          ${companyMoney(player.waivedAmount)} zł
+                        </div>
+                      `
+                      : ""
+                  }
                 </div>
-              </div>
 
-              <strong>
-                ${(Number(player.share)*100)
-                  .toFixed(2)
-                  .replace(".",",")}%
-              </strong>
-
-              <div style="text-align:right">
-                <strong>
-                  🎮 ${companyMoney(player.payoutSalary)} zł
-                </strong>
-                ${player.salaryWaived
-                  ? `<div class="muted">💚 ${companyMoney(player.waivedAmount)} zł</div>`
-                  : ""}
+                ${instruction}
               </div>
-            </div>
-          `)
+            `;
+          })
           .join("")
       : `
           <div class="empty">
@@ -6551,6 +6643,14 @@ function renderAdminCompanyPlan(
       a pozostała część 50% dochodu jest
       dzielona według wagi <b>wkład<sup>0,8</sup></b>.
       Pensję do gry zawsze ucinamy do pełnych złotych.
+    </div>
+
+    <div class="admin-company-salary-guide">
+      <strong>🎮 Co ustawić w MenelWars</strong>
+      <span>
+        🟡 USTAW = wartość różni się od ostatnio potwierdzonego planu.
+        🟢 ZOSTAW = w grze powinna już być prawidłowa wartość.
+      </span>
     </div>
 
     ${rowsHtml}

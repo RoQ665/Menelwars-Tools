@@ -2370,3 +2370,140 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .build-stat-level-hp-row .build-stat-total {
   font-weight:800;
 }
+
+/* ============================================================
+   v20.66 — ADMIN SPÓŁKA: INSTRUKCJA USTAWIANIA PENSJI
+   ============================================================ */
+
+.admin-company-salary-guide {
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:8px 0 6px;
+  padding:7px 8px;
+  border:1px solid #d8c7aa;
+  border-radius:8px;
+  background:rgba(255,255,255,.45);
+}
+
+.admin-company-salary-guide strong {
+  font-size:11px;
+}
+
+.admin-company-salary-guide span {
+  color:#786149;
+  font-size:8.5px;
+}
+
+.admin-company-salary-row {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+  align-items:center;
+  padding:8px 9px;
+  margin-top:5px;
+  border:1px solid #d8c7aa;
+  border-radius:8px;
+  background:#fffdf8;
+  font-size:11px;
+}
+
+.admin-company-salary-row.needs-change {
+  border-width:2px;
+}
+
+.admin-company-salary-player {
+  min-width:0;
+}
+
+.admin-company-player-name {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  flex-wrap:wrap;
+  margin-bottom:2px;
+}
+
+.admin-company-player-name > strong {
+  font-size:12px;
+}
+
+.admin-company-current-salary {
+  margin-top:3px;
+  font-size:9.5px;
+  color:#705a43;
+}
+
+.admin-company-waiver {
+  display:inline-flex;
+  align-items:center;
+  padding:2px 5px;
+  border-radius:999px;
+  font-size:7.5px;
+  font-weight:900;
+  line-height:1.2;
+  white-space:nowrap;
+}
+
+.admin-company-waiver.active {
+  background:rgba(70,145,76,.12);
+}
+
+.admin-company-waiver.pending {
+  background:rgba(223,174,54,.18);
+}
+
+.admin-company-waiver.pending-off {
+  background:rgba(190,125,70,.16);
+}
+
+.admin-company-instruction {
+  display:grid;
+  justify-items:end;
+  gap:1px;
+  min-width:82px;
+  padding:6px 8px;
+  border-radius:7px;
+  text-align:right;
+}
+
+.admin-company-instruction span {
+  font-size:7.5px;
+  font-weight:950;
+  letter-spacing:.03em;
+}
+
+.admin-company-instruction strong {
+  font-size:15px;
+  line-height:1.1;
+}
+
+.admin-company-instruction.change {
+  background:rgba(223,174,54,.16);
+}
+
+.admin-company-instruction.keep {
+  background:rgba(70,145,76,.10);
+}
+
+@media(max-width:520px) {
+  .admin-company-salary-row {
+    grid-template-columns:1fr;
+  }
+
+  .admin-company-instruction {
+    grid-template-columns:auto auto;
+    justify-content:space-between;
+    justify-items:initial;
+    align-items:center;
+    width:100%;
+    box-sizing:border-box;
+    text-align:left;
+  }
+
+  .admin-company-instruction strong {
+    text-align:right;
+  }
+}
