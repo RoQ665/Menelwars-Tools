@@ -8703,7 +8703,8 @@ function setupAdmin() {
       attack:cleanPositive(profile.attack,1),
       defense:cleanPositive(profile.defense,1),
       baseHp:cleanPositive(profile.baseHp,100),
-      petHp:cleanNonNegative(profile.petHp,0)
+      petHp:cleanNonNegative(profile.petHp,0),
+      eqHp:cleanNonNegative(profile.eqHp,0)
     };
   }
 
@@ -8731,7 +8732,11 @@ function setupAdmin() {
     stats.defenseFlat = profile.defense + END * 1.65;
     stats.defensePct = END * 0.65;
 
-    stats.maxHpFlat = profile.baseHp + profile.petHp + VIT * 1.5;
+    stats.maxHpFlat =
+      profile.baseHp +
+      profile.petHp +
+      profile.eqHp +
+      VIT * 1.5;
     stats.maxHpPct = VIT * 1.1;
 
     stats.accuracy = 85 + PRC * 0.5;
@@ -8891,7 +8896,10 @@ function setupAdmin() {
         profile:Object.assign(
           {},
           buildProfileStats(source || {}),
-          {petHp:0}
+          {
+            petHp:0,
+            eqHp:0
+          }
         )
       }
     );
@@ -8916,7 +8924,9 @@ function setupAdmin() {
     );
 
     const profileForItems = buildProfileStats(source || {});
-    itemStats.maxHpFlat += profileForItems.petHp;
+    itemStats.maxHpFlat +=
+      profileForItems.petHp +
+      profileForItems.eqHp;
 
     const groups = [
       {
@@ -9129,7 +9139,8 @@ function setupAdmin() {
         attack:1,
         defense:1,
         baseHp:100,
-        petHp:0
+        petHp:0,
+        eqHp:0
       },
       bonuses:[],
       bonusText:""
@@ -9373,6 +9384,9 @@ function setupAdmin() {
     const petHpValue =
       Number(el("build-profile-pet-hp")?.value);
 
+    const eqHpValue =
+      Number(el("build-profile-eq-hp")?.value);
+
     buildState.profile = {
       attack:readPositive("build-profile-attack",1),
       defense:readPositive("build-profile-defense",1),
@@ -9380,6 +9394,10 @@ function setupAdmin() {
       petHp:
         Number.isFinite(petHpValue) && petHpValue >= 0
           ? buildStatNumber(petHpValue)
+          : 0,
+      eqHp:
+        Number.isFinite(eqHpValue) && eqHpValue >= 0
+          ? buildStatNumber(eqHpValue)
           : 0
     };
 
@@ -9403,6 +9421,10 @@ function setupAdmin() {
 
     if (el("build-profile-pet-hp")) {
       el("build-profile-pet-hp").value = clean.petHp;
+    }
+
+    if (el("build-profile-eq-hp")) {
+      el("build-profile-eq-hp").value = clean.eqHp;
     }
   }
 
@@ -9965,7 +9987,8 @@ function setupAdmin() {
             attack:1,
             defense:1,
             baseHp:100,
-            petHp:0
+            petHp:0,
+            eqHp:0
           };
 
     fresh.bonuses =
@@ -9999,7 +10022,7 @@ function setupAdmin() {
       : (
           includeBonuses
             ? "📦 Skopiowano build razem z itemami. Zapis utworzy nowy build."
-            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój Atak, Obronę, Bazowe HP, HP z pancerza peta i wklej własne bonusy."
+            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój Atak, Obronę, Bazowe HP, HP z pancerza peta, HP ze zwykłego EQ (bez bonusu seta) i wklej własne bonusy."
         );
     renderBuildEditor();
     el("build-skill-editor").hidden = true;
@@ -10070,7 +10093,8 @@ function setupAdmin() {
       "build-profile-attack",
       "build-profile-defense",
       "build-profile-hp",
-      "build-profile-pet-hp"
+      "build-profile-pet-hp",
+      "build-profile-eq-hp"
     ].forEach(id => {
       el(id)?.addEventListener("input",()=>{
         buildReadProfileInputs();

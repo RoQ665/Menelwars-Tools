@@ -2310,3 +2310,37 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     font-size:11px;
   }
 }
+
+/* ============================================================
+   v20.64 — HP ZE ZWYKŁEGO EQ
+   ============================================================ */
+
+.build-profile-stats-grid {
+  grid-template-columns:repeat(5,minmax(0,1fr));
+}
+
+.build-profile-stats-grid label small {
+  display:block;
+  margin-top:3px;
+  color:#8a745b;
+  font-size:7.8px;
+  line-height:1.25;
+}
+
+@media(max-width:900px) {
+  .build-profile-stats-grid {
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+
+@media(max-width:650px) {
+  .build-profile-stats-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:520px) {
+  .build-profile-stats-grid {
+    grid-template-columns:1fr;
+  }
+}
