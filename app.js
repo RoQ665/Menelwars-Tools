@@ -8077,99 +8077,357 @@ function setupAdmin() {
 
 
   const BUILD_BONUS_LABELS = {
+    // HP
+    "hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
     "max hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
-    "maks. hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
-    "max hp (%)":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
+    "maks hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
+    "max hp %":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
+    "maks hp %":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
+
+    // Atak / obrona — auto rozróżnia flat i procent po znaku % wartości.
     "atak":{key:"attackAuto",label:"Atak",unit:"auto"},
+    "atak %":{key:"attackPct",label:"Atak (%)",unit:"pct"},
     "obrona":{key:"defenseAuto",label:"Obrona",unit:"auto"},
-    "celność":{key:"accuracy",label:"Celność",unit:"pct"},
+    "obrona %":{key:"defensePct",label:"Obrona (%)",unit:"pct"},
+
+    // Ofensywa
+    "celnosc":{key:"accuracy",label:"Celność",unit:"pct"},
     "pierwszy cios":{key:"firstStrike",label:"Pierwszy cios",unit:"pct"},
-    "próg egzekucji":{key:"execute",label:"Próg egzekucji",unit:"pct"},
-    "kradzież życia":{key:"lifesteal",label:"Kradzież życia",unit:"pct"},
+    "prog egzekucji":{key:"execute",label:"Próg egzekucji",unit:"pct"},
+    "kradziez zycia":{key:"lifesteal",label:"Kradzież życia",unit:"pct"},
     "przebicie pancerza":{key:"armorPen",label:"Przebicie pancerza",unit:"pct"},
-    "szansa ogłuszenia":{key:"stun",label:"Szansa ogłuszenia",unit:"pct"},
+    "szansa ogluszenia":{key:"stun",label:"Szansa ogłuszenia",unit:"pct"},
+    "szansa na ogluszenie":{key:"stun",label:"Szansa ogłuszenia",unit:"pct"},
     "szansa na kryt":{key:"critChance",label:"Szansa na kryt",unit:"pct"},
+    "szansa na kryta":{key:"critChance",label:"Szansa na kryt",unit:"pct"},
+    "obrazenia krytyczne":{key:"critDmg",label:"Obrażenia krytyczne",unit:"pct"},
     "szansa krwawienia":{key:"bleed",label:"Szansa krwawienia",unit:"pct"},
+    "szansa na krwawienie":{key:"bleed",label:"Szansa krwawienia",unit:"pct"},
     "obrazenia krwawienia":{key:"bleedDamage",label:"Obrażenia krwawienia",unit:"pct"},
-    "obrażenia krwawienia":{key:"bleedDamage",label:"Obrażenia krwawienia",unit:"pct"},
     "redukcja leczenia wroga":{key:"healingReduction",label:"Redukcja leczenia wroga",unit:"pct"},
-    "odp. na kryt (szansa)":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
-    "odp. na ogłuszenie":{key:"stunResist",label:"Odporność na ogłuszenie",unit:"pct"},
-    "podwójne uderzenie":{key:"doubleStrike",label:"Podwójne uderzenie",unit:"pct"},
-    "kontratak":{key:"counter",label:"Kontratak",unit:"pct"}
+    "podwojne uderzenie":{key:"doubleStrike",label:"Podwójne uderzenie",unit:"pct"},
+    "kontratak":{key:"counter",label:"Kontratak",unit:"pct"},
+    "unik":{key:"evasion",label:"Unik",unit:"pct"},
+
+    // Obrona / odporności
+    "redukcja obrazen":{key:"damageReduction",label:"Redukcja obrażeń",unit:"pct"},
+    "odpornosc na kryta":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
+    "odpornosc na kryt":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
+    "odp na kryt szansa":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
+    "odp na kryta szansa":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
+    "odpornosc na ogluszenie":{key:"stunResist",label:"Odporność na ogłuszenie",unit:"pct"},
+    "odp na ogluszenie":{key:"stunResist",label:"Odporność na ogłuszenie",unit:"pct"},
+    "odpornosc na krwawienie":{key:"bleedResist",label:"Odporność na krwawienie",unit:"pct"},
+    "odp na krwawienie":{key:"bleedResist",label:"Odporność na krwawienie",unit:"pct"}
   };
 
   function buildNormalizeBonusName(value) {
     return String(value || "")
+      .normalize("NFD")
+      .replace(/[łŁ]/g,"l")
+      .replace(/[\u0300-\u036f]/g,"")
       .replace(/\u00a0/g," ")
+      .toLocaleLowerCase("pl-PL")
+      // Gra potrafi zwrócić np. „Atak (%)”, „Odp. na kryt (szansa)”
+      // albo ten sam tekst bez polskich znaków. Sprowadzamy to do jednego klucza.
+      .replace(/[()]/g," ")
+      .replace(/[.:]/g," ")
+      .replace(/[^a-z0-9%]+/g," ")
       .replace(/\s+/g," ")
-      .trim()
-      .toLocaleLowerCase("pl-PL");
+      .trim();
   }
 
   function buildParseBonusText(text) {
     const entries = [];
     const unknown = [];
 
-    const lines = String(text || "")
+    const rawLines = String(text || "")
       .replace(/\r/g,"")
-      .split("\n")
-      .map(line => line.replace(/\*\*/g,"").replace(/\*/g,"").replace(/\u00a0/g," ").trim())
+      .split("\n");
+
+    const lines = rawLines
+      .map(line => String(line || "")
+        // Markdown link: [Atak](url) -> Atak
+        .replace(/\[([^\]]+)\]\([^)]+\)/g,"$1")
+        // Markdown image / standalone image label is not a stat.
+        .replace(/!\[[^\]]*\]\([^)]+\)/g,"")
+        .replace(/\*\*/g,"")
+        .replace(/\*/g,"")
+        .replace(/\u00a0/g," ")
+        .trim()
+      )
       .filter(Boolean)
       .filter(line => !/powyższe atrybuty/i.test(line));
 
-    const addEntry = (labelLine,valueLine) => {
-      const match = String(labelLine || "").match(/^(Set|Akcesoria|Gang\s*[—–-]\s*.+?)\s+(.+?)\s*$/i);
-      const valueMatch = String(valueLine || "").match(/^\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*$/);
+    let currentSetName = "";
 
-      if (!match || !valueMatch) return false;
+    const resolveDefinition = statName => {
+      const normalized =
+        buildNormalizeBonusName(statName);
 
-      const sourceName = match[1].replace(/\s+/g," ").trim();
-      const statName = match[2].replace(/\s+/g," ").trim();
-      const value = Number(valueMatch[1].replace(",","."));
-      const isPercent = Boolean(valueMatch[2]);
-      const def = BUILD_BONUS_LABELS[buildNormalizeBonusName(statName)];
+      return {
+        normalized,
+        def:BUILD_BONUS_LABELS[normalized] || null
+      };
+    };
 
-      if (!def || !Number.isFinite(value)) return false;
+    const pushEntry = (
+      sourceName,
+      statName,
+      value,
+      isPercent
+    ) => {
+      const number = Number(
+        String(value).replace(",",".")
+      );
 
+      const resolved =
+        resolveDefinition(statName);
+
+      if (
+        !resolved.def ||
+        !Number.isFinite(number)
+      ) {
+        return false;
+      }
+
+      const def = resolved.def;
       let key = def.key;
-      if (key === "attackAuto") key = isPercent ? "attackPct" : "attackFlat";
-      if (key === "defenseAuto") key = isPercent ? "defensePct" : "defenseFlat";
-      if (def.key === "maxHpFlat" && isPercent) key = "maxHpPct";
+
+      if (key === "attackAuto") {
+        key = isPercent
+          ? "attackPct"
+          : "attackFlat";
+      }
+
+      if (key === "defenseAuto") {
+        key = isPercent
+          ? "defensePct"
+          : "defenseFlat";
+      }
+
+      if (
+        def.key === "maxHpFlat" &&
+        isPercent
+      ) {
+        key = "maxHpPct";
+      }
 
       entries.push({
-        source:sourceName,
-        name:statName,
+        source:String(sourceName || "Set").trim(),
+        name:String(statName || def.label).trim(),
         key,
-        value:buildStatNumber(value),
-        percent:isPercent
+        value:buildStatNumber(number),
+        percent:Boolean(isPercent)
       });
+
       return true;
     };
 
-    for (let i=0; i<lines.length; i++) {
+    const addPrefixedEntry = (
+      labelLine,
+      valueLine
+    ) => {
+      const match =
+        String(labelLine || "")
+          .match(
+            /^(Set|Akcesoria|Gang\s*[—–-]\s*.+?)\s+(.+?)\s*$/i
+          );
+
+      const valueMatch =
+        String(valueLine || "")
+          .match(
+            /^\s*[⚔️]?\s*\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*$/
+          );
+
+      if (!match || !valueMatch) {
+        return false;
+      }
+
+      return pushEntry(
+        match[1].replace(/\s+/g," ").trim(),
+        match[2].replace(/\s+/g," ").trim(),
+        valueMatch[1],
+        Boolean(valueMatch[2])
+      );
+    };
+
+    const addStandaloneLine = (
+      line,
+      sourceName
+    ) => {
+      let clean =
+        String(line || "")
+          .replace(/^[⚔️\s]+/u,"")
+          .trim();
+
+      if (!clean) {
+        return false;
+      }
+
+      // Format setów, np.:
+      // +8% Unik
+      // +500 Max HP
+      // +10% Obrazenia krytyczne
+      let match =
+        clean.match(
+          /^\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*(.+?)\s*$/i
+        );
+
+      if (match) {
+        return pushEntry(
+          sourceName,
+          match[3],
+          match[1],
+          Boolean(match[2])
+        );
+      }
+
+      // Format stron setów, np.:
+      // Atak +20 atak
+      // Obrona +15 obrona
+      // HP +5 max HP
+      match =
+        clean.match(
+          /^(.+?)\s*\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*(.*?)\s*$/i
+        );
+
+      if (match) {
+        const before = match[1].trim();
+        const after = match[4].trim();
+
+        // Preferujemy nazwę po wartości, jeśli jest prawidłową statystyką
+        // ("HP +5 max HP"), w przeciwnym razie nazwę przed wartością.
+        const afterDef =
+          after
+            ? resolveDefinition(after).def
+            : null;
+
+        const beforeDef =
+          resolveDefinition(before).def;
+
+        const statName =
+          afterDef
+            ? after
+            : (
+                beforeDef
+                  ? before
+                  : ""
+              );
+
+        if (statName) {
+          return pushEntry(
+            sourceName,
+            statName,
+            match[2],
+            Boolean(match[3])
+          );
+        }
+      }
+
+      return false;
+    };
+
+    for (
+      let i=0;
+      i<lines.length;
+      i++
+    ) {
       const line = lines[i];
 
-      // Format 1: gra kopiuje nazwę bonusu i wartość w dwóch osobnych liniach:
-      // Gang – Piwnica Atak
-      // +14
-      if (i+1 < lines.length && addEntry(line,lines[i+1])) {
+      const setHeading =
+        line.match(
+          /(?:czesc|część)\s+zestawu\s*:\s*(.+)$/i
+        );
+
+      if (setHeading) {
+        currentSetName =
+          setHeading[1]
+            .replace(/\s+/g," ")
+            .trim();
+        continue;
+      }
+
+      if (
+        /^wymagane przedmioty\s*:/i.test(line) ||
+        /^bonusy za komplet\s*:/i.test(line) ||
+        /^bonus za ulepszenie/i.test(line) ||
+        /^t\d+\s*/i.test(line) ||
+        /^image$/i.test(line)
+      ) {
+        continue;
+      }
+
+      // Dotychczasowy format PWA:
+      // Akcesoria Atak
+      // +11.10%
+      if (
+        i+1 < lines.length &&
+        addPrefixedEntry(
+          line,
+          lines[i+1]
+        )
+      ) {
         i++;
         continue;
       }
 
-      // Format 2: obsługa również wersji jednowierszowej.
-      const oneLine = line.match(/^(.*\S)\s+(\+\s*[0-9]+(?:[.,][0-9]+)?%?)\s*$/);
-      if (oneLine && addEntry(oneLine[1],oneLine[2])) {
+      // Dotychczasowy format jednowierszowy:
+      // Akcesoria Atak +11.10%
+      const prefixedOneLine =
+        line.match(
+          /^(Set|Akcesoria|Gang\s*[—–-]\s*.+?)\s+(.+?)\s+\+\s*([0-9]+(?:[.,][0-9]+)?)(%)?\s*$/i
+        );
+
+      if (
+        prefixedOneLine &&
+        pushEntry(
+          prefixedOneLine[1],
+          prefixedOneLine[2],
+          prefixedOneLine[3],
+          Boolean(prefixedOneLine[4])
+        )
+      ) {
         continue;
       }
 
-      // Samotnej wartości nie raportujemy drugi raz jako osobnego błędu.
-      if (/^\+\s*[0-9]+(?:[.,][0-9]+)?%?\s*$/.test(line)) continue;
+      const sourceName =
+        currentSetName
+          ? `Set · ${currentSetName}`
+          : "Set";
+
+      if (
+        addStandaloneLine(
+          line,
+          sourceName
+        )
+      ) {
+        continue;
+      }
+
+      // Samotna wartość po nierozpoznanej etykiecie nie jest osobnym błędem.
+      if (
+        /^\s*[⚔️]?\s*\+\s*[0-9]+(?:[.,][0-9]+)?%?\s*$/u.test(line)
+      ) {
+        continue;
+      }
+
+      // Nazwy elementów zestawu / treści sklepu nie są błędami importera.
+      if (
+        /^https?:\/\//i.test(line) ||
+        /złota moneta/i.test(line) ||
+        /\b(kup|brakuje)\b/i.test(line)
+      ) {
+        continue;
+      }
+
       unknown.push(line);
     }
 
-    return {entries,unknown};
+    return {
+      entries,
+      unknown
+    };
   }
 
   function buildApplyImportedBonuses(stats,source) {
@@ -9435,10 +9693,24 @@ function setupAdmin() {
         moduleName !== "gang" ||
         !playerAccountSessionToken() ||
         viewId === "gang-gate-view" ||
+        viewId === "gang-menu-view" ||
         transientView;
     }
 
-    document.querySelectorAll("[data-subtab]").forEach(button=>{
+    document.querySelectorAll("[data-gang-menu-target]").forEach(button=>{
+    button.addEventListener("click",async ()=>{
+      if (!playerAccountSessionToken()) {
+        openGangLanding();
+        return;
+      }
+
+      await openGangModule(
+        button.dataset.gangMenuTarget
+      );
+    });
+  });
+
+  document.querySelectorAll("[data-subtab]").forEach(button=>{
       button.classList.toggle("active",button.dataset.subtab===viewId);
     });
   }
@@ -9598,6 +9870,30 @@ function setupAdmin() {
   }
 
 
+  function openGangLanding() {
+    if (!playerAccountSessionToken()) {
+      if (el("gang-tabs")) {
+        el("gang-tabs").hidden = true;
+      }
+
+      showToolView(
+        "gang-gate-view",
+        "gang"
+      );
+      return;
+    }
+
+    if (el("gang-tabs")) {
+      el("gang-tabs").hidden = true;
+    }
+
+    showToolView(
+      "gang-menu-view",
+      "gang"
+    );
+  }
+
+
   async function openGangModule(
     target="payments-view"
   ) {
@@ -9669,7 +9965,7 @@ function setupAdmin() {
       }
 
       if (moduleName === "gang") {
-        await openGangModule("payments-view");
+        openGangLanding();
         return;
       }
 
