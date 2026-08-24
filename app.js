@@ -8580,12 +8580,27 @@ function setupAdmin() {
     };
   }
 
-  function buildApplyImportedBonuses(stats,source) {
+  function buildApplyImportedBonuses(stats,source,options={}) {
     const entries = Array.isArray(source && source.bonuses) ? source.bonuses : [];
+    const skipProfileFlat = options.skipProfileFlat !== false;
+
     entries.forEach(entry => {
       const key = String(entry && entry.key || "");
       const value = Number(entry && entry.value);
-      if (!Object.prototype.hasOwnProperty.call(stats,key) || !Number.isFinite(value)) return;
+
+      if (!Object.prototype.hasOwnProperty.call(stats,key) || !Number.isFinite(value)) {
+        return;
+      }
+
+      // Atak i Obrona wpisane z menu Postaci już zawierają zwykłe płaskie
+      // bonusy z EQ, peta, EQ peta, skilli i Gangu. Nie doliczamy ich drugi raz.
+      if (
+        skipProfileFlat &&
+        (key === "attackFlat" || key === "defenseFlat")
+      ) {
+        return;
+      }
+
       stats[key] += value;
     });
   }
@@ -8648,6 +8663,28 @@ function setupAdmin() {
   }
 
 
+  function buildProfileStats(source) {
+    const profile =
+      source &&
+      source.profile &&
+      typeof source.profile === "object"
+        ? source.profile
+        : {};
+
+    const cleanPositive = (value,fallback) => {
+      const number = Number(value);
+      return Number.isFinite(number) && number >= 1
+        ? buildStatNumber(number)
+        : fallback;
+    };
+
+    return {
+      attack:cleanPositive(profile.attack,1),
+      defense:cleanPositive(profile.defense,1),
+      baseHp:cleanPositive(profile.baseHp,100)
+    };
+  }
+
   function buildCalculateStats(source) {
     const attributes = source && source.attributes ? source.attributes : {};
     const perks = source && source.perks ? source.perks : {};
@@ -8657,6 +8694,7 @@ function setupAdmin() {
     const AGI = Number(attributes.agility) || 0;
     const VIT = Number(attributes.vitality) || 0;
     const PRC = Number(attributes.precision) || 0;
+    const profile = buildProfileStats(source);
 
     const stats = buildNewStatBag();
     const extras = {
@@ -8665,13 +8703,13 @@ function setupAdmin() {
     };
 
     // Mechaniki atrybutów dokładnie według ekranów z gry.
-    stats.attackFlat = STR * 0.5 + AGI * 0.5 + PRC * 0.4;
+    stats.attackFlat = profile.attack + STR * 0.5 + AGI * 0.5 + PRC * 0.4;
     stats.attackPct = STR * 0.45;
 
-    stats.defenseFlat = END * 1.65;
+    stats.defenseFlat = profile.defense + END * 1.65;
     stats.defensePct = END * 0.65;
 
-    stats.maxHpFlat = VIT * 1.5;
+    stats.maxHpFlat = profile.baseHp + VIT * 1.5;
     stats.maxHpPct = VIT * 1.1;
 
     stats.accuracy = 85 + PRC * 0.5;
@@ -8748,10 +8786,16 @@ function setupAdmin() {
     })}${suffix}`;
   }
 
-  function buildBaseStatBag() {
+  function buildBaseStatBag(source) {
     const stats = buildNewStatBag();
+    const profile = buildProfileStats(source);
 
-    // Bazowe wartości mechanik gry przy 0 pkt atrybutów.
+    // Wartości startowe / wpisane z profilu postaci.
+    stats.attackFlat = profile.attack;
+    stats.defenseFlat = profile.defense;
+    stats.maxHpFlat = profile.baseHp;
+
+    // Bazowe wartości mechanik PvP przy 0 pkt atrybutów.
     stats.accuracy = 85;
     stats.initiative = 3;
     stats.critChance = 3;
@@ -8771,7 +8815,7 @@ function setupAdmin() {
     const buildOnlySource = Object.assign({},source || {},{bonuses:[]});
     const buildOnly = buildCalculateStats(buildOnlySource);
 
-    const baseStats = buildBaseStatBag();
+    const baseStats = buildBaseStatBag(source);
     const buildContribution = buildNewStatBag();
 
     Object.keys(buildContribution).forEach(key => {
@@ -8783,7 +8827,11 @@ function setupAdmin() {
     });
 
     const itemStats = buildNewStatBag();
-    buildApplyImportedBonuses(itemStats,source || {});
+    buildApplyImportedBonuses(
+      itemStats,
+      source || {},
+      {skipProfileFlat:true}
+    );
 
     const groups = [
       {
@@ -8928,6 +8976,11 @@ function setupAdmin() {
       },
       name:"",
       description:"",
+      profile:{
+        attack:1,
+        defense:1,
+        baseHp:100
+      },
       bonuses:[],
       bonusText:""
     };
@@ -9159,6 +9212,40 @@ function setupAdmin() {
     }
   }
 
+  function buildReadProfileInputs() {
+    const readPositive = (id,fallback) => {
+      const value = Number(el(id)?.value);
+      return Number.isFinite(value) && value >= 1
+        ? buildStatNumber(value)
+        : fallback;
+    };
+
+    buildState.profile = {
+      attack:readPositive("build-profile-attack",1),
+      defense:readPositive("build-profile-defense",1),
+      baseHp:readPositive("build-profile-hp",100)
+    };
+
+    return buildState.profile;
+  }
+
+  function buildWriteProfileInputs(profile) {
+    const clean = buildProfileStats({profile});
+
+    if (el("build-profile-attack")) {
+      el("build-profile-attack").value = clean.attack;
+    }
+
+    if (el("build-profile-defense")) {
+      el("build-profile-defense").value = clean.defense;
+    }
+
+    if (el("build-profile-hp")) {
+      el("build-profile-hp").value = clean.baseHp;
+    }
+  }
+
+
   function buildPayload(isPublic) {
     const accountNick = cachedAccountNick();
     const guestAuthor = el("build-guest-author")?.value.trim() || "";
@@ -9167,6 +9254,7 @@ function setupAdmin() {
 
     buildState.name = name;
     buildState.description = description;
+    buildReadProfileInputs();
 
     return {
       action:"buildSave",
@@ -9180,6 +9268,7 @@ function setupAdmin() {
       level:buildRequiredLevel(),
       attributes:buildState.attributes,
       perks:buildState.perks,
+      profile:Object.assign({},buildState.profile),
       bonuses:Array.isArray(buildState.bonuses) ? buildState.bonuses : []
     };
   }
@@ -9285,6 +9374,7 @@ function setupAdmin() {
       level:Math.max(1,Number(item && item.level) || 1),
       attributes:Object.assign(buildEmptyState().attributes,item && item.attributes || {}),
       perks:Object.assign(buildEmptyState().perks,item && item.perks || {}),
+      profile:buildProfileStats(item || {}),
       bonuses:Array.isArray(item && item.bonuses) ? item.bonuses : [],
       updatedAt:String(item && item.updatedAt || "")
     };
@@ -9704,6 +9794,18 @@ function setupAdmin() {
     fresh.level = Math.max(1,Number(item.level)||1);
     fresh.name = keepId ? String(item.name||"") : `${String(item.name||"Build")} — kopia`;
     fresh.description = String(item.description||"");
+    fresh.profile =
+      (
+        keepId ||
+        includeBonuses
+      )
+        ? buildProfileStats(item || {})
+        : {
+            attack:1,
+            defense:1,
+            baseHp:100
+          };
+
     fresh.bonuses =
       includeBonuses &&
       Array.isArray(item.bonuses)
@@ -9727,6 +9829,7 @@ function setupAdmin() {
     buildActiveAttr = "";
     el("build-name").value = fresh.name;
     el("build-description").value = fresh.description;
+    buildWriteProfileInputs(fresh.profile);
     if (el("build-bonus-text")) el("build-bonus-text").value = "";
     buildRenderBonusPreview();
     el("build-save-status").textContent = keepId
@@ -9734,7 +9837,7 @@ function setupAdmin() {
       : (
           includeBonuses
             ? "📦 Skopiowano build razem z itemami. Zapis utworzy nowy build."
-            : "📋 Skopiowano atrybuty i perki bez itemów autora. Wklej własne bonusy i zapisz jako nowy build."
+            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój Atak, Obronę, Bazowe HP i wklej własne bonusy."
         );
     renderBuildEditor();
     el("build-skill-editor").hidden = true;
@@ -9746,6 +9849,7 @@ function setupAdmin() {
     buildActiveAttr = "";
     el("build-name").value = "";
     el("build-description").value = "";
+    buildWriteProfileInputs(buildState.profile);
     if (el("build-bonus-text")) el("build-bonus-text").value = "";
     if (el("build-bonus-status")) el("build-bonus-status").textContent = "";
     buildRenderBonusPreview();
@@ -9799,6 +9903,20 @@ function setupAdmin() {
     setupBuildPublicFilters();
     el("build-bonus-import")?.addEventListener("click",buildImportBonuses);
     el("build-bonus-clear")?.addEventListener("click",buildClearBonuses);
+
+    [
+      "build-profile-attack",
+      "build-profile-defense",
+      "build-profile-hp"
+    ].forEach(id => {
+      el(id)?.addEventListener("input",()=>{
+        buildReadProfileInputs();
+        renderBuildStats();
+      });
+    });
+
+    buildWriteProfileInputs(buildState.profile);
+
     el("build-save-private")?.addEventListener("click",()=>saveBuild(false));
     el("build-share-public")?.addEventListener("click",()=>saveBuild(true));
 
