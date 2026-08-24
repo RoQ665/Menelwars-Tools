@@ -4565,7 +4565,9 @@ const goal = payload && payload.goal;
   }
 
   function setupPayments() {
-    el("payments-refresh")?.addEventListener("click",loadPayments);
+    el("payments-refresh")?.addEventListener("click",async ()=>{
+      await openGangModule("payments-view");
+    });
     el("gang-tabs").hidden = true;
   }
 
@@ -9405,186 +9407,12 @@ function setupAdmin() {
   let runtimeLoaderProgress = 0;
   let runtimeLoaderActive = false;
 
-  function runtimeLoaderStart(
-    text="⏳ Odświeżam dane...",
-    funnyTexts=[
-      "🥫 Serwer szuka ostatniej puszki...",
-      "🍺 Ktoś zalał logi, już wycieram...",
-      "🧹 Odkurzam dane spod serwera...",
-      "🥴 Jeszcze chwila, backend ma kaca..."
-    ]
-  ) {
-    const box=el("app-preload");
-    const bar=el("app-preload-bar");
-    const percent=el("app-preload-percent");
-
-    if(!box||!bar||!percent)return;
-
-    clearInterval(runtimeLoaderTimer);
-    clearTimeout(runtimeLoaderFunnyTimer);
-
-    runtimeLoaderActive=true;
-    runtimeLoaderProgress=8;
-
-    box.hidden=false;
-    box.classList.remove("done","hiding","finishing");
-
-    appBootSetText(text);
-    bar.style.width="8%";
-    percent.textContent="8%";
-
-    const startedAt=Date.now();
-
-    runtimeLoaderTimer=setInterval(()=>{
-      if(!runtimeLoaderActive)return;
-
-      const elapsed =
-        Date.now() - startedAt;
-
-      // v20.21 — wolniejszy, bardziej naturalny postęp.
-      // Pasek nie dobija szybko do 90% przy dłuższych operacjach.
-      const target =
-        Math.min(
-          92,
-          8 +
-          84 *
-          (
-            1 -
-            Math.exp(
-              -elapsed / 7000
-            )
-          )
-        );
-
-      runtimeLoaderProgress +=
-        Math.max(
-          .22,
-          (
-            target -
-            runtimeLoaderProgress
-          ) * .105
-        );
-
-      runtimeLoaderProgress =
-        Math.min(
-          runtimeLoaderProgress,
-          92
-        );
-
-      bar.style.width=`${runtimeLoaderProgress}%`;
-      percent.textContent=`${Math.round(runtimeLoaderProgress)}%`;
-    },90);
-
-    runtimeLoaderFunnyTimer=setTimeout(()=>{
-      if(!runtimeLoaderActive)return;
-
-      const texts=Array.isArray(funnyTexts)
-        ? funnyTexts.filter(Boolean)
-        : [String(funnyTexts||"")].filter(Boolean);
-
-      if(!texts.length)return;
-
-      let index=0;
-      appBootSetText(texts[index++]);
-
-      const rotation=setInterval(()=>{
-        if(!runtimeLoaderActive){
-          clearInterval(rotation);
-          return;
-        }
-
-        appBootSetText(
-          texts[index%texts.length]
-        );
-        index+=1;
-      },1200);
-    },2000);
+  function runtimeLoaderStart() {
+    // v20.51 — globalny pasek u góry został usunięty.
   }
 
-  async function runtimeLoaderFinish(
-    finalText="✅ Gotowe"
-  ) {
-    if (!runtimeLoaderActive) {
-      return;
-    }
-
-    runtimeLoaderActive = false;
-
-    clearInterval(runtimeLoaderTimer);
-    clearTimeout(runtimeLoaderFunnyTimer);
-
-    const box = el("app-preload");
-    const bar = el("app-preload-bar");
-    const percent = el("app-preload-percent");
-
-    if (!box || !bar || !percent) {
-      return;
-    }
-
-    appBootSetText(finalText);
-    box.classList.add("finishing");
-
-    const from =
-      Math.max(
-        0,
-        Math.min(
-          99,
-          runtimeLoaderProgress
-        )
-      );
-
-    const duration = 260;
-    const started = performance.now();
-
-    await new Promise(resolve => {
-      const tick = now => {
-        const t =
-          Math.min(
-            1,
-            (now - started) / duration
-          );
-
-        const eased =
-          1 - Math.pow(1 - t, 3);
-
-        const value =
-          from + (100 - from) * eased;
-
-        bar.style.width = `${value}%`;
-        percent.textContent =
-          `${Math.round(value)}%`;
-
-        if (t < 1) {
-          requestAnimationFrame(tick);
-        } else {
-          resolve();
-        }
-      };
-
-      requestAnimationFrame(tick);
-    });
-
-    bar.style.width = "100%";
-    percent.textContent = "100%";
-    box.classList.remove("finishing");
-    box.classList.add("done");
-
-    await new Promise(
-      resolve => setTimeout(resolve, 420)
-    );
-
-    box.classList.add("hiding");
-
-    await new Promise(
-      resolve => setTimeout(resolve, 280)
-    );
-
-    box.hidden = true;
-    box.classList.remove(
-      "done",
-      "hiding",
-      "finishing"
-    );
+  async function runtimeLoaderFinish() {
+    // v20.51 — loadery są teraz lokalne dla modułów / przycisków.
   }
 
   async function withRuntimeLoader(
@@ -9701,51 +9529,43 @@ function setupAdmin() {
       return;
     }
 
-    const dataIsStale =
-      !latestGangPayload ||
-      Date.now() - latestGangPayloadAt > 30000;
+    const labels = {
+      "payments-view":"💰 Ładowanie Wpłat...",
+      "company-view":"🏢 Ładowanie Spółki...",
+      "polls-view":"📊 Ładowanie Ankiet...",
+      "goals-view":"🎯 Ładowanie Celów...",
+      "announcements-view":"📢 Ładowanie Ogłoszeń..."
+    };
 
-    const requests = [];
+    showModuleLoading(
+      "gang",
+      labels[target] || "👥 Ładowanie Gangu...",
+      "Pobieram aktualne dane tego modułu."
+    );
 
-    if (dataIsStale) {
-      requests.push(loadPayments({background:true}));
-    }
+    const requests = [
+      loadPayments({background:true})
+    ];
 
     if (target === "polls-view") {
       requests.push(loadGangPolls());
     }
 
-    if (requests.length) {
-      const labels = {
-        "payments-view":"💰 Ładowanie Wpłat...",
-        "company-view":"🏢 Ładowanie Spółki...",
-        "polls-view":"📊 Ładowanie Ankiet...",
-        "goals-view":"🎯 Ładowanie Celów...",
-        "announcements-view":"📢 Ładowanie Ogłoszeń..."
-      };
+    if (!moduleOpenInFlight.gang) {
+      moduleOpenInFlight.gang =
+        Promise.allSettled(requests);
+    }
 
-      showModuleLoading(
-        "gang",
-        labels[target] || "👥 Ładowanie Gangu...",
-        "Pobieram aktualne dane tego modułu."
-      );
+    try {
+      await moduleOpenInFlight.gang;
+    } finally {
+      moduleOpenInFlight.gang = null;
+    }
 
-      if (!moduleOpenInFlight.gang) {
-        moduleOpenInFlight.gang =
-          Promise.allSettled(requests);
-      }
-
-      try {
-        await moduleOpenInFlight.gang;
-      } finally {
-        moduleOpenInFlight.gang = null;
-      }
-
-      if (!playerAccountSessionToken()) {
-        el("gang-tabs").hidden = true;
-        showToolView("gang-gate-view","gang");
-        return;
-      }
+    if (!playerAccountSessionToken()) {
+      el("gang-tabs").hidden = true;
+      showToolView("gang-gate-view","gang");
+      return;
     }
 
     el("gang-tabs").hidden = false;
@@ -9849,302 +9669,10 @@ function setupAdmin() {
   });
 
 // ============================================================
-  // GLOBALNY PRELOAD / PASEK POSTĘPU
+  // START — tylko sprawdzenie konta
   // ============================================================
 
-  let appBootProgress = 5;
-  let appBootTarget = 5;
-  let appBootTimer = null;
-  let appBootFinished = false;
-
-  function appBootSetText(text) {
-    const label =
-      el("app-preload-text");
-
-    if (label) {
-      label.textContent = text;
-    }
-  }
-
-  function appBootRender() {
-    const box =
-      el("app-preload");
-
-    const bar =
-      el("app-preload-bar");
-
-    const percent =
-      el("app-preload-percent");
-
-    if (!box || !bar || !percent) {
-      return;
-    }
-
-    box.hidden = false;
-    bar.style.width =
-      `${Math.round(appBootProgress)}%`;
-
-    percent.textContent =
-      `${Math.round(appBootProgress)}%`;
-  }
-
-  function appBootReach(value,text) {
-    appBootTarget =
-      Math.max(
-        appBootTarget,
-        Math.min(
-          94,
-          Number(value) || 0
-        )
-      );
-
-    if (text) {
-      appBootSetText(text);
-    }
-
-    appBootRender();
-  }
-
-  function appBootStart() {
-    const box =
-      el("app-preload");
-
-    if (!box) return;
-
-    box.hidden = false;
-    box.classList.remove(
-      "done",
-      "hiding"
-    );
-
-    appBootProgress = 5;
-    appBootTarget = 14;
-    appBootFinished = false;
-
-    appBootSetText(
-      "⏳ Przygotowuję konto..."
-    );
-
-    appBootRender();
-
-    clearInterval(
-      appBootTimer
-    );
-
-    const startedAt =
-      Date.now();
-
-    appBootTimer =
-      setInterval(
-        () => {
-          if (appBootFinished) {
-            return;
-          }
-
-          const elapsed =
-            Date.now() -
-            startedAt;
-
-          // Symulowany wzrost przez ok. 5 s.
-          // Nigdy nie dobija sam do 100%.
-          const simulated =
-            Math.min(
-              90,
-              5 +
-              (
-                elapsed /
-                6500
-              ) *
-              83
-            );
-
-          appBootTarget =
-            Math.max(
-              appBootTarget,
-              simulated
-            );
-
-          if (
-            appBootProgress <
-            appBootTarget
-          ) {
-            const distance =
-              appBootTarget -
-              appBootProgress;
-
-            appBootProgress +=
-              Math.max(
-                .35,
-                distance * .12
-              );
-
-            appBootProgress =
-              Math.min(
-                appBootProgress,
-                94
-              );
-
-            appBootRender();
-          }
-        },
-        120
-      );
-  }
-
-  function appBootDone() {
-    appBootFinishSmooth();
-  }
-
-
-  async function appBootFinishSmooth() {
-    if (appBootFinished) {
-      return;
-    }
-
-    appBootFinished = true;
-
-    clearInterval(
-      appBootTimer
-    );
-
-    const box =
-      el("app-preload");
-
-    const bar =
-      el("app-preload-bar");
-
-    const percent =
-      el("app-preload-percent");
-
-    if (
-      !box ||
-      !bar ||
-      !percent
-    ) {
-      return;
-    }
-
-    // Najpierw komunikat końcowy, potem krótki płynny dojazd do 100%.
-    appBootSetText(
-      "✅ Dane gotowe"
-    );
-
-    box.classList.add(
-      "finishing"
-    );
-
-    const from =
-      Math.max(
-        0,
-        Math.min(
-          99,
-          appBootProgress
-        )
-      );
-
-    const duration =
-      320;
-
-    const started =
-      performance.now();
-
-    await new Promise(
-      resolve => {
-        const tick =
-          now => {
-            const t =
-              Math.min(
-                1,
-                (
-                  now -
-                  started
-                ) /
-                duration
-              );
-
-            const eased =
-              1 -
-              Math.pow(
-                1 - t,
-                3
-              );
-
-            appBootProgress =
-              from +
-              (
-                100 -
-                from
-              ) *
-              eased;
-
-            bar.style.width =
-              `${appBootProgress}%`;
-
-            percent.textContent =
-              `${Math.round(appBootProgress)}%`;
-
-            if (t < 1) {
-              requestAnimationFrame(
-                tick
-              );
-            } else {
-              resolve();
-            }
-          };
-
-        requestAnimationFrame(
-          tick
-        );
-      }
-    );
-
-    appBootProgress = 100;
-    appBootTarget = 100;
-
-    bar.style.width =
-      "100%";
-
-    percent.textContent =
-      "100%";
-
-    box.classList.remove(
-      "finishing"
-    );
-
-    box.classList.add(
-      "done"
-    );
-
-    setTimeout(
-      () => {
-        box.classList.add(
-          "hiding"
-        );
-
-        setTimeout(
-          () => {
-            box.hidden = true;
-
-            box.classList.remove(
-              "done",
-              "hiding",
-              "finishing"
-            );
-          },
-          280
-        );
-      },
-      1100
-    );
-  }
-
-
   async function preloadApplicationData() {
-    appBootReach(
-      18,
-      "🔐 Sprawdzam konto i sesję..."
-    );
-
     let account = null;
 
     try {
@@ -10156,21 +9684,12 @@ function setupAdmin() {
       }
     } catch (err) {
       console.warn(
-        "[MenelWars Tools] Preload konta:",
+        "[MenelWars Tools] Sprawdzanie konta:",
         err
       );
     }
 
     updateHomeAccountState(account);
-
-    appBootReach(
-      92,
-      account
-        ? "✅ Konto gotowe"
-        : "✅ Aplikacja gotowa"
-    );
-
-    await appBootFinishSmooth();
   }
 
 
@@ -10187,7 +9706,6 @@ setupAdmin();
 showToolView("home-view", "");
 if (el("admin-view")) el("admin-view").hidden = true;
 
-appBootStart();
 preloadApplicationData();
 
 
