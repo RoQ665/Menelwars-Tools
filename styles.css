@@ -2507,3 +2507,20 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     text-align:right;
   }
 }
+
+
+/* ============================================================
+   v20.67 — ADMIN SPÓŁKA: CHECKLISTA ZMIAN I SORTOWANIE PENSJI
+   ============================================================ */
+.admin-company-salary-section { margin-top:9px; }
+.admin-company-salary-section + .admin-company-salary-section { margin-top:13px; }
+.admin-company-salary-section-head {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:6px 8px; border-radius:7px; font-size:10px; font-weight:900;
+}
+.admin-company-salary-section-head span { font-size:8.5px; font-weight:800; opacity:.72; }
+.admin-company-salary-section.change-section .admin-company-salary-section-head { background:rgba(223,174,54,.18); }
+.admin-company-salary-section.correct-section .admin-company-salary-section-head { background:rgba(70,145,76,.10); }
+.admin-company-salary-section.correct-section .admin-company-salary-row { opacity:.82; }
+.admin-company-instruction.waiver-change { background:rgba(184,70,58,.13); }
+.admin-company-instruction.waiver-change span { color:#8f3029; }
