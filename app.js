@@ -8114,7 +8114,8 @@ function setupAdmin() {
       stunResist:0,
       bleedResist:0,
       hpRegen:0,
-      hpRegenPct:0
+      hpRegenPct:0,
+      levelHp:0
     };
   }
 
@@ -8719,6 +8720,15 @@ function setupAdmin() {
     const PRC = Number(attributes.precision) || 0;
     const profile = buildProfileStats(source);
 
+    const usedAttributePoints =
+      STR + END + AGI + VIT + PRC;
+
+    const requiredLevel =
+      Math.max(
+        1,
+        Math.ceil(usedAttributePoints / 2)
+      );
+
     const stats = buildNewStatBag();
     const extras = {
       conditional:[],
@@ -8732,8 +8742,12 @@ function setupAdmin() {
     stats.defenseFlat = profile.defense + END * 1.65;
     stats.defensePct = END * 0.65;
 
+    stats.levelHp =
+      requiredLevel * 5;
+
     stats.maxHpFlat =
       profile.baseHp +
+      stats.levelHp +
       profile.petHp +
       profile.eqHp +
       VIT * 1.5;
@@ -8815,7 +8829,13 @@ function setupAdmin() {
     extras.conditional = [...new Set(extras.conditional)];
     extras.special = [...new Set(extras.special)];
 
-    return {stats,rawStats,capInfo,extras};
+    return {
+      stats,
+      rawStats,
+      capInfo,
+      extras,
+      requiredLevel
+    };
   }
 
   function buildFormatStatValue(key,value) {
@@ -8955,6 +8975,7 @@ function setupAdmin() {
         title:"❤️ Życie",
         finalKind:"hp",
         finalLabel:"HP po przeliczeniu",
+        levelHpRow:true,
         keys:["maxHpFlat","maxHpPct","hpRegen"]
       }
     ];
@@ -9068,6 +9089,40 @@ function setupAdmin() {
           </div>
 
           <div class="build-stat-grid">
+            ${
+              group.levelHpRow
+                ? `
+                  <div class="build-stat-row build-stat-level-hp-row">
+                    <span class="build-stat-name">
+                      HP za poziom
+                      <small>
+                        ${escapeHtml(String(calculated.requiredLevel))} × 5 HP
+                      </small>
+                    </span>
+                    <span class="build-stat-base">—</span>
+                    <span class="build-stat-build">
+                      ${escapeHtml(
+                        sourceValue(
+                          "maxHpFlat",
+                          calculated.requiredLevel * 5
+                        )
+                      )}
+                    </span>
+                    <span class="build-stat-items">—</span>
+                    <span class="build-stat-total">
+                      <strong>
+                        ${escapeHtml(
+                          sourceValue(
+                            "maxHpFlat",
+                            calculated.requiredLevel * 5
+                          )
+                        )}
+                      </strong>
+                    </span>
+                  </div>
+                `
+                : ""
+            }
             ${group.keys.map(key => `
               <div class="build-stat-row">
                 <span class="build-stat-name">${escapeHtml(BUILD_STAT_META[key][0])}</span>
