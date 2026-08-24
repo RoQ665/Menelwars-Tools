@@ -2169,13 +2169,13 @@ const MAP_POSITIONS = {
     if (account && account.nick) {
       box.className = "submit-info known-recipe";
       box.innerHTML =
-        `✅ Konto <b>${escapeHtml(account.nick)}</b> gotowe${account.admin ? " · 🛠 Administrator" : ""}.`;
+        `✅ Zalogowano jako <b>${escapeHtml(account.nick)}</b>${account.admin ? " · 🛠 Administrator" : ""}.`;
     } else if (playerAccountSessionToken()) {
       box.className = "submit-info unknown-recipe";
       box.textContent = "⚠️ Nie udało się potwierdzić zapisanej sesji.";
     } else {
       box.className = "submit-info";
-      box.textContent = "👤 Nie jesteś zalogowany. Moduły publiczne działają bez konta.";
+      box.textContent = "👤 Korzystasz bez logowania. Destylarnia, Buildy i Mapa są dostępne bez konta.";
     }
   }
 
