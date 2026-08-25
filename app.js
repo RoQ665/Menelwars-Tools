@@ -1185,7 +1185,13 @@ const MAP_POSITIONS = {
                 </article>
               `;
             }).join("")
-          : `<div class="empty">Aktualnie żadna receptura nie jest zarezerwowana.</div>`;
+          : (
+              approvedRecipesRequestState === "loading"
+                ? `<div class="empty">⏳ Sprawdzam aktualne badania...</div>`
+                : approvedRecipesRequestState === "error"
+                  ? `<div class="empty">⚠️ Nie udało się potwierdzić aktualnych badań. Użyj Odśwież.</div>`
+                  : `<div class="empty">Aktualnie żadna receptura nie jest zarezerwowana.</div>`
+            );
     }
 
     if (researchList) {
@@ -2141,6 +2147,7 @@ const MAP_POSITIONS = {
   // ============================================================
 
   let approvedRecipesInFlight = null;
+  let approvedRecipesRequestState = "idle";
   let distilleryDataLoaded = false;
   let mapModuleLoaded = false;
 
@@ -2259,6 +2266,7 @@ const MAP_POSITIONS = {
 
   function fetchApprovedRecipes(options={}) {
     if (!backendConfigured()) {
+      approvedRecipesRequestState = "error";
       renderAll();
       distilleryDataLoaded = true;
       return Promise.resolve(false);
@@ -2268,7 +2276,18 @@ const MAP_POSITIONS = {
       return approvedRecipesInFlight;
     }
 
+    approvedRecipesRequestState = "loading";
+
+    // Jeżeli użytkownik patrzy już na Destylarnię,
+    // nie pokazujemy fałszywego "brak badań" podczas requestu.
+    if (distilleryDataLoaded) {
+      renderAll();
+    }
+
     approvedRecipesInFlight = new Promise(resolve => {
+      const timingStartedAt =
+        requestTimingNow();
+
       const callbackName =
         "roqApproved_" +
         Date.now() +
@@ -2278,33 +2297,84 @@ const MAP_POSITIONS = {
       const script =
         document.createElement("script");
 
-      let finished = false;
+      let settled = false;
+      let timingRecorded = false;
+      let lateCleanupTimer = null;
 
-      const finish = result => {
-        if (finished) return;
-        finished = true;
+      const recordTiming = ok => {
+        if (timingRecorded) return;
+        timingRecorded = true;
+
+        recordRequestTiming(
+          "approvedRecipes",
+          requestTimingNow() - timingStartedAt,
+          ok,
+          "GET"
+        );
+      };
+
+      const leaveSafeNoopCallback = () => {
+        window[callbackName] = () => {};
+      };
+
+      const cleanupCompleted = () => {
         clearTimeout(timeout);
+
+        if (lateCleanupTimer) {
+          clearTimeout(lateCleanupTimer);
+          lateCleanupTimer = null;
+        }
+
+        script.remove();
 
         try {
           delete window[callbackName];
-        } catch {}
-
-        script.remove();
-        resolve(result);
+        } catch {
+          leaveSafeNoopCallback();
+        }
       };
 
       const timeout =
         setTimeout(
           () => {
-            renderAll();
+            if (settled) return;
+            settled = true;
+
+            approvedRecipesRequestState = "error";
             distilleryDataLoaded = true;
-            finish(false);
+
+            recordTiming(false);
+            renderAll();
+
+            lateCleanupTimer =
+              setTimeout(() => {
+                script.remove();
+                leaveSafeNoopCallback();
+              }, JSONP_LATE_GRACE_MS);
+
+            resolve(false);
           },
-          12000
+          JSONP_TIMEOUT_MS
         );
 
       window[callbackName] =
         payload => {
+          if (settled) {
+            if (lateCleanupTimer) {
+              clearTimeout(lateCleanupTimer);
+              lateCleanupTimer = null;
+            }
+
+            script.remove();
+            leaveSafeNoopCallback();
+            return;
+          }
+
+          settled = true;
+          clearTimeout(timeout);
+
+          let ok = false;
+
           try {
             if (
               payload &&
@@ -2315,7 +2385,8 @@ const MAP_POSITIONS = {
               remoteApproved = payload.recipes;
 
               recipeReservations =
-                payload.reservations && typeof payload.reservations === "object"
+                payload.reservations &&
+                typeof payload.reservations === "object"
                   ? payload.reservations
                   : {};
 
@@ -2328,21 +2399,45 @@ const MAP_POSITIONS = {
                 REMOTE_KEY,
                 JSON.stringify(remoteApproved)
               );
+
+              ok = true;
             }
           } catch (err) {
-            console.warn("[MenelWars Tools] Destylarnia:",err);
+            console.warn(
+              "[MenelWars Tools] Destylarnia:",
+              err
+            );
           }
+
+          approvedRecipesRequestState =
+            ok ? "ready" : "error";
 
           renderAll();
           updateSubmissionInfo();
           distilleryDataLoaded = true;
-          finish(true);
+
+          recordTiming(ok);
+          cleanupCompleted();
+          resolve(ok);
         };
 
       script.onerror = () => {
-        renderAll();
+        if (settled) {
+          script.remove();
+          leaveSafeNoopCallback();
+          return;
+        }
+
+        settled = true;
+        clearTimeout(timeout);
+
+        approvedRecipesRequestState = "error";
         distilleryDataLoaded = true;
-        finish(false);
+
+        recordTiming(false);
+        renderAll();
+        cleanupCompleted();
+        resolve(false);
       };
 
       script.src =
@@ -2517,6 +2612,9 @@ const MAP_POSITIONS = {
   };
 
 
+  const JSONP_TIMEOUT_MS = 20 * 1000;
+  const JSONP_LATE_GRACE_MS = 60 * 1000;
+
   function jsonp(action, params={}) {
 
     const timingStartedAt =
@@ -2533,22 +2631,36 @@ const MAP_POSITIONS = {
       const script =
         document.createElement("script");
 
-      let done = false;
+      let settled = false;
+      let lateCleanupTimer = null;
 
-      const cleanup = () => {
-        if (done) return;
-        done = true;
+      const leaveSafeNoopCallback = () => {
+        // Jeżeli Apps Script odpowie bardzo późno, callback nadal istnieje.
+        // Dzięki temu nie dostajemy "mwJsonp_xxx is not defined".
+        window[callbackName] = () => {};
+      };
+
+      const cleanupCompleted = () => {
+        clearTimeout(timeout);
+
+        if (lateCleanupTimer) {
+          clearTimeout(lateCleanupTimer);
+          lateCleanupTimer = null;
+        }
+
+        script.remove();
 
         try {
           delete window[callbackName];
-        } catch {}
-
-        script.remove();
+        } catch {
+          leaveSafeNoopCallback();
+        }
       };
 
       const timeout =
         setTimeout(() => {
-          cleanup();
+          if (settled) return;
+          settled = true;
 
           recordRequestTiming(
             action,
@@ -2557,12 +2669,35 @@ const MAP_POSITIONS = {
             "GET"
           );
 
-          reject(new Error("Przekroczono czas odpowiedzi serwera."));
-        }, 12000);
+          // Nie usuwamy od razu tagu <script> ani callbacku.
+          // Apps Script może odpowiedzieć już po naszym limicie.
+          lateCleanupTimer =
+            setTimeout(() => {
+              script.remove();
+              leaveSafeNoopCallback();
+            }, JSONP_LATE_GRACE_MS);
+
+          reject(
+            new Error(
+              "Przekroczono czas odpowiedzi serwera."
+            )
+          );
+        }, JSONP_TIMEOUT_MS);
 
       window[callbackName] = payload => {
+        if (settled) {
+          if (lateCleanupTimer) {
+            clearTimeout(lateCleanupTimer);
+            lateCleanupTimer = null;
+          }
+
+          script.remove();
+          leaveSafeNoopCallback();
+          return;
+        }
+
+        settled = true;
         clearTimeout(timeout);
-        cleanup();
 
         recordRequestTiming(
           action,
@@ -2571,12 +2706,19 @@ const MAP_POSITIONS = {
           "GET"
         );
 
+        cleanupCompleted();
         resolve(payload);
       };
 
       script.onerror = () => {
+        if (settled) {
+          script.remove();
+          leaveSafeNoopCallback();
+          return;
+        }
+
+        settled = true;
         clearTimeout(timeout);
-        cleanup();
 
         recordRequestTiming(
           action,
@@ -2585,7 +2727,13 @@ const MAP_POSITIONS = {
           "GET"
         );
 
-        reject(new Error("Błąd połączenia z serwerem."));
+        cleanupCompleted();
+
+        reject(
+          new Error(
+            "Błąd połączenia z serwerem."
+          )
+        );
       };
 
       const query =
