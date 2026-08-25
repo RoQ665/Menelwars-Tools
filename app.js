@@ -4150,13 +4150,65 @@ async function loadAccountAdminPermissions(
   }
 
   let gangPollsLoadInFlight = null;
+  let gangPollsCache = null;
+  let gangPollsCacheAt = 0;
+  let gangPollsCacheToken = "";
+  const GANG_POLLS_CACHE_TTL_MS = 60 * 1000;
 
-  async function loadGangPolls() {
+  function invalidateGangPollsCache() {
+    gangPollsCache = null;
+    gangPollsCacheAt = 0;
+    gangPollsCacheToken = "";
+  }
+
+  async function fetchGangPollsPayload(options={}) {
+    const force = Boolean(options.force);
+    const token = playerAccountSessionToken();
+
+    if (!token) {
+      invalidateGangPollsCache();
+      return null;
+    }
+
+    if (
+      !force &&
+      gangPollsCache &&
+      gangPollsCacheToken === token &&
+      Date.now() - gangPollsCacheAt < GANG_POLLS_CACHE_TTL_MS
+    ) {
+      return gangPollsCache;
+    }
+
     if (gangPollsLoadInFlight) {
       return gangPollsLoadInFlight;
     }
 
     gangPollsLoadInFlight = (async () => {
+      try {
+        const payload = await jsonp(
+          "gangPolls",
+          {
+            sessionToken: token,
+            identityToken: token
+          }
+        );
+
+        if (payload && payload.ok !== false) {
+          gangPollsCache = payload;
+          gangPollsCacheAt = Date.now();
+          gangPollsCacheToken = token;
+        }
+
+        return payload;
+      } finally {
+        gangPollsLoadInFlight = null;
+      }
+    })();
+
+    return gangPollsLoadInFlight;
+  }
+
+  async function loadGangPolls(options={}) {
     const box =
       el("gang-polls-list");
 
@@ -4164,15 +4216,7 @@ async function loadAccountAdminPermissions(
 
     try {
       const payload =
-        await jsonp(
-          "gangPolls",
-          {
-            sessionToken:
-              playerAccountSessionToken(),
-            identityToken:
-              playerAccountSessionToken()
-          }
-        );
+        await fetchGangPollsPayload(options);
 
       const polls =
         Array.isArray(
@@ -4320,7 +4364,8 @@ async function loadAccountAdminPermissions(
                   }
                 );
 
-                await loadGangPolls();
+                invalidateGangPollsCache();
+                await loadGangPolls({force:true});
 
               } catch (err) {
                 window.alert(
@@ -4338,14 +4383,6 @@ async function loadAccountAdminPermissions(
           Nie udało się pobrać ankiet.
         </div>
       `;
-    }
-  
-    })();
-
-    try {
-      return await gangPollsLoadInFlight;
-    } finally {
-      gangPollsLoadInFlight = null;
     }
   }
 
@@ -5411,13 +5448,7 @@ async function loadAdminPolls() {
 
   try {
     const payload =
-      await jsonp(
-        "gangPolls",
-        {
-          sessionToken:
-            playerAccountSessionToken()
-        }
-      );
+      await fetchGangPollsPayload();
 
     const polls =
       Array.isArray(
@@ -5479,7 +5510,10 @@ async function loadAdminPolls() {
               }
             );
 
+              invalidateGangPollsCache();
+
               await Promise.allSettled([
+                fetchGangPollsPayload({force:true}),
                 loadAdminPolls(),
                 loadGangPolls()
               ]);
@@ -5524,7 +5558,10 @@ async function loadAdminPolls() {
               }
             );
 
+              invalidateGangPollsCache();
+
               await Promise.allSettled([
+                fetchGangPollsPayload({force:true}),
                 loadAdminPolls(),
                 loadGangPolls()
               ]);
@@ -6484,7 +6521,8 @@ async function setAdminSubmissionStatus(
     // Backend v20.19 robi SpreadsheetApp.flush()
     // przed odpowiedzią, więc nie potrzebujemy już
     // sztucznego dodatkowego oczekiwania 500 ms.
-    await loadAdminSubmissions();
+    invalidateAdminSubmissionsCache();
+    await loadAdminSubmissions({force:true});
 
 
     // Zatwierdzona receptura ma od razu trafić
@@ -6533,7 +6571,63 @@ async function setAdminSubmissionStatus(
   }
 }
 
-async function loadAdminSubmissions() {
+let adminSubmissionsCache = null;
+let adminSubmissionsCacheAt = 0;
+let adminSubmissionsCacheToken = "";
+let adminSubmissionsInFlight = null;
+const ADMIN_SUBMISSIONS_CACHE_TTL_MS = 60 * 1000;
+
+function invalidateAdminSubmissionsCache() {
+  adminSubmissionsCache = null;
+  adminSubmissionsCacheAt = 0;
+  adminSubmissionsCacheToken = "";
+}
+
+async function fetchAdminSubmissionsPayload(options={}) {
+  const force = Boolean(options.force);
+  const token = adminToken();
+
+  if (!token) {
+    invalidateAdminSubmissionsCache();
+    return null;
+  }
+
+  if (
+    !force &&
+    adminSubmissionsCache &&
+    adminSubmissionsCacheToken === token &&
+    Date.now() - adminSubmissionsCacheAt < ADMIN_SUBMISSIONS_CACHE_TTL_MS
+  ) {
+    return adminSubmissionsCache;
+  }
+
+  if (adminSubmissionsInFlight) {
+    return adminSubmissionsInFlight;
+  }
+
+  adminSubmissionsInFlight = (async () => {
+    try {
+      const payload = await jsonp(
+        "adminSubmissions",
+        {token}
+      );
+
+      if (payload && payload.ok) {
+        adminSubmissionsCache = payload;
+        adminSubmissionsCacheAt = Date.now();
+        adminSubmissionsCacheToken = token;
+      }
+
+      return payload;
+    } finally {
+      adminSubmissionsInFlight = null;
+    }
+  })();
+
+  return adminSubmissionsInFlight;
+}
+
+async function loadAdminSubmissions(options={}) {
 
   const token =
     adminToken();
@@ -6549,10 +6643,7 @@ async function loadAdminSubmissions() {
   try {
 
     const payload =
-      await jsonp(
-        "adminSubmissions",
-        {token}
-      );
+      await fetchAdminSubmissionsPayload(options);
 
     if (
       !payload ||
@@ -8424,7 +8515,10 @@ function setupAdmin() {
           el("admin-poll-options").value = "";
           el("admin-poll-end").value = "";
 
+          invalidateGangPollsCache();
+
           await Promise.allSettled([
+            fetchGangPollsPayload({force:true}),
             loadAdminPolls(),
             loadGangPolls()
           ]);
