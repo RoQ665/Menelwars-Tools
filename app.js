@@ -2388,7 +2388,139 @@ const MAP_POSITIONS = {
     return Array.from(bytes, b => b.toString(16).padStart(2,"0")).join("");
   }
 
+  // ============================================================
+  // v20.74 — POMIAR CZASÓW REQUESTÓW
+  // ============================================================
+
+  const requestTimingStats = new Map();
+  const requestTimingHistory = [];
+  const REQUEST_TIMING_HISTORY_MAX = 150;
+
+  function requestTimingNow() {
+    return (
+      typeof performance !== "undefined" &&
+      typeof performance.now === "function"
+    )
+      ? performance.now()
+      : Date.now();
+  }
+
+  function recordRequestTiming(
+    action,
+    durationMs,
+    ok=true,
+    method="GET"
+  ) {
+    const key =
+      `${String(method || "GET").toUpperCase()} ${String(action || "unknown")}`;
+
+    const ms =
+      Math.max(
+        0,
+        Math.round(Number(durationMs) || 0)
+      );
+
+    const item =
+      requestTimingStats.get(key) || {
+        action:key,
+        count:0,
+        success:0,
+        errors:0,
+        totalMs:0,
+        minMs:null,
+        maxMs:0,
+        lastMs:0,
+        lastAt:""
+      };
+
+    item.count++;
+    item.success += ok ? 1 : 0;
+    item.errors += ok ? 0 : 1;
+    item.totalMs += ms;
+    item.minMs =
+      item.minMs === null
+        ? ms
+        : Math.min(item.minMs,ms);
+    item.maxMs =
+      Math.max(item.maxMs,ms);
+    item.lastMs = ms;
+    item.lastAt =
+      new Date().toISOString();
+
+    requestTimingStats.set(
+      key,
+      item
+    );
+
+    requestTimingHistory.push({
+      action:key,
+      ms,
+      ok:Boolean(ok),
+      at:item.lastAt
+    });
+
+    if (
+      requestTimingHistory.length >
+      REQUEST_TIMING_HISTORY_MAX
+    ) {
+      requestTimingHistory.splice(
+        0,
+        requestTimingHistory.length -
+        REQUEST_TIMING_HISTORY_MAX
+      );
+    }
+  }
+
+  function requestTimingSummary() {
+    return Array.from(
+      requestTimingStats.values()
+    )
+      .map(item => ({
+        request:item.action,
+        count:item.count,
+        avgMs:
+          item.count
+            ? Math.round(item.totalMs / item.count)
+            : 0,
+        minMs:item.minMs ?? 0,
+        maxMs:item.maxMs,
+        lastMs:item.lastMs,
+        errors:item.errors,
+        lastAt:item.lastAt
+      }))
+      .sort(
+        (a,b) =>
+          b.avgMs - a.avgMs
+      );
+  }
+
+  window.mwRequestTimings = () => {
+    const summary =
+      requestTimingSummary();
+
+    console.table(summary);
+
+    return {
+      summary,
+      history:
+        requestTimingHistory.slice()
+    };
+  };
+
+  window.mwClearRequestTimings = () => {
+    requestTimingStats.clear();
+    requestTimingHistory.length = 0;
+
+    console.info(
+      "[MenelWars Tools] Wyczyszczono pomiary requestów."
+    );
+  };
+
+
   function jsonp(action, params={}) {
+
+    const timingStartedAt =
+      requestTimingNow();
 
     return new Promise((resolve, reject) => {
 
@@ -2417,18 +2549,42 @@ const MAP_POSITIONS = {
       const timeout =
         setTimeout(() => {
           cleanup();
+
+          recordRequestTiming(
+            action,
+            requestTimingNow() - timingStartedAt,
+            false,
+            "GET"
+          );
+
           reject(new Error("Przekroczono czas odpowiedzi serwera."));
         }, 12000);
 
       window[callbackName] = payload => {
         clearTimeout(timeout);
         cleanup();
+
+        recordRequestTiming(
+          action,
+          requestTimingNow() - timingStartedAt,
+          Boolean(!payload || payload.ok !== false),
+          "GET"
+        );
+
         resolve(payload);
       };
 
       script.onerror = () => {
         clearTimeout(timeout);
         cleanup();
+
+        recordRequestTiming(
+          action,
+          requestTimingNow() - timingStartedAt,
+          false,
+          "GET"
+        );
+
         reject(new Error("Błąd połączenia z serwerem."));
       };
 
@@ -2627,12 +2783,14 @@ const MAP_POSITIONS = {
   async function playerAccountPostAction(action,data={}) {
     const nonce = makeRecipeNonce();
 
-    await fetch(BACKEND_URL,{
-      method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"text/plain;charset=UTF-8"},
-      body:JSON.stringify({action,nonce,...data})
-    });
+    await timedBackendPost(
+      action,
+      {
+        action,
+        nonce,
+        ...data
+      }
+    );
 
     let result = null;
     for (let i=0;i<20;i++) {
@@ -4664,6 +4822,123 @@ let latestGangPayloadAt = 0;
 const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
 let gangSessionValidationAt = 0;
 
+
+// ============================================================
+// v20.74 — CENTRALNA INVALIDACJA CACHE
+// ============================================================
+
+function invalidateAppCache(scope) {
+  const scopes =
+    Array.isArray(scope)
+      ? scope
+      : [scope];
+
+  scopes.forEach(name => {
+    switch (name) {
+
+      case "gang-finance":
+      case "payments":
+      case "company":
+        latestGangPayload = null;
+        latestGangPayloadAt = 0;
+
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.delete(
+            "admin-section-payments"
+          );
+        }
+        break;
+
+      case "admin":
+        adminWarmLoadedAt = 0;
+
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.clear();
+        }
+        break;
+
+      case "admin-company":
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.delete(
+            "admin-section-payments"
+          );
+        }
+        break;
+
+      case "admin-submissions":
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.delete(
+            "admin-section-submissions"
+          );
+        }
+        break;
+
+      case "admin-reservations":
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.delete(
+            "admin-section-reservations"
+          );
+        }
+        break;
+
+      case "builds":
+        buildListsLoaded = false;
+
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.delete(
+            "admin-section-builds"
+          );
+        }
+        break;
+
+      case "distillery":
+        distilleryDataLoaded = false;
+        break;
+
+      case "account":
+        cachedAccountStatus = null;
+        cachedAccountStatusAt = 0;
+        cachedAccountStatusToken = "";
+        accountStatusInFlight = null;
+        break;
+
+      case "all":
+        latestGangPayload = null;
+        latestGangPayloadAt = 0;
+        adminWarmLoadedAt = 0;
+        distilleryDataLoaded = false;
+        buildListsLoaded = false;
+
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.clear();
+        }
+
+        cachedAccountStatus = null;
+        cachedAccountStatusAt = 0;
+        cachedAccountStatusToken = "";
+        accountStatusInFlight = null;
+        break;
+    }
+  });
+}
+
+
+
+
 // v20.11 — jeden wspólny preload Admina.
 // Kliknięcie panelu podczas prefetchu nie uruchamia drugiego kompletu requestów.
 let adminWarmPromise = null;
@@ -4775,6 +5050,50 @@ function criticalOperationFinish() {
   document.documentElement.classList.remove("critical-operation-active");
 }
 
+async function timedBackendPost(
+  action,
+  body
+) {
+  const startedAt =
+    requestTimingNow();
+
+  try {
+    const result =
+      await fetch(
+        BACKEND_URL,
+        {
+          method:"POST",
+          mode:"no-cors",
+          headers:{
+            "Content-Type":
+              "text/plain;charset=UTF-8"
+          },
+          body:JSON.stringify(body)
+        }
+      );
+
+    recordRequestTiming(
+      action,
+      requestTimingNow() - startedAt,
+      true,
+      "POST"
+    );
+
+    return result;
+
+  } catch (err) {
+    recordRequestTiming(
+      action,
+      requestTimingNow() - startedAt,
+      false,
+      "POST"
+    );
+
+    throw err;
+  }
+}
+
+
 async function adminPostAction(action, data={}) {
   const token = adminToken();
 
@@ -4783,19 +5102,12 @@ async function adminPostAction(action, data={}) {
     throw new Error("Brak sesji administratora.");
   }
 
-  await fetch(
-    BACKEND_URL,
+  await timedBackendPost(
+    action,
     {
-      method:"POST",
-      mode:"no-cors",
-      headers:{
-        "Content-Type":"text/plain;charset=UTF-8"
-      },
-      body:JSON.stringify({
-        action,
-        token,
-        ...data
-      })
+      action,
+      token,
+      ...data
     }
   );
 
@@ -5350,7 +5662,7 @@ async function loadAdminBuilds() {
 
             // Czyścimy lokalny cache listy buildów, żeby publiczna karta
             // po kolejnym wejściu nie pokazała usuniętego wpisu.
-            buildListsLoaded = false;
+            invalidateAppCache("builds");
 
             await Promise.allSettled([
               loadAdminBuilds(),
@@ -7350,9 +7662,9 @@ async function importAdminPayments() {
 
     status.textContent = message;
 
-    // Wszystkie widoki korzystają od tej chwili z nowego snapshotu.
-    latestGangPayload = null;
-    latestGangPayloadAt = 0;
+    // Wszystkie widoki finansowe korzystają od tej chwili
+    // z nowego snapshotu.
+    invalidateAppCache("gang-finance");
 
     await Promise.allSettled([
       loadAdminPaymentsStatus(),
@@ -7382,9 +7694,7 @@ function setupAdmin() {
     .addEventListener(
       "click",
       () => {
-        adminWarmLoadedAt = 0;
-
-        adminSectionLoadedAt.clear();
+        invalidateAppCache("admin");
         closeAllAdminSections();
 
         withRuntimeLoader(
@@ -9635,12 +9945,10 @@ function setupAdmin() {
   async function buildPostAction(payload) {
     if (!backendConfigured()) throw new Error("Backend nie jest skonfigurowany.");
 
-    await fetch(BACKEND_URL,{
-      method:"POST",
-      mode:"no-cors",
-      headers:{"Content-Type":"text/plain;charset=UTF-8"},
-      body:JSON.stringify(payload)
-    });
+    await timedBackendPost(
+      payload.action || "buildAction",
+      payload
+    );
 
     let result = null;
     for (let attempt=0; attempt<20; attempt++) {
@@ -10134,7 +10442,7 @@ function setupAdmin() {
         await buildPostAction(payload);
         status.textContent = "✅ Build został usunięty.";
         host.hidden = true;
-        buildListsLoaded = false;
+        invalidateAppCache("builds");
         await fetchBuildLists(true);
       } catch(err) {
         status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się usunąć buildu.");
