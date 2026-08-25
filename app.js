@@ -4644,8 +4644,12 @@ const goal = payload && payload.goal;
 
   function setupPayments() {
     el("payments-refresh")?.addEventListener("click",async ()=>{
-      await openGangModule("payments-view");
+      await openGangModule(
+        "payments-view",
+        {forceRefresh:true}
+      );
     });
+
     el("gang-tabs").hidden = true;
   }
 
@@ -10618,11 +10622,43 @@ function setupAdmin() {
 
 
   async function openGangModule(
-    target="payments-view"
+    target="payments-view",
+    options={}
   ) {
     if (!playerAccountSessionToken()) {
       el("gang-tabs").hidden = true;
       showToolView("gang-gate-view","gang");
+      return;
+    }
+
+    const forceRefresh =
+      Boolean(options.forceRefresh);
+
+    const isPaymentsOrCompany =
+      target === "payments-view" ||
+      target === "company-view";
+
+    // v20.71:
+    // Wpłaty i Spółka są renderowane z tego samego payloadu.
+    // Jeśli został już pobrany w tej sesji, samo przełączenie zakładki
+    // nie wykonuje kolejnego requestu ani nie pokazuje ekranu ładowania.
+    if (
+      isPaymentsOrCompany &&
+      latestGangPayload &&
+      !forceRefresh
+    ) {
+      el("gang-tabs").hidden = false;
+
+      renderGangPayload(
+        latestGangPayload
+      );
+
+      showToolView(
+        target,
+        "gang"
+      );
+
+      validateGangSessionInBackground();
       return;
     }
 
@@ -10637,16 +10673,20 @@ function setupAdmin() {
     showModuleLoading(
       "gang",
       labels[target] || "👥 Ładowanie Gangu...",
-      "Pobieram aktualne dane tego modułu."
+      forceRefresh
+        ? "Odświeżam dane tego modułu."
+        : "Pobieram aktualne dane tego modułu."
     );
 
     const requests = [];
 
-    if (
-      target === "payments-view" ||
-      target === "company-view"
-    ) {
-      requests.push(loadPayments({background:true}));
+    if (isPaymentsOrCompany) {
+      requests.push(
+        loadPayments({
+          background:true,
+          force:forceRefresh
+        })
+      );
     }
 
     if (target === "polls-view") {
@@ -10683,12 +10723,11 @@ function setupAdmin() {
 
     if (
       latestGangPayload &&
-      (
-        target === "payments-view" ||
-        target === "company-view"
-      )
+      isPaymentsOrCompany
     ) {
-      renderGangPayload(latestGangPayload);
+      renderGangPayload(
+        latestGangPayload
+      );
     }
 
     validateGangSessionInBackground();
