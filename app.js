@@ -3442,7 +3442,85 @@ const MAP_POSITIONS = {
   }
 
 
-  async function loadAccountAdminPermissions() {
+  let accountAdminPlayersCache = null;
+let accountAdminPlayersCacheAt = 0;
+let accountAdminPlayersCacheToken = "";
+let accountAdminPlayersInFlight = null;
+
+const ACCOUNT_ADMIN_PLAYERS_TTL_MS =
+  60 * 1000;
+
+async function fetchAccountAdminPlayers(
+  options={}
+) {
+  const force =
+    Boolean(options.force);
+
+  const token =
+    playerAccountSessionToken();
+
+  if (!token) {
+    accountAdminPlayersCache = null;
+    accountAdminPlayersCacheAt = 0;
+    accountAdminPlayersCacheToken = "";
+    accountAdminPlayersInFlight = null;
+    return null;
+  }
+
+  if (
+    !force &&
+    accountAdminPlayersCache &&
+    accountAdminPlayersCacheToken === token &&
+    Date.now() - accountAdminPlayersCacheAt <
+      ACCOUNT_ADMIN_PLAYERS_TTL_MS
+  ) {
+    return accountAdminPlayersCache;
+  }
+
+  if (accountAdminPlayersInFlight) {
+    return accountAdminPlayersInFlight;
+  }
+
+  accountAdminPlayersInFlight =
+    (async () => {
+      try {
+        const result =
+          await jsonp(
+            "accountAdminPlayers",
+            {
+              sessionToken:token
+            }
+          );
+
+        if (
+          result &&
+          result.ok
+        ) {
+          accountAdminPlayersCache =
+            result;
+
+          accountAdminPlayersCacheAt =
+            Date.now();
+
+          accountAdminPlayersCacheToken =
+            token;
+        }
+
+        return result;
+
+      } finally {
+        accountAdminPlayersInFlight =
+          null;
+      }
+    })();
+
+  return accountAdminPlayersInFlight;
+}
+
+
+async function loadAccountAdminPermissions(
+  options={}
+) {
     const holder =
       el("account-admin-permissions");
 
@@ -3450,13 +3528,10 @@ const MAP_POSITIONS = {
 
     try {
       const result =
-        await jsonp(
-          "accountAdminPlayers",
-          {
-            sessionToken:
-              playerAccountSessionToken()
-          }
-        );
+        await fetchAccountAdminPlayers({
+          force:
+            Boolean(options.force)
+        });
 
       if (
         !result ||
@@ -3574,31 +3649,26 @@ const MAP_POSITIONS = {
         .forEach(button => {
           button.onclick =
             async () => {
-              await fetch(
-                BACKEND_URL,
+              await timedBackendPost(
+                "accountAdminSetPermission",
                 {
-                  method:"POST",
-                  mode:"no-cors",
-                  headers:{
-                    "Content-Type":
-                      "text/plain;charset=UTF-8"
-                  },
-                  body:
-                    JSON.stringify({
-                      action:
-                        "accountAdminSetPermission",
-                      sessionToken:
-                        playerAccountSessionToken(),
-                      nick:
-                        button.dataset.accountAdminToggle,
-                      enabled:
-                        button.dataset.enabled !== "1"
-                    })
+                  action:
+                    "accountAdminSetPermission",
+                  sessionToken:
+                    playerAccountSessionToken(),
+                  nick:
+                    button.dataset.accountAdminToggle,
+                  enabled:
+                    button.dataset.enabled !== "1"
                 }
               );
 
+              accountAdminPlayersCacheAt = 0;
+
               // Bez sztucznego dodatkowego 400 ms.
-              loadAccountAdminPermissions();
+              loadAccountAdminPermissions({
+                force:true
+              });
             };
         });
 
@@ -3620,27 +3690,22 @@ const MAP_POSITIONS = {
                 return;
               }
 
-              await fetch(
-                BACKEND_URL,
+              await timedBackendPost(
+                "accountAdminLogoutAll",
                 {
-                  method:"POST",
-                  mode:"no-cors",
-                  headers:{
-                    "Content-Type":
-                      "text/plain;charset=UTF-8"
-                  },
-                  body:
-                    JSON.stringify({
-                      action:
-                        "accountAdminLogoutAll",
-                      sessionToken:
-                        playerAccountSessionToken(),
-                      nick
-                    })
+                  action:
+                    "accountAdminLogoutAll",
+                  sessionToken:
+                    playerAccountSessionToken(),
+                  nick
                 }
               );
 
-              loadAccountAdminPermissions();
+              accountAdminPlayersCacheAt = 0;
+
+              loadAccountAdminPermissions({
+                force:true
+              });
             };
         });
 
@@ -5060,6 +5125,29 @@ function invalidateAppCache(scope) {
         cachedAccountStatusAt = 0;
         cachedAccountStatusToken = "";
         accountStatusInFlight = null;
+
+        accountAdminPlayersCache = null;
+        accountAdminPlayersCacheAt = 0;
+        accountAdminPlayersCacheToken = "";
+        accountAdminPlayersInFlight = null;
+        break;
+
+      case "admin-accounts":
+        accountAdminPlayersCache = null;
+        accountAdminPlayersCacheAt = 0;
+        accountAdminPlayersCacheToken = "";
+        accountAdminPlayersInFlight = null;
+
+        if (
+          typeof adminSectionLoadedAt !== "undefined"
+        ) {
+          adminSectionLoadedAt.delete(
+            "admin-section-salary-access"
+          );
+          adminSectionLoadedAt.delete(
+            "admin-section-players"
+          );
+        }
         break;
 
       case "all":
@@ -5079,6 +5167,11 @@ function invalidateAppCache(scope) {
         cachedAccountStatusAt = 0;
         cachedAccountStatusToken = "";
         accountStatusInFlight = null;
+
+        accountAdminPlayersCache = null;
+        accountAdminPlayersCacheAt = 0;
+        accountAdminPlayersCacheToken = "";
+        accountAdminPlayersInFlight = null;
         break;
     }
   });
@@ -5320,7 +5413,10 @@ async function loadAdminPolls() {
     const payload =
       await jsonp(
         "gangPolls",
-        {}
+        {
+          sessionToken:
+            playerAccountSessionToken()
+        }
       );
 
     const polls =
@@ -10689,9 +10785,7 @@ function setupAdmin() {
 
         if (hasSession) {
           try {
-            await playerAccountStatus({
-              force:true
-            });
+            await playerAccountStatus();
           } catch (err) {}
         }
 
