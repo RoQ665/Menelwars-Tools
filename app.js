@@ -5391,7 +5391,12 @@ async function loadAdminBuilds() {
 
 
 let adminDashboardStatusInFlight = null;
-const adminSectionLoaded = new Set();
+
+// v20.73 — cache sekcji Admina z TTL.
+// Sekcja pokazuje od razu ostatnio wyrenderowane dane,
+// a po 10 minutach odświeża je po cichu w tle.
+const ADMIN_SECTION_TTL_MS = 10 * 60 * 1000;
+const adminSectionLoadedAt = new Map();
 
 function closeAllAdminSections() {
   document
@@ -5473,34 +5478,100 @@ async function loadAdminDashboardStatus() {
   finally { adminDashboardStatusInFlight = null; }
 }
 
-async function loadAdminSection(sectionId,force=false) {
-  if (!force && adminSectionLoaded.has(sectionId)) return;
+async function loadAdminSection(
+  sectionId,
+  force=false,
+  options={}
+) {
+  const background =
+    Boolean(options.background);
 
-  if (sectionId === "admin-section-submissions") {
-    await loadAdminSubmissions();
-  } else if (sectionId === "admin-section-reservations") {
-    await loadAdminGangTools();
-  } else if (sectionId === "admin-section-builds") {
-    await loadAdminBuilds();
-  } else if (sectionId === "admin-section-payments") {
-    await loadAdminPaymentsStatus();
-  } else if (
-    sectionId === "admin-section-goal" ||
-    sectionId === "admin-section-announcements"
+  const loadedAt =
+    Number(
+      adminSectionLoadedAt.get(sectionId)
+    ) || 0;
+
+  const age =
+    loadedAt
+      ? Date.now() - loadedAt
+      : Infinity;
+
+  // Świeże dane: niczego nie pobieramy ponownie.
+  if (
+    !force &&
+    loadedAt &&
+    age < ADMIN_SECTION_TTL_MS
   ) {
-    await loadAdminGangTools();
-  } else if (sectionId === "admin-section-polls") {
-    await loadAdminPolls();
-  } else if (sectionId === "admin-section-salary-access") {
-    await loadAccountAdminPermissions();
-  } else if (sectionId === "admin-section-players") {
-    await Promise.allSettled([
-      loadAdminPlayers(),
-      loadAccountAdminPermissions()
-    ]);
+    return;
   }
 
-  adminSectionLoaded.add(sectionId);
+  const load = async () => {
+    if (sectionId === "admin-section-submissions") {
+      await loadAdminSubmissions();
+
+    } else if (sectionId === "admin-section-reservations") {
+      await loadAdminGangTools();
+
+    } else if (sectionId === "admin-section-builds") {
+      await loadAdminBuilds();
+
+    } else if (sectionId === "admin-section-payments") {
+      await loadAdminPaymentsStatus();
+
+    } else if (
+      sectionId === "admin-section-goal" ||
+      sectionId === "admin-section-announcements"
+    ) {
+      await loadAdminGangTools();
+
+    } else if (sectionId === "admin-section-polls") {
+      await loadAdminPolls();
+
+    } else if (sectionId === "admin-section-salary-access") {
+      await loadAccountAdminPermissions();
+
+    } else if (sectionId === "admin-section-players") {
+      await Promise.allSettled([
+        loadAdminPlayers(),
+        loadAccountAdminPermissions()
+      ]);
+    }
+
+    adminSectionLoadedAt.set(
+      sectionId,
+      Date.now()
+    );
+  };
+
+  // Jeśli sekcja była już kiedyś pobrana i TTL minął,
+  // zostawiamy starą zawartość na ekranie i odświeżamy ją w tle.
+  if (
+    !force &&
+    loadedAt &&
+    age >= ADMIN_SECTION_TTL_MS
+  ) {
+    load().catch(err => {
+      console.warn(
+        `[MenelWars Tools] Nie udało się odświeżyć sekcji Admina ${sectionId}:`,
+        err
+      );
+    });
+
+    return;
+  }
+
+  // Pierwsze otwarcie albo ręczny force refresh.
+  if (background) {
+    load().catch(err => {
+      console.warn(
+        `[MenelWars Tools] Nie udało się załadować sekcji Admina ${sectionId}:`,
+        err
+      );
+    });
+    return;
+  }
+
+  await load();
 }
 
 function setupAdminAccordionLazyLoad() {
@@ -5512,11 +5583,20 @@ function setupAdminAccordionLazyLoad() {
 
       details.addEventListener("toggle",async () => {
         if (!details.open) return;
+
         try {
-          await loadAdminSection(details.id);
+          await loadAdminSection(
+            details.id
+          );
         } catch (err) {
           const status = el("admin-status");
-          if (status) status.textContent = err && err.message ? err.message : "Nie udało się pobrać sekcji.";
+
+          if (status) {
+            status.textContent =
+              err && err.message
+                ? err.message
+                : "Nie udało się pobrać sekcji.";
+          }
         }
       });
     });
@@ -7304,7 +7384,7 @@ function setupAdmin() {
       () => {
         adminWarmLoadedAt = 0;
 
-        adminSectionLoaded.clear();
+        adminSectionLoadedAt.clear();
         closeAllAdminSections();
 
         withRuntimeLoader(
