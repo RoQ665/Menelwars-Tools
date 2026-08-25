@@ -3031,6 +3031,9 @@ const MAP_POSITIONS = {
         el("admin-login").hidden=true;
         el("admin-content").hidden=false;
 
+        closeAllAdminSections();
+        setupAdminAccordionLazyLoad();
+
         const adminNeedsRequest =
           !adminWarmLoadedAt ||
           Date.now() - adminWarmLoadedAt >= 30000;
@@ -3094,10 +3097,7 @@ const MAP_POSITIONS = {
         const results =
           await Promise.allSettled([
             loadAccountAdminPermissions(),
-            loadAdminGangTools(),
-            loadAdminPaymentsStatus(),
-            loadAdminSubmissions(),
-            loadAdminBuilds()
+            loadAdminDashboardStatus()
           ]);
 
         const anyOk =
@@ -4133,7 +4133,18 @@ const MAP_POSITIONS = {
     const money = value =>
       (Number(value) || 0).toLocaleString("pl-PL",{maximumFractionDigits:2}) + " zł";
 
+    const snapshotLabel =
+      payload.snapshotUpdatedAtDisplay ||
+      payload.updatedAtDisplay ||
+      payload.updatedAt ||
+      payload.saldoDate ||
+      "—";
+
     box.innerHTML = `
+      <div class="company-snapshot-info">
+        💾 Wpłaty: snapshot z <strong>${escapeHtml(formatPaymentsDateTime(snapshotLabel))}</strong>
+      </div>
+
       <div class="company-grid">
         <div class="company-stat"><small>Dzienny dochód</small><b>${money(payload.companyIncome)}</b></div>
         <div class="company-stat"><small>Budżet pensji 50%</small><b>${money(payload.salaryBudget)}</b></div>
@@ -4315,6 +4326,47 @@ const goal = payload && payload.goal;
     );
   }
 
+  let gangGoalInFlight = null;
+  let gangAnnouncementsInFlight = null;
+
+  async function loadGangGoal() {
+    if (gangGoalInFlight) return gangGoalInFlight;
+
+    gangGoalInFlight = (async () => {
+      const token = gangToken();
+      if (!token) return null;
+
+      const payload = await jsonp("gangGoal",{sessionToken:token});
+      if (!payload || !payload.ok) {
+        throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać celu.");
+      }
+      renderGangGoal(payload);
+      return payload;
+    })();
+
+    try { return await gangGoalInFlight; }
+    finally { gangGoalInFlight = null; }
+  }
+
+  async function loadGangAnnouncements() {
+    if (gangAnnouncementsInFlight) return gangAnnouncementsInFlight;
+
+    gangAnnouncementsInFlight = (async () => {
+      const token = gangToken();
+      if (!token) return null;
+
+      const payload = await jsonp("gangAnnouncements",{sessionToken:token});
+      if (!payload || !payload.ok) {
+        throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać ogłoszeń.");
+      }
+      renderGangAnnouncements(payload);
+      return payload;
+    })();
+
+    try { return await gangAnnouncementsInFlight; }
+    finally { gangAnnouncementsInFlight = null; }
+  }
+
   function renderGangAnnouncements(payload) {
     const box = el("gang-announcements-content");
     if (!box) return;
@@ -4349,8 +4401,6 @@ const goal = payload && payload.goal;
     if (!payload) return;
 
     renderCompanySummary(payload);
-    renderGangGoal(payload);
-    renderGangAnnouncements(payload);
 
     const players =
       Array.isArray(payload.players)
@@ -4676,6 +4726,50 @@ function clearActionLoading(button) {
   }
 }
 
+let criticalOperationDepth = 0;
+
+function criticalOperationEnsureOverlay() {
+  let overlay = document.getElementById("critical-operation-overlay");
+
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "critical-operation-overlay";
+    overlay.hidden = true;
+    overlay.innerHTML = `
+      <div class="critical-operation-card" role="status" aria-live="polite">
+        <div class="critical-operation-hourglass">⌛</div>
+        <strong id="critical-operation-title">Zapisywanie zmian…</strong>
+        <div id="critical-operation-text">Poczekaj na zakończenie operacji.</div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  return overlay;
+}
+
+function criticalOperationStart(title,text="Nie zamykaj strony i nie klikaj ponownie.") {
+  criticalOperationDepth++;
+  const overlay = criticalOperationEnsureOverlay();
+  const titleEl = overlay.querySelector("#critical-operation-title");
+  const textEl = overlay.querySelector("#critical-operation-text");
+
+  if (titleEl) titleEl.textContent = title || "Zapisywanie zmian…";
+  if (textEl) textEl.textContent = text;
+
+  overlay.hidden = false;
+  document.documentElement.classList.add("critical-operation-active");
+}
+
+function criticalOperationFinish() {
+  criticalOperationDepth = Math.max(0,criticalOperationDepth-1);
+  if (criticalOperationDepth > 0) return;
+
+  const overlay = document.getElementById("critical-operation-overlay");
+  if (overlay) overlay.hidden = true;
+  document.documentElement.classList.remove("critical-operation-active");
+}
+
 async function adminPostAction(action, data={}) {
   const token = adminToken();
 
@@ -4911,12 +5005,6 @@ function renderAdminGangTools(payload) {
   const reservationsAccordion =
     el("admin-section-reservations");
 
-  if (
-    reservationsAccordion &&
-    reservations.length > 0
-  ) {
-    reservationsAccordion.open = true;
-  }
 
   if (reservationsBox) {
     reservationsBox.innerHTML =
@@ -5297,20 +5385,153 @@ async function loadAdminBuilds() {
 }
 
 
-function showAdminContent() {
+let adminDashboardStatusInFlight = null;
+const adminSectionLoaded = new Set();
 
+function closeAllAdminSections() {
+  document
+    .querySelectorAll("#admin-content details.admin-accordion")
+    .forEach(details => {
+      details.open = false;
+    });
+}
+
+function setAdminSectionBadge(sectionId,count,label="") {
+  const details = el(sectionId);
+  const summary = details && details.querySelector(":scope > summary");
+  if (!summary) return;
+
+  let badge = summary.querySelector(".admin-attention-badge");
+
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "admin-attention-badge";
+    const chevron = summary.querySelector(".accordion-chevron");
+    if (chevron) summary.insertBefore(badge,chevron);
+    else summary.appendChild(badge);
+  }
+
+  const number = Math.max(0,Number(count) || 0);
+  badge.hidden = number <= 0;
+  badge.textContent = number > 0 ? (label || String(number)) : "";
+}
+
+function setAdminGlobalBadge(count) {
+  const button = el("account-admin-open");
+  if (!button) return;
+
+  let badge = button.querySelector(".admin-global-badge");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "admin-global-badge";
+    button.appendChild(badge);
+  }
+
+  const number = Math.max(0,Number(count) || 0);
+  badge.hidden = number <= 0;
+  badge.textContent = number > 0 ? String(number) : "";
+}
+
+function applyAdminDashboardStatus(payload) {
+  const pending = Math.max(0,Number(payload && payload.pendingSubmissions) || 0);
+  const company = Math.max(0,Number(payload && payload.companyChanges) || 0);
+  const total = Math.max(0,Number(payload && payload.totalAttention) || pending + company);
+
+  setAdminSectionBadge("admin-section-submissions",pending);
+  setAdminSectionBadge("admin-section-payments",company);
+  setAdminGlobalBadge(total);
+
+  const count = el("admin-submissions-count");
+  if (count) {
+    count.textContent = total
+      ? `Wymaga uwagi: ${total}`
+      : "Brak rzeczy wymagających uwagi";
+  }
+}
+
+async function loadAdminDashboardStatus() {
+  if (adminDashboardStatusInFlight) return adminDashboardStatusInFlight;
+
+  const token = adminToken();
+  if (!token) return null;
+
+  adminDashboardStatusInFlight = (async () => {
+    const payload = await jsonp("adminDashboardStatus",{token});
+    if (!payload || !payload.ok) {
+      throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać statusu Admina.");
+    }
+    applyAdminDashboardStatus(payload);
+    return payload;
+  })();
+
+  try { return await adminDashboardStatusInFlight; }
+  finally { adminDashboardStatusInFlight = null; }
+}
+
+async function loadAdminSection(sectionId,force=false) {
+  if (!force && adminSectionLoaded.has(sectionId)) return;
+
+  if (sectionId === "admin-section-submissions") {
+    await loadAdminSubmissions();
+  } else if (sectionId === "admin-section-reservations") {
+    await loadAdminGangTools();
+  } else if (sectionId === "admin-section-builds") {
+    await loadAdminBuilds();
+  } else if (sectionId === "admin-section-payments") {
+    await loadAdminPaymentsStatus();
+  } else if (
+    sectionId === "admin-section-goal" ||
+    sectionId === "admin-section-announcements"
+  ) {
+    await loadAdminGangTools();
+  } else if (sectionId === "admin-section-polls") {
+    await loadAdminPolls();
+  } else if (sectionId === "admin-section-salary-access") {
+    await loadAccountAdminPermissions();
+  } else if (sectionId === "admin-section-players") {
+    await Promise.allSettled([
+      loadAdminPlayers(),
+      loadAccountAdminPermissions()
+    ]);
+  }
+
+  adminSectionLoaded.add(sectionId);
+}
+
+function setupAdminAccordionLazyLoad() {
+  document
+    .querySelectorAll("#admin-content details.admin-accordion")
+    .forEach(details => {
+      if (details.dataset.lazyBound === "1") return;
+      details.dataset.lazyBound = "1";
+
+      details.addEventListener("toggle",async () => {
+        if (!details.open) return;
+        try {
+          await loadAdminSection(details.id);
+        } catch (err) {
+          const status = el("admin-status");
+          if (status) status.textContent = err && err.message ? err.message : "Nie udało się pobrać sekcji.";
+        }
+      });
+    });
+}
+
+function showAdminContent() {
   el("admin-login").hidden = true;
   el("admin-content").hidden = false;
 
   el("admin-status").textContent = "";
 
-  loadAdminSubmissions();	
-  loadAdminPaymentsStatus();
-  loadAdminPlayers();
-  loadAdminGangTools();
-  loadAdminBuilds();
-}
+  closeAllAdminSections();
+  setupAdminAccordionLazyLoad();
 
+  // Na wejściu pobieramy tylko lekkie statusy i uprawnienia konta.
+  Promise.allSettled([
+    loadAdminDashboardStatus(),
+    loadAccountAdminPermissions()
+  ]);
+}
 
 async function checkAdminAccess() {
 
@@ -5582,9 +5803,9 @@ async function setAdminSubmissionStatus(
   el("admin-status").textContent =
     loadingText;
 
-  runtimeLoaderStart(
+  criticalOperationStart(
     loadingText,
-    funnyText
+    "Poczekaj aż receptura zostanie zapisana i lista odświeżona."
   );
 
 
@@ -5665,6 +5886,9 @@ async function setAdminSubmissionStatus(
     await runtimeLoaderFinish(
       "❌ Operacja nieudana"
     );
+  } finally {
+    criticalOperationFinish();
+    loadAdminDashboardStatus().catch(()=>{});
   }
 }
 
@@ -5729,10 +5953,13 @@ async function loadAdminSubmissions() {
         ? payload.submissions
         : [];
 
-    el(
-      "admin-submissions-count"
-    ).textContent =
-      `Oczekujące zgłoszenia: ${submissions.length}`;
+    setAdminSectionBadge(
+      "admin-section-submissions",
+      submissions.length
+    );
+
+    // Zbiorczy badge też aktualizujemy po pełnym odczycie sekcji.
+    loadAdminDashboardStatus().catch(()=>{});
 
     el(
       "admin-submissions"
@@ -6724,14 +6951,25 @@ async function loadAdminPaymentsStatus() {
     );
 
     const writeProtection =
-      {blocked:false};
+      payload.writeProtection || {blocked:false};
 
     const writeBlocked =
-      Boolean(
-        writeProtection.blocked
-      );
+      Boolean(writeProtection.blocked);
+
+    const saveButton = el("admin-payments-preview");
+    if (saveButton) {
+      saveButton.disabled = writeBlocked;
+      saveButton.textContent = writeBlocked
+        ? "🌙 Aktualizacja zablokowana do 04:00"
+        : "🔎 Sprawdź i zapisz ranking";
+    }
 
     box.innerHTML = `
+
+      <div class="admin-snapshot-meta">
+        <span>💾 Wpłaty: ${escapeHtml(formatAdminDate(payload.snapshotUpdatedAtDisplay || payload.lastClose))}</span>
+        <span>🟢 Fundusz: ${escapeHtml(formatAdminDate(payload.fundSnapshotUpdatedAtDisplay))}</span>
+      </div>
 
       <div style="
         display:grid;
@@ -6921,70 +7159,57 @@ function renderAdminPaymentsPreview(payload) {
 
 
 async function previewAdminPayments() {
-
-  const token =
-    adminToken();
+  // v20.70 — jedno kliknięcie: walidacja i zapis są atomowe po stronie backendu.
+  return importAdminPayments();
+}
+async function importAdminPayments() {
+  const token = adminToken();
 
   if (!token) {
     showAdminLogin();
     return;
   }
 
-
-  const report =
-    el("admin-payments-report")
-      .value
-      .trim();
-
-
-  const status =
-    el("admin-payments-preview-status");
-
-
-  const result =
-    el("admin-payments-preview-result");
-
+  const report = el("admin-payments-report").value.trim();
+  const status = el("admin-payments-preview-status");
+  const resultBox = el("admin-payments-preview-result");
+  const button = el("admin-payments-preview");
 
   if (!report) {
-
-    status.textContent =
-      "Wklej pełny ranking łącznych wpłat.";
-
-    result.innerHTML = "";
-
+    status.textContent = "Wklej pełny ranking łącznych wpłat.";
     return;
   }
 
+  const writeProtection =
+    adminPaymentsSnapshot && adminPaymentsSnapshot.writeProtection
+      ? adminPaymentsSnapshot.writeProtection
+      : null;
 
-  status.textContent =
-    "Sprawdzanie danych...";
+  if (writeProtection && writeProtection.blocked) {
+    status.textContent =
+      "🌙 Aktualizacja Wpłat jest zablokowana od 00:00 do 04:00. Spółka korzysta z ostatniego snapshotu.";
+    return;
+  }
 
-  result.innerHTML = "";
+  const nonce = makeNonce();
+  button.disabled = true;
+  status.textContent = "Sprawdzanie i zapisywanie danych...";
+  if (resultBox) resultBox.innerHTML = "";
 
-
-  const nonce =
-    makeNonce();
-
-  adminLoaderTexts("paymentsPreview");
-
+  criticalOperationStart(
+    "💰 Aktualizuję Ranking wpłat…",
+    "Sprawdzam raport, zapisuję dane i tworzę nowy snapshot."
+  );
 
   try {
-
     await fetch(
       BACKEND_URL,
       {
-        method: "POST",
-        mode: "no-cors",
-
-        headers: {
-          "Content-Type":
-            "text/plain;charset=UTF-8"
-        },
-
-        body: JSON.stringify({
-          action:
-            "adminPreviewPayments",
-
+        method:"POST",
+        mode:"no-cors",
+        headers:{"Content-Type":"text/plain;charset=UTF-8"},
+        body:JSON.stringify({
+          action:"adminImportPayments",
           token,
           nonce,
           report
@@ -6992,359 +7217,80 @@ async function previewAdminPayments() {
       }
     );
 
-
     let payload = null;
 
+    for (let i=0; i<24; i++) {
+      if (i > 0) await new Promise(resolve => setTimeout(resolve,500));
 
-    for (
-      let i = 0;
-      i < 12;
-      i++
-    ) {
-
-      await new Promise(
-        resolve =>
-          setTimeout(
-            resolve,
-            500
-          )
+      payload = await jsonp(
+        "adminImportPaymentsResult",
+        {token,nonce}
       );
 
-
-      payload =
-        await jsonp(
-          "adminPreviewPaymentsResult",
-          {
-            token,
-            nonce
-          }
-        );
-
-
-      if (
-        !payload ||
-        !payload.pending
-      ) {
-        break;
-      }
+      if (!payload || !payload.pending) break;
     }
 
-
-    if (
-      !payload ||
-      payload.pending
-    ) {
-
-      throw new Error(
-        "Serwer nie zwrócił wyniku sprawdzania."
-      );
+    if (!payload || payload.pending) {
+      throw new Error("Serwer nie zwrócił wyniku zapisu.");
     }
-
 
     if (!payload.ok) {
-
-      throw new Error(
-        payload.error ||
-        "Nie udało się sprawdzić raportu."
-      );
-    }
-
-    renderAdminPaymentsPreview(
-      payload
-    );
-
-    status.textContent = "";
-
-    await runtimeLoaderFinish(
-      "✅ Dane sprawdzone"
-    );
-
-
-  } catch (err) {
-
-    status.textContent =
-      err &&
-      err.message
-        ? err.message
-        : "Nie udało się sprawdzić danych.";
-
-    await runtimeLoaderFinish(
-      "❌ Sprawdzanie nieudane"
-    );
-  }
-}
-
-async function importAdminPayments() {
-
-  const token =
-    adminToken();
-
-
-  if (!token) {
-
-    showAdminLogin();
-    return;
-  }
-
-
-  const report =
-    el("admin-payments-report")
-      .value
-      .trim();
-
-
-  const status =
-    el(
-      "admin-payments-preview-status"
-    );
-
-
-  const button =
-    el(
-      "admin-payments-import"
-    );
-
-
-  if (!report) {
-
-    status.textContent =
-      "Wklej pełny ranking łącznych wpłat.";
-
-    return;
-  }
-
-
-  const confirmed =
-    window.confirm(
-      "Zapisać ten stan rankingu i przeliczyć dożywotnie salda?"
-    );
-
-
-  if (!confirmed) {
-    return;
-  }
-
-
-  const nonce =
-    makeNonce();
-
-
-  button.disabled = true;
-
-  status.textContent =
-    "Wprowadzanie danych...";
-
-  adminLoaderTexts(
-    "paymentsImport"
-  );
-
-
-  try {
-
-    await fetch(
-      BACKEND_URL,
-      {
-        method: "POST",
-        mode: "no-cors",
-
-        headers: {
-          "Content-Type":
-            "text/plain;charset=UTF-8"
-        },
-
-        body:
-          JSON.stringify({
-            action:
-              "adminImportPayments",
-
-            token,
-            nonce,
-            report
-          })
+      if (payload.preview) {
+        renderAdminPaymentsPreview(payload.preview);
       }
-    );
-
-
-    let payload = null;
-
-
-    for (
-      let i = 0;
-      i < 20;
-      i++
-    ) {
-
-      await new Promise(
-        resolve =>
-          setTimeout(
-            resolve,
-            500
-          )
-      );
-
-
-      payload =
-        await jsonp(
-          "adminImportPaymentsResult",
-          {
-            token,
-            nonce
-          }
-        );
-
-
-      if (
-        !payload ||
-        !payload.pending
-      ) {
-        break;
-      }
+      throw new Error(payload.error || "Raport zawiera błędy i nie został zapisany.");
     }
 
-
-    if (
-      !payload ||
-      payload.pending
-    ) {
-
-      throw new Error(
-        "Serwer nie zwrócił wyniku zapisu."
-      );
+    if (payload.preview) {
+      renderAdminPaymentsPreview(payload.preview);
     }
 
+    let message = `✅ ${payload.message || "Dane zostały zapisane."}`;
 
-    if (!payload.ok) {
-
-      throw new Error(
-        payload.error ||
-        "Nie udało się wprowadzić danych."
-      );
+    if (payload.paymentsSnapshot) {
+      message += `\n💾 Nowy snapshot: ${formatAdminDate(payload.paymentsSnapshot.updatedAtDisplay || payload.paymentsSnapshot.updatedAt)}`;
     }
-
-
-    let message =
-      `✅ ${payload.message || "Dane zostały zapisane."}`;
 
     if (
       payload.fundSettlement &&
-      Number(
-        payload.fundSettlement.payoutCount
-      ) > 0
+      Number(payload.fundSettlement.payoutCount) > 0
     ) {
       message +=
         "\n\n💚 Rozliczono wypłaty Spółki: " +
-        Number(
-          payload.fundSettlement.payoutCount
-        ) +
+        Number(payload.fundSettlement.payoutCount) +
         "\nDo Funduszu: " +
-        (
-          Number(
-            payload.fundSettlement.totalFund
-          ) || 0
-        ).toLocaleString(
-          "pl-PL",
-          {
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-          }
-        ) +
-        " zł" +
-        "\nBonus do wkładów: +" +
-        (
-          Number(
-            payload.fundSettlement.totalBonus
-          ) || 0
-        ).toLocaleString(
-          "pl-PL",
-          {
-            minimumFractionDigits:2,
-            maximumFractionDigits:2
-          }
-        ) +
+        (Number(payload.fundSettlement.totalFund) || 0).toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2}) +
         " zł";
     }
 
+    status.textContent = message;
 
-    if (
-      Array.isArray(
-        payload.written
-      ) &&
-      payload.written.length
-    ) {
+    // Wszystkie widoki korzystają od tej chwili z nowego snapshotu.
+    latestGangPayload = null;
+    latestGangPayloadAt = 0;
 
-      message +=
-        "\n\nZapisane dni:\n" +
-        payload.written
-          .map(item => {
+    await Promise.allSettled([
+      loadAdminPaymentsStatus(),
+      loadPayments({background:true,force:true}),
+      loadAdminDashboardStatus()
+    ]);
 
-            const mode =
-              item.mode === "overwrite"
-                ? "nadpisano"
-                : "dodano";
-
-            return (
-              `• ${item.date} — ${mode}`
-            );
-          })
-          .join("\n");
-    }
-
-
-    if (
-      Array.isArray(
-        payload.skipped
-      ) &&
-      payload.skipped.length
-    ) {
-
-      message +=
-        "\n\nPominięte dni:\n" +
-        payload.skipped
-          .map(
-            item =>
-              `• ${item.date} — ${item.reason}`
-          )
-          .join("\n");
-    }
-
-
-    status.textContent =
-      message;
-
-
-    // Po zapisie pobieramy aktualny stan arkusza.
-    await loadAdminPaymentsStatus();
-
-
-    await runtimeLoaderFinish(
-      "✅ Wpłaty zaktualizowane"
-    );
-
-
-    // Raport został już wykorzystany.
-    // Ukrywamy przycisk zapisu,
-    // aby przypadkiem nie zapisać go drugi raz.
-    button.hidden = true;
-
+    el("admin-payments-report").value = "";
 
   } catch (err) {
-
     status.textContent =
-      err &&
-      err.message
-        ? err.message
-        : "Nie udało się wprowadzić danych.";
-
-    await runtimeLoaderFinish(
-      "❌ Import nieudany"
-    );
-
+      err && err.message
+        ? `❌ ${err.message}`
+        : "❌ Nie udało się wprowadzić danych.";
   } finally {
+    criticalOperationFinish();
 
-    button.disabled = false;
+    // Status może po operacji ustawić blokadę nocną albo ponownie odblokować.
+    if (!(adminPaymentsSnapshot && adminPaymentsSnapshot.writeProtection && adminPaymentsSnapshot.writeProtection.blocked)) {
+      button.disabled = false;
+    }
   }
 }
-
 function setupAdmin() {
 
   el("admin-refresh")
@@ -7353,10 +7299,12 @@ function setupAdmin() {
       () => {
         adminWarmLoadedAt = 0;
 
+        adminSectionLoaded.clear();
+        closeAllAdminSections();
+
         withRuntimeLoader(
           () => Promise.allSettled([
-            warmAdminData({force:true}),
-            loadAdminPlayers()
+            warmAdminData({force:true})
           ]),
           "🛠️ Odświeżam panel Admina...",
           ['🍺 Panel Admina robi dolewkę, już kończę...','🥫 Szukam ostatniej puszki z uprawnieniami...','🧹 Sprzątam kolejkę requestów...','🥴 Jeszcze tylko jedna rubryka...']
@@ -7475,7 +7423,10 @@ function setupAdmin() {
         )) return;
 
         setActionLoading(button,status,"Zapisywanie planu...");
-        adminLoaderTexts("salaryPlan");
+        criticalOperationStart(
+          "💰 Zapisuję plan pensji…",
+          "Ustawiam potwierdzony plan jako źródło wypłaty o 03:00."
+        );
 
         try {
           await adminPostAction(
@@ -7503,7 +7454,9 @@ function setupAdmin() {
             "❌ Aktywacja nieudana"
           );
         } finally {
+          criticalOperationFinish();
           clearActionLoading(button);
+          loadAdminDashboardStatus().catch(()=>{});
         }
       }
     );
@@ -10687,12 +10640,25 @@ function setupAdmin() {
       "Pobieram aktualne dane tego modułu."
     );
 
-    const requests = [
-      loadPayments({background:true})
-    ];
+    const requests = [];
+
+    if (
+      target === "payments-view" ||
+      target === "company-view"
+    ) {
+      requests.push(loadPayments({background:true}));
+    }
 
     if (target === "polls-view") {
       requests.push(loadGangPolls());
+    }
+
+    if (target === "goals-view") {
+      requests.push(loadGangGoal());
+    }
+
+    if (target === "announcements-view") {
+      requests.push(loadGangAnnouncements());
     }
 
     if (!moduleOpenInFlight.gang) {
@@ -10715,7 +10681,13 @@ function setupAdmin() {
     el("gang-tabs").hidden = false;
     showToolView(target,"gang");
 
-    if (latestGangPayload) {
+    if (
+      latestGangPayload &&
+      (
+        target === "payments-view" ||
+        target === "company-view"
+      )
+    ) {
       renderGangPayload(latestGangPayload);
     }
 

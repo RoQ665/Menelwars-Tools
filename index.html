@@ -1367,11 +1367,21 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
         </div>
 
-        <div id="admin-submissions"></div>
+        <details id="admin-section-submissions" class="admin-accordion">
+          <summary>
+            <span>🧪 Receptury do akceptacji</span>
+            <span class="accordion-chevron">⌄</span>
+          </summary>
+          <div class="admin-accordion-body">
+            <div id="admin-submissions">
+              <div class="muted">Otwórz sekcję, aby pobrać zgłoszenia.</div>
+            </div>
+          </div>
+        </details>
 
         <div class="admin-gang-tools">
 
-          <details id="admin-section-reservations" class="admin-accordion" open>
+          <details id="admin-section-reservations" class="admin-accordion">
             <summary>
               <span>🔒 Rezerwacje receptur</span>
               <span class="accordion-chevron">⌄</span>
@@ -1536,7 +1546,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
   </strong>
 
   <div class="muted" style="margin-top:4px;margin-bottom:8px">
-    Wklej pełny ranking łącznych wpłat. System porówna go z poprzednim snapshotem i wyliczy dożywotnie saldo.
+    Wklej pełny ranking łącznych wpłat. Jedno kliknięcie sprawdzi dane, zapisze poprawny stan i natychmiast utworzy nowy snapshot dla Wpłat i Spółki.
   </div>
 
   <textarea
@@ -1560,21 +1570,15 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       margin-top:8px;
     "
   >
-    🔍 Sprawdź dane
+    🔎 Sprawdź i zapisz ranking
   </button>
 
   <button
-  id="admin-payments-import"
-  class="primary-btn"
-  type="button"
-  hidden
-  style="
-    width:100%;
-    margin-top:8px;
-  "
->
-  ✅ Wprowadź dane
-</button>
+    id="admin-payments-import"
+    type="button"
+    hidden
+    aria-hidden="true"
+  ></button>
 
   <div
     id="admin-payments-preview-status"
