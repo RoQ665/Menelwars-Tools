@@ -4661,6 +4661,7 @@ const goal = payload && payload.goal;
 let adminPaymentsSnapshot = null;
 let latestGangPayload = null;
 let latestGangPayloadAt = 0;
+const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
 let gangSessionValidationAt = 0;
 
 // v20.11 — jeden wspólny preload Admina.
@@ -10657,6 +10658,28 @@ function setupAdmin() {
         target,
         "gang"
       );
+
+      const payloadAge =
+        Date.now() - latestGangPayloadAt;
+
+      // v20.72 — stale-while-revalidate:
+      // < 10 min: przełączanie bez requestu.
+      // >= 10 min: stary widok pokazujemy od razu,
+      // a świeże dane pobieramy po cichu w tle.
+      if (
+        !latestGangPayloadAt ||
+        payloadAge >= GANG_PAYLOAD_TTL_MS
+      ) {
+        loadPayments({
+          background:true,
+          force:true
+        }).catch(error => {
+          console.warn(
+            "Nie udało się odświeżyć payloadu Gangu w tle:",
+            error
+          );
+        });
+      }
 
       validateGangSessionInBackground();
       return;
