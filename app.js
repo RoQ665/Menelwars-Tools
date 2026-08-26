@@ -2182,7 +2182,7 @@ const MAP_POSITIONS = {
       box.textContent = "⚠️ Nie udało się potwierdzić zapisanej sesji.";
     } else {
       box.className = "submit-info";
-      box.textContent = "👤 Korzystasz bez logowania. Destylarnia, Buildy i Mapa są dostępne bez konta.";
+      box.textContent = "👤 Korzystasz bez logowania. Zaloguj się, aby uzyskać dostęp do funkcji wymagających Konta.";
     }
   }
 
