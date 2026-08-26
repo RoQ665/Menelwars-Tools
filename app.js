@@ -2186,10 +2186,150 @@ const MAP_POSITIONS = {
     }
   }
 
+  let moduleAccessPolicyCache = {
+    distillery:false,
+    builds:false,
+    map:false
+  };
+
+  let moduleAccessPolicyAt = 0;
+  let moduleAccessPolicyInFlight = null;
+
+  const MODULE_ACCESS_POLICY_TTL_MS =
+    30 * 1000;
+
+  async function fetchModuleAccessPolicy(
+    options={}
+  ) {
+    const force =
+      Boolean(options.force);
+
+    if (
+      !force &&
+      moduleAccessPolicyAt &&
+      Date.now() - moduleAccessPolicyAt <
+        MODULE_ACCESS_POLICY_TTL_MS
+    ) {
+      return moduleAccessPolicyCache;
+    }
+
+    if (moduleAccessPolicyInFlight) {
+      return moduleAccessPolicyInFlight;
+    }
+
+    moduleAccessPolicyInFlight =
+      (async () => {
+        try {
+          const payload =
+            await jsonp(
+              "moduleAccessPolicy",
+              {}
+            );
+
+          if (
+            payload &&
+            payload.ok &&
+            payload.policy
+          ) {
+            moduleAccessPolicyCache = {
+              distillery:
+                Boolean(
+                  payload.policy.distillery
+                ),
+              builds:
+                Boolean(
+                  payload.policy.builds
+                ),
+              map:
+                Boolean(
+                  payload.policy.map
+                )
+            };
+
+            moduleAccessPolicyAt =
+              Date.now();
+          }
+        } catch (err) {
+          console.warn(
+            "[MenelWars Tools] Ustawienia dostępu do modułów:",
+            err
+          );
+        } finally {
+          moduleAccessPolicyInFlight =
+            null;
+        }
+
+        return moduleAccessPolicyCache;
+      })();
+
+    return moduleAccessPolicyInFlight;
+  }
+
+  const MODULE_ACCESS_LABELS = {
+    distillery:"Destylarnia",
+    builds:"Buildy",
+    map:"Mapa"
+  };
+
+  async function showModuleAccountGate(
+    moduleName
+  ) {
+    await renderAccountView();
+
+    showToolView(
+      "account-view",
+      "account"
+    );
+
+    const status =
+      el("account-status");
+
+    if (status) {
+      status.textContent =
+        `🔒 ${MODULE_ACCESS_LABELS[moduleName] || "Ten moduł"} wymaga zalogowanego Konta.`;
+    }
+  }
+
+  async function ensureModuleAccess(
+    moduleName
+  ) {
+    const policy =
+      await fetchModuleAccessPolicy();
+
+    if (
+      !policy ||
+      !policy[moduleName]
+    ) {
+      return true;
+    }
+
+    const account =
+      await playerAccountStatus();
+
+    if (account) {
+      return true;
+    }
+
+    await showModuleAccountGate(
+      moduleName
+    );
+
+    return false;
+  }
+
+
   async function openDistilleryModule(
     target="optimizer-view",
     options={}
   ) {
+    if (
+      !(await ensureModuleAccess(
+        "distillery"
+      ))
+    ) {
+      return;
+    }
+
     const forceRefresh =
       Boolean(options.forceRefresh);
 
@@ -2229,6 +2369,14 @@ const MAP_POSITIONS = {
   }
 
   async function openMapModule() {
+    if (
+      !(await ensureModuleAccess(
+        "map"
+      ))
+    ) {
+      return;
+    }
+
     showModuleLoading(
       "map",
       "🗺 Ładowanie mapy...",
@@ -2378,6 +2526,21 @@ const MAP_POSITIONS = {
           try {
             if (
               payload &&
+              payload.authRequired
+            ) {
+              approvedRecipesRequestState =
+                "error";
+
+              if (
+                activeToolModule ===
+                "distillery"
+              ) {
+                showModuleAccountGate(
+                  "distillery"
+                );
+              }
+            } else if (
+              payload &&
               payload.ok &&
               payload.recipes &&
               typeof payload.recipes === "object"
@@ -2443,6 +2606,10 @@ const MAP_POSITIONS = {
       script.src =
         BACKEND_URL +
         "?action=approved" +
+        "&sessionToken=" +
+        encodeURIComponent(
+          playerAccountSessionToken()
+        ) +
         "&callback=" +
         encodeURIComponent(callbackName) +
         "&_=" +
@@ -3223,6 +3390,13 @@ const MAP_POSITIONS = {
         </div>
       </div>
     `;
+
+    if (account.admin) {
+      // Badge panelu Admina ma być aktualny już na ekranie Konta,
+      // bez konieczności otwierania samego panelu.
+      loadAdminDashboardStatus()
+        .catch(()=>{});
+    }
 
     el("account-change-open")?.addEventListener("click",()=>{
       el("account-change-panel").hidden=!el("account-change-panel").hidden;
@@ -5842,6 +6016,139 @@ async function loadAdminGangTools() {
 }
 
 
+async function loadAdminModuleAccess() {
+  const box =
+    el("admin-module-access-list");
+
+  const status =
+    el("admin-module-access-status");
+
+  if (!box) return;
+
+  try {
+    const policy =
+      await fetchModuleAccessPolicy({
+        force:true
+      });
+
+    const rows = [
+      [
+        "distillery",
+        "⚗ Destylarnia",
+        "Receptury, badania i rezerwacje."
+      ],
+      [
+        "builds",
+        "🛠 Buildy",
+        "Kreator i publiczne buildy PvP."
+      ],
+      [
+        "map",
+        "🗺 Mapa",
+        "Ściąga mapy gry."
+      ]
+    ];
+
+    box.innerHTML =
+      rows.map(
+        ([key,label,description]) => `
+          <div class="module-access-row">
+            <div class="module-access-meta">
+              <strong>${label}</strong>
+              <span class="muted">${description}</span>
+            </div>
+
+            <label
+              class="module-access-switch"
+              title="Wymagaj zalogowanego Konta">
+              <input
+                type="checkbox"
+                data-module-access="${key}"
+                ${policy && policy[key] ? "checked" : ""}
+              >
+              <span class="module-access-slider"></span>
+            </label>
+          </div>
+        `
+      ).join("");
+
+    box
+      .querySelectorAll(
+        "[data-module-access]"
+      )
+      .forEach(input => {
+        input.addEventListener(
+          "change",
+          async () => {
+            const moduleName =
+              input.dataset.moduleAccess;
+
+            const nextValue =
+              Boolean(input.checked);
+
+            input.disabled = true;
+
+            if (status) {
+              status.textContent =
+                "Zapisywanie ustawienia...";
+            }
+
+            try {
+              await adminPostAction(
+                "adminSetModuleAccess",
+                {
+                  module:moduleName,
+                  requiresAccount:
+                    nextValue
+                }
+              );
+
+              moduleAccessPolicyCache = {
+                ...moduleAccessPolicyCache,
+                [moduleName]:nextValue
+              };
+
+              moduleAccessPolicyAt =
+                Date.now();
+
+              if (status) {
+                status.textContent =
+                  nextValue
+                    ? `✅ ${MODULE_ACCESS_LABELS[moduleName]} wymaga teraz Konta.`
+                    : `✅ ${MODULE_ACCESS_LABELS[moduleName]} jest dostępna bez Konta.`;
+              }
+
+            } catch (err) {
+              input.checked =
+                !nextValue;
+
+              if (status) {
+                status.textContent =
+                  err && err.message
+                    ? err.message
+                    : "Nie udało się zapisać ustawienia.";
+              }
+            } finally {
+              input.disabled = false;
+            }
+          }
+        );
+      });
+
+  } catch (err) {
+    box.innerHTML =
+      `<div class="muted">Nie udało się pobrać ustawień dostępu.</div>`;
+
+    if (status) {
+      status.textContent =
+        err && err.message
+          ? err.message
+          : "";
+    }
+  }
+}
+
+
 async function loadAdminBuilds() {
   const token = adminToken();
   const box = el("admin-builds-list");
@@ -6099,7 +6406,10 @@ async function loadAdminSection(
   }
 
   const load = async () => {
-    if (sectionId === "admin-section-submissions") {
+    if (sectionId === "admin-section-module-access") {
+      await loadAdminModuleAccess();
+
+    } else if (sectionId === "admin-section-submissions") {
       await loadAdminSubmissions();
 
     } else if (sectionId === "admin-section-reservations") {
@@ -10866,6 +11176,14 @@ function setupAdmin() {
   }
 
   async function openBuildModule() {
+    if (
+      !(await ensureModuleAccess(
+        "builds"
+      ))
+    ) {
+      return;
+    }
+
     showModuleLoading(
       "builds",
       "🛠 Ładowanie Buildów...",
@@ -11594,7 +11912,36 @@ showToolView("home-view", "");
 if (el("admin-view")) el("admin-view").hidden = true;
 
 preloadApplicationData();
+fetchModuleAccessPolicy().catch(()=>{});
 
+
+  const ADMIN_ACCOUNT_BADGE_REFRESH_MS =
+    60 * 1000;
+
+  async function refreshAdminBadgeOnAccount() {
+    if (
+      activeToolModule !== "account" ||
+      document.visibilityState !== "visible" ||
+      !cachedAccountStatus ||
+      !cachedAccountStatus.admin
+    ) {
+      return;
+    }
+
+    try {
+      await loadAdminDashboardStatus();
+    } catch (err) {
+      console.warn(
+        "[MenelWars Tools] Odświeżanie badge Admina:",
+        err
+      );
+    }
+  }
+
+  setInterval(
+    refreshAdminBadgeOnAccount,
+    ADMIN_ACCOUNT_BADGE_REFRESH_MS
+  );
 
   // Destylarnia: aktualne rezerwacje również wtedy,
   // gdy użytkownik już ma moduł otwarty.
@@ -11637,6 +11984,13 @@ preloadApplicationData();
         activeToolModule === "distillery"
       ) {
         refreshActiveDistilleryInBackground();
+      }
+
+      if (
+        document.visibilityState === "visible" &&
+        activeToolModule === "account"
+      ) {
+        refreshAdminBadgeOnAccount();
       }
     }
   );

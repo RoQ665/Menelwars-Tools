@@ -2655,3 +2655,55 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   opacity:.55;
   cursor:not-allowed;
 }
+
+
+/* v20.79 — dostęp do modułów */
+.module-access-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 0;
+  border-bottom:1px solid rgba(0,0,0,.08);
+}
+.module-access-row:last-child{border-bottom:0}
+.module-access-meta{display:flex;flex-direction:column;gap:2px}
+.module-access-switch{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  width:48px;
+  height:26px;
+  flex:0 0 auto;
+}
+.module-access-switch input{
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+.module-access-slider{
+  position:absolute;
+  inset:0;
+  border-radius:999px;
+  background:#c9c9c9;
+  transition:.18s ease;
+  cursor:pointer;
+}
+.module-access-slider::after{
+  content:"";
+  position:absolute;
+  width:20px;
+  height:20px;
+  left:3px;
+  top:3px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.3);
+  transition:.18s ease;
+}
+.module-access-switch input:checked + .module-access-slider{
+  background:#7a5b28;
+}
+.module-access-switch input:checked + .module-access-slider::after{
+  transform:translateX(22px);
+}
