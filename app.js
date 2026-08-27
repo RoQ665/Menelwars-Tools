@@ -3805,6 +3805,12 @@ async function loadAccountAdminPermissions(
 
                   <button
                     type="button"
+                    data-account-rename-player="${escapeHtml(player.nick)}">
+                    ✏️ Zmień nick
+                  </button>
+
+                  <button
+                    type="button"
                     class="account-player-delete"
                     data-account-delete-player="${escapeHtml(player.nick)}">
                     🗑 Usuń
@@ -3823,7 +3829,13 @@ async function loadAccountAdminPermissions(
         .forEach(button => {
           button.onclick =
             async () => {
-              await timedBackendPost(
+              criticalOperationStart(
+                "🛠 Zmieniam uprawnienia Admina…",
+                "Zapisuję zmianę uprawnień gracza."
+              );
+
+              try {
+                await timedBackendPost(
                 "accountAdminSetPermission",
                 {
                   action:
@@ -3843,6 +3855,9 @@ async function loadAccountAdminPermissions(
               loadAccountAdminPermissions({
                 force:true
               });
+              } finally {
+                criticalOperationFinish();
+              }
             };
         });
 
@@ -3864,7 +3879,13 @@ async function loadAccountAdminPermissions(
                 return;
               }
 
-              await timedBackendPost(
+              criticalOperationStart(
+                "🚫 Wylogowuję sesje gracza…",
+                "Unieważniam aktywne sesje tego konta."
+              );
+
+              try {
+                await timedBackendPost(
                 "accountAdminLogoutAll",
                 {
                   action:
@@ -3880,6 +3901,22 @@ async function loadAccountAdminPermissions(
               loadAccountAdminPermissions({
                 force:true
               });
+              } finally {
+                criticalOperationFinish();
+              }
+            };
+        });
+
+      holder
+        .querySelectorAll(
+          "[data-account-rename-player]"
+        )
+        .forEach(button => {
+          button.onclick =
+            async () => {
+              await renameAdminPlayer(
+                button.dataset.accountRenamePlayer
+              );
             };
         });
 
@@ -5546,6 +5583,21 @@ async function timedBackendPost(
 }
 
 
+const ADMIN_CRITICAL_ACTIONS = {
+  adminSaveGoal:"🎯 Zapisuję cel…",
+  adminDeleteGoal:"🗑 Usuwam cel…",
+  adminAddAnnouncement:"📢 Dodaję ogłoszenie…",
+  adminDeleteAnnouncement:"🗑 Usuwam ogłoszenie…",
+  adminSetAnnouncementImportant:"📌 Aktualizuję ogłoszenie…",
+  adminCreateGangPoll:"📊 Tworzę ankietę…",
+  adminSetGangPollStatus:"📊 Aktualizuję ankietę…",
+  adminDeleteGangPoll:"🗑 Usuwam ankietę…",
+  adminSetModuleAccess:"🔐 Zmieniam dostęp do modułu…",
+  adminDeleteBuild:"🗑 Usuwam publiczny build…",
+  adminClearAllReservations:"🧹 Czyszczę rezerwacje…",
+  adminRenamePlayer:"✏️ Zmieniam nick gracza…"
+};
+
 async function adminPostAction(action, data={}) {
   const token = adminToken();
 
@@ -5554,17 +5606,35 @@ async function adminPostAction(action, data={}) {
     throw new Error("Brak sesji administratora.");
   }
 
-  await timedBackendPost(
-    action,
-    {
-      action,
-      token,
-      ...data
-    }
-  );
+  const criticalTitle =
+    ADMIN_CRITICAL_ACTIONS[action] || "";
 
-  // Apps Script + no-cors: wynik odczytujemy przez odświeżenie GET.
-  await new Promise(resolve => setTimeout(resolve, 350));
+  if (criticalTitle) {
+    criticalOperationStart(
+      criticalTitle,
+      "Zapisuję zmianę. Poczekaj na potwierdzenie serwera."
+    );
+  }
+
+  try {
+    await timedBackendPost(
+      action,
+      {
+        action,
+        token,
+        ...data
+      }
+    );
+
+    // Apps Script + no-cors: krótki bufor przed odczytem świeżego stanu.
+    await new Promise(resolve => setTimeout(resolve, 350));
+  } finally {
+    // Overlay dotyczy samego zapisu. Dalsze GET-y mogą odświeżyć widoki
+    // bez niepotrzebnego blokowania całej aplikacji.
+    if (criticalTitle) {
+      criticalOperationFinish();
+    }
+  }
 }
 
 function adminRecipeLabel(item) {
@@ -7232,6 +7302,10 @@ async function addAdminPlayer(event) {
     "playerAdd"
   );
 
+  criticalOperationStart(
+    "➕ Dodaję gracza…",
+    "Aktualizuję roster i snapshot Wpłat."
+  );
 
   try {
 
@@ -7285,6 +7359,8 @@ async function addAdminPlayer(event) {
     await runtimeLoaderFinish(
       "❌ Dodawanie nieudane"
     );
+  } finally {
+    criticalOperationFinish();
   }
 }
 
@@ -7350,6 +7426,10 @@ async function deleteAdminPlayer(
     "playerDelete"
   );
 
+  criticalOperationStart(
+    "🗑 Usuwam gracza…",
+    "Usuwam bieżące dane gracza, konto i aktualizuję snapshot."
+  );
 
   try {
 
@@ -7404,6 +7484,112 @@ async function deleteAdminPlayer(
     await runtimeLoaderFinish(
       "❌ Usuwanie nieudane"
     );
+  } finally {
+    criticalOperationFinish();
+  }
+}
+
+
+async function renameAdminPlayer(
+  oldNick
+) {
+  const status =
+    el("admin-players-status");
+
+  const proposed =
+    window.prompt(
+      `Zmiana nicku gracza\n\nAktualny nick: ${oldNick}\n\nPodaj nowy nick:`,
+      oldNick
+    );
+
+  if (proposed === null) {
+    return;
+  }
+
+  const newNick =
+    String(proposed || "").trim();
+
+  if (!newNick) {
+    if (status) {
+      status.textContent =
+        "Podaj nowy nick gracza.";
+    }
+    return;
+  }
+
+  if (
+    newNick.toLocaleLowerCase("pl-PL") ===
+    String(oldNick || "")
+      .trim()
+      .toLocaleLowerCase("pl-PL")
+  ) {
+    if (status) {
+      status.textContent =
+        "Nowy nick jest taki sam jak obecny.";
+    }
+    return;
+  }
+
+  if (
+    !window.confirm(
+      `Zmienić nick "${oldNick}" → "${newNick}"?\n\n` +
+      `Konto, hasło, aktywne sesje, bieżący fundusz i buildy zostaną zachowane.`
+    )
+  ) {
+    return;
+  }
+
+  if (status) {
+    status.textContent =
+      `Zmieniam nick ${oldNick} → ${newNick}...`;
+  }
+
+  criticalOperationStart(
+    "✏️ Zmieniam nick gracza…",
+    "Migruję konto, sesje i bieżące dane gracza."
+  );
+
+  try {
+    await adminPostAction(
+      "adminRenamePlayer",
+      {
+        oldNick,
+        newNick
+      }
+    );
+
+    accountAdminPlayersCacheAt = 0;
+    invalidateAppCache("payments");
+    invalidateAppCache("builds");
+
+    await Promise.allSettled([
+      loadAdminPlayers(),
+      loadAccountAdminPermissions({force:true}),
+      loadAdminPaymentsStatus(),
+      loadPayments({background:true})
+    ]);
+
+    if (status) {
+      status.textContent =
+        `✅ Zmieniono nick ${oldNick} → ${newNick}.`;
+    }
+
+    await runtimeLoaderFinish(
+      "✅ Nick zmieniony"
+    );
+  } catch (err) {
+    if (status) {
+      status.textContent =
+        err && err.message
+          ? err.message
+          : "Nie udało się zmienić nicku.";
+    }
+
+    await runtimeLoaderFinish(
+      "❌ Zmiana nicku nieudana"
+    );
+  } finally {
+    criticalOperationFinish();
   }
 }
 
@@ -8404,6 +8590,11 @@ function setupAdmin() {
             "company"
           );
 
+          criticalOperationStart(
+            "💰 Aktualizuję dochód Spółki…",
+            "Zapisuję nową wartość. Pozostałe dane odświeżą się w tle."
+          );
+
           const payload =
             await jsonp(
               "adminSetCompanyIncome",
@@ -8422,6 +8613,8 @@ function setupAdmin() {
                 : "Nie udało się zapisać dochodu spółki."
             );
           }
+
+          criticalOperationFinish();
 
           await loadAdminPaymentsStatus();
 
@@ -8446,6 +8639,7 @@ function setupAdmin() {
           );
 
         } finally {
+          criticalOperationFinish();
           input.disabled = false;
         }
       }
