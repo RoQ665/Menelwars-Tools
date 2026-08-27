@@ -1,131 +1,90 @@
-# MenelWars Tools
+# 🍻 MenelWars Tools
 
-**MenelWars Tools** to PWA rozszerzające MenelWars o wspólne narzędzia dla destylarni i gangu.
+**MenelWars Tools** to niezależna aplikacja webowa stworzona jako zestaw dodatkowych narzędzi dla graczy MenelWars.
 
-Aplikacja korzysta ze wspólnego backendu Apps Script i Google Sheets, dzięki czemu dane są synchronizowane pomiędzy użytkownikami bez konieczności publikowania nowej wersji strony przy każdej zmianie danych.
+Łączy w jednym miejscu narzędzia do Destylarni, planowania buildów, korzystania z mapy oraz funkcje wspierające organizację i codzienne działanie gangu.
 
-## Najważniejsze moduły
-
-### ⚗ Destylarnia
-
-**Dostępne recepty** — pełna lista zatwierdzonych receptur z filtrami. Składniki premium wpływają wyłącznie na podium Top 3.
-
-**Nieodkryte** — lista kombinacji do zbadania, filtrowanie oraz sekcja recept aktualnie badanych przez innych graczy.
-
-**Rezerwacje receptur** — gracz może zaklepać nieodkrytą recepturę na 12 godzin. Po wykonaniu recepty może przesłać wynik bezpośrednio z rezerwacji.
-
-Jeżeli gracz jest zalogowany, rezerwacja przypisana do jego nicku może być obsługiwana na każdym urządzeniu, na którym zalogowane jest to samo konto. Dla użytkowników niezalogowanych pozostaje zabezpieczenie urządzenia, z którego utworzono rezerwację.
-
-**Dodaj** — zgłoszenie nowo odkrytej receptury do weryfikacji.
-
-**Postęp** — statystyki odkryć oraz ranking osób, których unikalne receptury zostały zaakceptowane.
-
-### 👥 Gang
-
-Prywatny moduł dostępny wyłącznie dla zalogowanych członków gangu.
-
-**Wpłaty** — dożywotnie saldo `Nadpłata / Dług`, ranking graczy i informacje o ostatniej aktualizacji.
-
-**Spółka** — wkład w firmę, udział procentowy i przewidywana pensja. Aktualny podział dochodu: 50% pensje / 50% rozwój. Gracz może dobrowolnie zrzec się części własnej pensji ponad minimalne 160 zł; środki trafiają wtedy do Funduszu.
-
-**Ankiety** — głosowania dostępne dla zalogowanych graczy. Każdy może głosować wyłącznie jako nick przypisany do swojego konta.
-
-**Cele** — wspólny cel gangu z wartością aktualną, docelową i paskiem postępu.
-
-**Ogłoszenia** — kilka aktywnych komunikatów, w tym możliwość oznaczenia `📌 Ważne`.
-
-### 👤 Konto
-
-Każdy gracz posiada konto przypisane do nicku z gry.
-
-Pierwsze ustawienie hasła odbywa się przez kod wygenerowany przez administratora. Konto pozwala korzystać z prywatnych modułów gangu na wielu urządzeniach, zmieniać hasło, sprawdzać aktywne sesje i wylogować pozostałe urządzenia.
-
-### 🛠 Panel administratora
-
-Dostęp do Admina jest uprawnieniem konkretnego konta — nie istnieje osobne hasło administratora.
-
-Panel pozwala zarządzać m.in.:
-- zgłoszeniami i wynikami receptur,
-- rezerwacjami,
-- wpłatami i rankingiem,
-- Spółką,
-- ankietami,
-- celami i ogłoszeniami,
-- graczami,
-- kontami, kodami resetu i uprawnieniami Admin.
-
-### 🗺 Mapa
-
-Szybka ściąga aktualnych ustawień mapy MenelWars.
-
-## System receptur
-
-Zgłoszenia trafiają do Google Sheets i mają statusy:
-- `OCZEKUJE`
-- `ZATWIERDZONE`
-- `ODRZUCONE`
-- `DUPLIKAT`
-
-Do wspólnej bazy trafiają tylko zatwierdzone wyniki. Identyczne zgłoszenie może zostać oznaczone jako duplikat, a inny wynik tej samej receptury może zostać zatwierdzony jako korekta.
-
-PWA automatycznie pobiera zatwierdzone receptury, dlatego aktualizacja samych wyników nie wymaga ponownego wdrażania strony.
-
-## Rezerwacje
-
-Rezerwacje nieodkrytych receptur są przechowywane po stronie Apps Script i standardowo wygasają po 12 godzinach.
-
-Administrator może zwolnić pojedynczą rezerwację albo wyczyścić wszystkie naraz.
-
-Po przesłaniu wyniku rezerwacja pozostaje aktywna do czasu decyzji administratora.
-
-## Wpłaty i Spółka
-
-System opiera się na rankingu łącznych wpłat graczy. Kolejny snapshot jest porównywany z poprzednim, dzięki czemu naliczane jest dożywotnie saldo gracza.
-
-- dodatnie saldo = **Nadpłata**
-- ujemne saldo = **Dług**
-- próg udziału w Spółce = **30 000 zł**
-- minimalna pensja zakwalifikowanego gracza = **160 zł**
-- dzienny dochód Spółki = **50% pensje / 50% rozwój**
-
-Dobrowolna rezygnacja z części pensji nie zwiększa pensji innych graczy — różnica trafia do Funduszu.
-
-## Uruchamianie i ładowanie
-
-Po otwarciu PWA aplikacja sprawdza konto i równolegle przygotowuje dane Gangu, ankiet oraz — dla uprawnionych kont — panelu Admina.
-
-Pasek postępu pokazuje wizualny stan ładowania i kończy się na `✅ Dane gotowe`. Warstwa wizualna nie opóźnia faktycznego działania aplikacji.
-
-## Bezpieczeństwo
-
-Prywatne dane Gangu i funkcje administratora wymagają poprawnej sesji konta.
-
-Stary dostęp przez hasło gangu, stare tokeny administratora oraz wcześniejszy skrypt Tampermonkey są wycofane i nie mogą uzyskać dostępu do chronionych danych po wdrożeniu aktualnego backendu.
-
-Publiczna część Destylarni pozostaje dostępna bez konta.
-
-## PWA
-
-MenelWars Tools działa jako samodzielna aplikacja PWA publikowana przez GitHub Pages i może być używana na komputerze oraz telefonie.
-
-Projekt nie korzysta już ze skryptu Tampermonkey.
-
-## Aktualizacje
-
-Po opublikowaniu nowej wersji PWA aktualizuje się przez GitHub Pages.
-
-Zmiany samych danych receptur, wpłat, celów czy ogłoszeń mogą być wykonywane po stronie backendu bez publikowania nowej wersji frontendu.
-
-## Architektura
-
-**PWA**  
-↓  
-**Backend Google Apps Script**  
-↓  
-**Google Sheets**
-
-Frontend odpowiada za interfejs, Apps Script za logikę serwera i autoryzację, a Google Sheets pełni rolę wspólnego magazynu danych.
+Większość funkcji aplikacji jest dostępna po zalogowaniu na **Konto gracza**.
 
 ---
 
-**MenelWars Tools · autor: RoQ**
+## 🧰 Co znajdziesz w aplikacji?
+
+### ⚗️ Destylarnia
+
+Baza odkrytych receptur wraz z narzędziami pomagającymi w prowadzeniu badań.
+
+Możesz przeglądać dostępne receptury, sprawdzać kombinacje składników, śledzić aktualnie prowadzone badania oraz rezerwować receptury do własnych testów.
+
+System rezerwacji pomaga uniknąć sytuacji, w której kilku graczy jednocześnie bada tę samą kombinację.
+
+---
+
+### 🛠️ Kreator Buildów
+
+Narzędzie do planowania i analizowania buildów postaci.
+
+Pozwala dobierać statystyki oraz przedmioty i sprawdzać, jak wpływają one na końcowe parametry postaci.
+
+Możesz tworzyć własne buildy, zapisywać je na swoim Koncie oraz udostępniać innym graczom.
+
+Publiczne buildy mogą służyć jako inspiracja lub punkt wyjścia do stworzenia własnej konfiguracji.
+
+---
+
+### 🗺️ Mapa
+
+Szybka ściąga pomagająca odnaleźć najważniejsze miejsca i informacje związane z mapą gry.
+
+Zamiast szukać potrzebnych informacji podczas gry, możesz mieć je pod ręką w jednym miejscu.
+
+---
+
+### 👥 Gang
+
+Sekcja przeznaczona dla członków gangu i związana z jego codziennym funkcjonowaniem.
+
+W jednym miejscu możesz znaleźć między innymi:
+
+- 💰 ranking wpłat,
+- 🏢 informacje o Spółce,
+- 💵 swoją aktualną pensję i wkład,
+- 🎯 cele gangu,
+- 📢 ogłoszenia,
+- 📊 ankiety.
+
+Dzięki temu najważniejsze informacje związane z gangiem nie muszą być rozproszone pomiędzy grą, wiadomościami i dodatkowymi arkuszami.
+
+---
+
+## 👤 Konto gracza
+
+MenelWars Tools korzysta z Kont graczy, aby rozpoznawać członków gangu i udostępniać im odpowiednie funkcje aplikacji.
+
+Po zalogowaniu otrzymujesz dostęp do przeznaczonych dla graczy narzędzi, takich jak **Destylarnia, Kreator Buildów, Mapa oraz funkcje Gangu**.
+
+Dostępność poszczególnych modułów może być zmieniana w zależności od aktualnych potrzeb projektu.
+
+---
+
+## 📱 Aplikacja PWA
+
+MenelWars Tools działa jako aplikacja webowa i może być zainstalowana na telefonie lub komputerze jako **PWA (Progressive Web App)**.
+
+Dzięki temu można uruchamiać ją podobnie jak zwykłą aplikację, bez konieczności każdorazowego otwierania strony w przeglądarce.
+
+---
+
+## 🎯 Po co powstał MenelWars Tools?
+
+MenelWars Tools powstało po to, żeby ograniczyć rzeczy, które podczas gry trzeba liczyć, zapisywać albo sprawdzać ręcznie.
+
+Zamiast korzystać z kilku arkuszy, wiadomości i notatek, najczęściej używane narzędzia znajdują się w jednym miejscu.
+
+Projekt jest rozwijany wraz z potrzebami graczy i kolejnymi pomysłami na usprawnienie codziennej gry.
+
+---
+
+## ⚠️ Informacja
+
+**MenelWars Tools jest niezależnym projektem społecznościowym i nie jest oficjalnym narzędziem twórców gry MenelWars.**
