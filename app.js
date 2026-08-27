@@ -9422,19 +9422,62 @@ function setupAdmin() {
 
   function buildApplyPerkEffect(stats,effect,extras) {
     const text = String(effect || "").trim();
-    const lower = text.toLocaleLowerCase("pl-PL");
 
-    // Bonusy zależne od HP / tury / specjalnego warunku pokazujemy osobno.
-    if (
-      lower.includes("gdy hp<") ||
-      lower.includes("krytyki mogą")
-    ) {
-      extras.conditional.push(text);
+    // Jeden perk może zawierać jednocześnie bonus stały i warunkowy.
+    // Przykład Nieumarły:
+    // "+22% maksymalnego HP, +6 regeneracji HP gdy HP<50%"
+    // +22% HP liczymy zawsze, a tylko regenerację pokazujemy jako warunkową.
+    const parts = text
+      .split(/\s*[,;]\s*/)
+      .map(part => part.trim())
+      .filter(Boolean);
+
+    const unconditionalParts = [];
+
+    parts.forEach(part => {
+      const partLower =
+        part.toLocaleLowerCase("pl-PL");
+
+      const attackPerTurn =
+        part.match(
+          /([+-]?\d+(?:[.,]\d+)?)%\s*ataku\s+za\s+turę/i
+        );
+
+      if (attackPerTurn) {
+        extras.dynamic.push({
+          type:"attackPctPerTurn",
+          amount:
+            Number(
+              String(attackPerTurn[1])
+                .replace(",",".")
+            ) || 0,
+          text:part
+        });
+        return;
+      }
+
+      if (
+        partLower.includes("gdy hp<") ||
+        partLower.includes("krytyki mogą")
+      ) {
+        extras.conditional.push(part);
+      } else {
+        unconditionalParts.push(part);
+      }
+    });
+
+    if (!unconditionalParts.length) {
       return;
     }
 
+    const calcText =
+      unconditionalParts.join(", ");
+
+    const lower =
+      calcText.toLocaleLowerCase("pl-PL");
+
     const add = (key,pattern,transform=value=>value) => {
-      const value = buildEffectNumber(text,pattern);
+      const value = buildEffectNumber(calcText,pattern);
       if (value) stats[key] += transform(value);
     };
 
@@ -9446,20 +9489,20 @@ function setupAdmin() {
 
     // "szansy na podwójne uderzenie" i skrócone "podwójnego uderzenia"
     let doubleBonus =
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na podwójne uderzenie/i) ||
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*podwójnego uderzenia/i);
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na podwójne uderzenie/i) ||
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*podwójnego uderzenia/i);
     stats.doubleStrike += doubleBonus;
 
     let evasionBonus =
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na unik/i) ||
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*uniku\b/i);
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na unik/i) ||
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*uniku\b/i);
     stats.evasion += evasionBonus;
 
     add("counter",/([+-]?\d+(?:[.,]\d+)?)%\s*kontrataku/i);
 
     let critBonus =
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na trafienie krytyczne/i) ||
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na krytyka/i);
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na trafienie krytyczne/i) ||
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na krytyka/i);
     stats.critChance += critBonus;
 
     add("accuracy",/([+-]?\d+(?:[.,]\d+)?)%\s*celności/i);
@@ -9471,7 +9514,7 @@ function setupAdmin() {
     add("maxHpPct",/([+-]?\d+(?:[.,]\d+)?)%\s*maksymalnego hp/i);
 
     const allResist =
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*wszystkich odporności/i);
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*wszystkich odporności/i);
     if (allResist) {
       stats.critResist += allResist;
       stats.stunResist += allResist;
@@ -9480,12 +9523,12 @@ function setupAdmin() {
 
     // Ujemne "otrzymywane obrażenia" zamieniamy na dodatnią redukcję obrażeń.
     const taken =
-      buildEffectNumber(text,/([+-]?\d+(?:[.,]\d+)?)%\s*otrzymywanych obrażeń/i);
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*otrzymywanych obrażeń/i);
     if (taken < 0) stats.damageReduction += Math.abs(taken);
 
     const regenPct =
       buildEffectNumber(
-        text,
+        calcText,
         /([+-]?\d+(?:[.,]\d+)?)%\s*regeneracji hp/i
       );
     if (regenPct) {
@@ -9494,7 +9537,7 @@ function setupAdmin() {
 
     const regenFlat =
       buildEffectNumber(
-        text,
+        calcText,
         /([+-]?\d+(?:[.,]\d+)?)(?!\s*%)\s*regeneracji hp/i
       );
     if (regenFlat) {
@@ -9504,11 +9547,11 @@ function setupAdmin() {
     // Zachowujemy nietypowe, nieprzeliczalne opisy jako efekty specjalne.
     if (
       lower.includes("krwawienie") &&
-      !/odporności na krwawienie/i.test(text) &&
-      !/otrzymywanych obrażeń/i.test(text)
+      !/odporności na krwawienie/i.test(calcText) &&
+      !/otrzymywanych obrażeń/i.test(calcText)
     ) {
-      if (!/^\+?\d+(?:[.,]\d+)?%\s*kradzieży życia/i.test(text)) {
-        extras.special.push(text);
+      if (!/^\+?\d+(?:[.,]\d+)?%\s*kradzieży życia/i.test(calcText)) {
+        extras.special.push(calcText);
       }
     }
   }
@@ -10005,6 +10048,7 @@ function setupAdmin() {
     const stats = buildNewStatBag();
     const extras = {
       conditional:[],
+      dynamic:[],
       special:[]
     };
 
@@ -10098,8 +10142,25 @@ function setupAdmin() {
       stats[key] = info.effective;
     });
 
-    // Usuń duplikaty opisów warunkowych/specjalnych.
+    // Usuń duplikaty opisów warunkowych/dynamicznych/specjalnych.
     extras.conditional = [...new Set(extras.conditional)];
+
+    const dynamicSeen =
+      new Set();
+
+    extras.dynamic =
+      extras.dynamic.filter(item => {
+        const key =
+          `${item.type}|${item.amount}|${item.text}`;
+
+        if (dynamicSeen.has(key)) {
+          return false;
+        }
+
+        dynamicSeen.add(key);
+        return true;
+      });
+
     extras.special = [...new Set(extras.special)];
 
     return {
@@ -10411,6 +10472,124 @@ function setupAdmin() {
       `;
     }).join("");
 
+    const dynamicAttackPerTurn =
+      extras.dynamic.filter(
+        item =>
+          item &&
+          item.type ===
+            "attackPctPerTurn" &&
+          Number(item.amount)
+      );
+
+    const dynamicAttackPerTurnTotal =
+      dynamicAttackPerTurn.reduce(
+        (sum,item) =>
+          sum +
+          (Number(item.amount) || 0),
+        0
+      );
+
+    const dynamicHtml =
+      dynamicAttackPerTurnTotal
+        ? (() => {
+            const maxTurns = 15;
+
+            const maxBonus =
+              buildStatNumber(
+                dynamicAttackPerTurnTotal *
+                maxTurns
+              );
+
+            const rows =
+              Array.from(
+                {length:maxTurns},
+                (_,index) => {
+                  const turn =
+                    index + 1;
+
+                  const turnBonus =
+                    buildStatNumber(
+                      dynamicAttackPerTurnTotal *
+                      turn
+                    );
+
+                  const totalAttackPct =
+                    buildStatNumber(
+                      (Number(
+                        calculated.stats.attackPct
+                      ) || 0) +
+                      turnBonus
+                    );
+
+                  const turnAttack =
+                    buildStatNumber(
+                      (Number(
+                        calculated.stats.attackFlat
+                      ) || 0) *
+                      (
+                        1 +
+                        totalAttackPct /
+                        100
+                      )
+                    );
+
+                  return `
+                    <tr>
+                      <td>${turn}</td>
+                      <td>+${escapeHtml(finalPrimaryValue(turnBonus))}%</td>
+                      <td>${escapeHtml(finalPrimaryValue(totalAttackPct))}%</td>
+                      <td><strong>${escapeHtml(finalPrimaryValue(turnAttack))}</strong></td>
+                    </tr>
+                  `;
+                }
+              ).join("");
+
+            const sourceText =
+              dynamicAttackPerTurn
+                .map(item => item.text)
+                .join(" + ");
+
+            return `
+              <section class="build-stat-group build-stat-extra">
+                <div class="build-stat-group-title">
+                  📈 Bonusy narastające z perków
+                </div>
+
+                <div class="build-stat-extra-list">
+                  <div>
+                    • ${escapeHtml(sourceText)}
+                    <strong>
+                      (maks. +${escapeHtml(finalPrimaryValue(maxBonus))}% w 15. turze)
+                    </strong>
+                  </div>
+                </div>
+
+                <details style="margin-top:10px">
+                  <summary style="cursor:pointer;font-weight:700">
+                    Pokaż przeliczenie tur 1–15
+                  </summary>
+
+                  <div style="overflow-x:auto;margin-top:8px">
+                    <table style="width:100%;border-collapse:collapse;text-align:right">
+                      <thead>
+                        <tr>
+                          <th style="text-align:left;padding:6px">Tura</th>
+                          <th style="padding:6px">Bonus</th>
+                          <th style="padding:6px">Łączny Atak %</th>
+                          <th style="padding:6px">Atak po przeliczeniu</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${rows}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              </section>
+            `;
+          })()
+        : "";
+
     const conditionalHtml = extras.conditional.length
       ? `
         <section class="build-stat-group build-stat-extra">
@@ -10433,7 +10612,7 @@ function setupAdmin() {
       `
       : "";
 
-    return groupsHtml + conditionalHtml + specialHtml;
+    return groupsHtml + dynamicHtml + conditionalHtml + specialHtml;
   }
 
   function renderBuildStats() {
