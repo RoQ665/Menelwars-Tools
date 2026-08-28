@@ -7885,8 +7885,15 @@ function renderAdminCompanyPlan(
     const waiverPending = Boolean(player.waiverPending);
     const salaryChanged =
       !activeExists || active === null || Math.abs(active - proposed) > 0.009;
+    // Tabela "Co ustawić w MenelWars" ma pokazywać wyłącznie
+    // realną zmianę, którą Admin musi wykonać w grze.
+    //
+    // player.planPending może być true także wtedy, gdy zmieniła się
+    // pełna należna / kwota Funduszu, ale wypłata w grze pozostaje
+    // identyczna (np. aktywne zrzeczenie: 160 zł -> 160 zł).
+    // Taki gracz powinien mieć "ZOSTAW", nie "USTAW".
     const needsAction =
-      salaryChanged || waiverPending || Boolean(player.planPending);
+      salaryChanged || waiverPending;
 
     return {
       player, proposed, activeExists, active, requestedWaiver,
