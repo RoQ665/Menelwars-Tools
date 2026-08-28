@@ -2895,3 +2895,13 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .garden-start-time-options{gap:6px}
   .garden-start-time-options span{padding:8px 7px}
 }
+
+/* =========================================================
+   v20.96 — mobile: klawiatura ekranowa nie łamie sticky topbara
+   ========================================================= */
+@media(max-width:700px){
+  body.mobile-form-focus .topbar{
+    position:static!important;
+  }
+}
+

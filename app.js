@@ -12202,6 +12202,12 @@ function setupAdmin() {
 
     const status = el("garden-action-status");
     if (status) status.textContent = "⏳ Zapisuję czas wzrostu…";
+
+    criticalOperationStart(
+      "🧺 Zapisuję zbiór…",
+      "Zapisuję czas wzrostu i odświeżam grządkę. Poczekaj na zakończenie operacji."
+    );
+
     try {
       const result = await jsonp("gardenFinish",{
         id:own.id,
@@ -12212,8 +12218,12 @@ function setupAdmin() {
       gardenSetLocalPlot(gardenSelectedPlot,null);
       if (status) status.textContent = `✅ Zapisano wynik: ${gardenFormatDuration(result.durationMs)}.`;
       await gardenFetchData({force:true});
+      gardenRenderPlots();
+      gardenRenderEditor();
     } catch (err) {
       if (status) status.textContent = `❌ ${err && err.message ? err.message : "Błąd."}`;
+    } finally {
+      criticalOperationFinish();
     }
   }
 
@@ -12224,6 +12234,12 @@ function setupAdmin() {
 
     const status = el("garden-action-status");
     if (status) status.textContent = "⏳ Anuluję uprawę…";
+
+    criticalOperationStart(
+      "🗑️ Anuluję uprawę…",
+      "Usuwam aktywną rezerwację i odświeżam grządkę. Poczekaj na zakończenie operacji."
+    );
+
     try {
       const result = await jsonp("gardenCancel",{
         id:own.id,
@@ -12234,8 +12250,12 @@ function setupAdmin() {
       gardenSetLocalPlot(gardenSelectedPlot,null);
       if (status) status.textContent = "✅ Uprawa anulowana.";
       await gardenFetchData({force:true});
+      gardenRenderPlots();
+      gardenRenderEditor();
     } catch (err) {
       if (status) status.textContent = `❌ ${err && err.message ? err.message : "Błąd."}`;
+    } finally {
+      criticalOperationFinish();
     }
   }
 
@@ -13206,6 +13226,37 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
   );
 
+
+  // ============================================================
+  // v20.96 — MOBILE: stabilny nagłówek podczas klawiatury ekranowej
+  // ============================================================
+
+  function mobileFormFocusTarget(target) {
+    return Boolean(
+      target &&
+      target.matches &&
+      target.matches('input, textarea, select, [contenteditable="true"]')
+    );
+  }
+
+  function updateMobileFormFocusState() {
+    const mobile = window.matchMedia('(max-width:700px)').matches;
+    const focused = mobileFormFocusTarget(document.activeElement);
+    document.body.classList.toggle('mobile-form-focus',mobile && focused);
+  }
+
+  document.addEventListener('focusin',event => {
+    if (!mobileFormFocusTarget(event.target)) return;
+    updateMobileFormFocusState();
+  });
+
+  document.addEventListener('focusout',() => {
+    // Android potrafi przełączyć focus dopiero po schowaniu klawiatury,
+    // dlatego sprawdzamy aktywny element w następnym kroku event loop.
+    setTimeout(updateMobileFormFocusState,0);
+  });
+
+  window.addEventListener('resize',updateMobileFormFocusState);
 
   // ============================================================
   // INSTALACJA PWA
