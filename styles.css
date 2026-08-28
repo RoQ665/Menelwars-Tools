@@ -2707,3 +2707,54 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .module-access-switch input:checked + .module-access-slider::after{
   transform:translateX(22px);
 }
+
+
+/* ============================================================
+   OGRÓD v20.88
+   ============================================================ */
+.garden-intro{margin-bottom:14px}
+.garden-plots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.garden-plot{appearance:none;border:1px solid var(--border,#d8d8d8);border-radius:14px;background:var(--card,#fff);padding:8px;min-width:0;text-align:center;cursor:pointer;color:inherit}
+.garden-plot.active{outline:2px solid var(--accent,#7467ef);outline-offset:1px}
+.garden-plot-visual{height:112px;border-radius:11px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:linear-gradient(#b9d9e7 0 45%,#88a66a 45% 52%,#60472f 52% 100%)}
+.garden-plot-visual::after{content:"";position:absolute;left:10%;right:10%;bottom:10px;height:36px;border-radius:50%;background:radial-gradient(ellipse at center,#7a593a 0 58%,#563c28 60% 100%);box-shadow:inset 0 4px 8px rgba(255,255,255,.08)}
+.garden-plant-art{position:relative;z-index:1;font-size:46px;line-height:1;transform:translateY(14px)}
+.garden-plot.empty .garden-plant-art{display:none}
+.garden-plot-name{display:block;font-weight:700;margin-top:7px}
+.garden-plot-meta{display:block;font-size:.82rem;opacity:.72;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.garden-editor{border:1px solid var(--border,#d8d8d8);border-radius:14px;padding:14px;background:var(--card,#fff)}
+.garden-editor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.garden-field,.garden-slider-row{display:block;margin:12px 0}
+.garden-field>span,.garden-slider-row>span{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-weight:600}
+.garden-field select{width:100%;min-height:44px}
+.garden-slider-row input[type="range"]{width:100%;accent-color:var(--accent,#7467ef)}
+.garden-combo-status{margin-top:14px;padding:12px;border-radius:11px;background:rgba(127,127,127,.08);border:1px solid var(--border,#ddd);line-height:1.45}
+.garden-combo-status .garden-known{font-weight:700}
+.garden-combo-status .garden-reserved{font-weight:700}
+.garden-active-time{margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(127,127,127,.08);font-weight:700}
+.garden-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.garden-actions button{flex:1 1 180px;min-height:44px}
+.garden-plot.growing .garden-plot-visual{background:linear-gradient(#b9d9e7 0 45%,#8cab70 45% 52%,#60472f 52% 100%)}
+@media (max-width:700px){.garden-plots{grid-template-columns:repeat(2,minmax(0,1fr))}.garden-plot-visual{height:100px}}
+
+/* v20.87 — Ogród dodaje czwarty moduł publiczny. */
+#main-tabs .main-tabs-public{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.home-module-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:700px){
+  #main-tabs .main-tabs-public{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .home-module-summary{grid-template-columns:1fr}
+}
+
+
+/* OGRÓD v20.88 — wskazówki kierunkowe z bazy pomiarów */
+.garden-advice{margin-top:11px;padding-top:10px;border-top:1px solid var(--border,#ddd)}
+.garden-advice-title{font-weight:800;margin-bottom:7px}
+.garden-advice-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:4px 0}
+.garden-advice-row strong{white-space:nowrap}
+.garden-advice-row small{opacity:.68;white-space:nowrap}
+.garden-advice-more,.garden-advice-less{font-weight:800}
+.garden-advice-note{font-size:.78rem;line-height:1.35;opacity:.68;margin-top:7px}
+@media(max-width:460px){
+  .garden-advice-row{grid-template-columns:minmax(0,1fr) auto}
+  .garden-advice-row small{grid-column:1/-1;margin-top:-3px}
+}

@@ -2149,10 +2149,12 @@ const MAP_POSITIONS = {
   let approvedRecipesInFlight = null;
   let approvedRecipesRequestState = "idle";
   let distilleryDataLoaded = false;
+  let gardenDataLoaded = false;
   let mapModuleLoaded = false;
 
   const moduleOpenInFlight = {
     distillery:null,
+    garden:null,
     gang:null,
     builds:null,
     map:null,
@@ -2188,6 +2190,7 @@ const MAP_POSITIONS = {
 
   let moduleAccessPolicyCache = {
     distillery:false,
+    garden:false,
     builds:false,
     map:false
   };
@@ -2236,6 +2239,10 @@ const MAP_POSITIONS = {
                 Boolean(
                   payload.policy.distillery
                 ),
+              garden:
+                Boolean(
+                  payload.policy.garden
+                ),
               builds:
                 Boolean(
                   payload.policy.builds
@@ -2267,6 +2274,7 @@ const MAP_POSITIONS = {
 
   const MODULE_ACCESS_LABELS = {
     distillery:"Destylarnia",
+    garden:"Ogród",
     builds:"Buildy",
     map:"Mapa"
   };
@@ -5368,6 +5376,10 @@ function invalidateAppCache(scope) {
         distilleryDataLoaded = false;
         break;
 
+      case "garden":
+        gardenDataLoaded = false;
+        break;
+
       case "account":
         cachedAccountStatus = null;
         cachedAccountStatusAt = 0;
@@ -5403,6 +5415,7 @@ function invalidateAppCache(scope) {
         latestGangPayloadAt = 0;
         adminWarmLoadedAt = 0;
         distilleryDataLoaded = false;
+        gardenDataLoaded = false;
         buildListsLoaded = false;
 
         if (
@@ -6106,6 +6119,11 @@ async function loadAdminModuleAccess() {
         "distillery",
         "⚗ Destylarnia",
         "Receptury, badania i rezerwacje."
+      ],
+      [
+        "garden",
+        "🌱 Ogród",
+        "Uprawy, pomiary czasu i rezerwacje ustawień."
       ],
       [
         "builds",
@@ -11555,6 +11573,516 @@ function setupAdmin() {
     renderBuildEditor();
   }
 
+
+  // ============================================================
+  // OGRÓD v20.88 — kierunkowe wskazówki z wyników
+  // ============================================================
+
+  const GARDEN_LOCAL_KEY = "menelwars_garden_plots_v1";
+  let gardenData = {active:[],results:[],plants:["Cebula"]};
+  let gardenSelectedPlot = 1;
+  let gardenRefreshTimer = null;
+  let gardenClockTimer = null;
+
+  function gardenLoadLocalPlots() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(GARDEN_LOCAL_KEY) || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function gardenSaveLocalPlots(value) {
+    localStorage.setItem(GARDEN_LOCAL_KEY,JSON.stringify(value || {}));
+  }
+
+  function gardenSetLocalPlot(plot,item) {
+    const all = gardenLoadLocalPlots();
+    if (item) all[String(plot)] = item;
+    else delete all[String(plot)];
+    gardenSaveLocalPlots(all);
+  }
+
+  function gardenComboKey(item) {
+    return [
+      String(item && item.plant || ""),
+      Math.round(Number(item && item.sun) || 0),
+      Math.round(Number(item && item.water) || 0),
+      (Math.round((Number(item && item.ph) || 0)*10)/10).toFixed(1)
+    ].join("|");
+  }
+
+  function gardenFormatDuration(ms) {
+    ms = Math.max(0,Number(ms) || 0);
+    const totalMinutes = Math.floor(ms / 60000);
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    const parts = [];
+    if (days) parts.push(`${days} d`);
+    if (days || hours) parts.push(`${hours} godz.`);
+    parts.push(`${minutes} min`);
+    return parts.join(" ");
+  }
+
+  function gardenCurrentControls() {
+    return {
+      plant:el("garden-plant")?.value || "Cebula",
+      sun:Math.round(Number(el("garden-sun")?.value) || 0),
+      water:Math.round(Number(el("garden-water")?.value) || 0),
+      ph:Math.round((Number(el("garden-ph")?.value) || 0)*10)/10
+    };
+  }
+
+  function gardenLatestResultFor(combo) {
+    const wanted = gardenComboKey(combo);
+    return (gardenData.results || []).find(item => gardenComboKey(item) === wanted) || null;
+  }
+
+  function gardenActiveFor(combo) {
+    const wanted = gardenComboKey(combo);
+    return (gardenData.active || []).filter(item => gardenComboKey(item) === wanted);
+  }
+
+  function gardenOwnExperimentForPlot(plot) {
+    const local = gardenLoadLocalPlots()[String(plot)] || null;
+    const accountNick = cachedAccountNick();
+    const active = gardenData.active || [];
+
+    if (local && local.id) {
+      const found = active.find(item => String(item.id) === String(local.id));
+      if (found) return {...found,ownerToken:String(local.ownerToken || "")};
+    }
+
+    if (accountNick) {
+      const found = active.find(item =>
+        Number(item.plot) === Number(plot) &&
+        normalizedPlayerNick(item.nick) === normalizedPlayerNick(accountNick)
+      );
+      if (found) return {...found,ownerToken:""};
+    }
+
+    return null;
+  }
+
+  function gardenRenderPlots() {
+    const host = el("garden-plots");
+    if (!host) return;
+
+    host.innerHTML = [1,2,3,4].map(plot => {
+      const active = gardenOwnExperimentForPlot(plot);
+      return `
+        <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">
+          <span class="garden-plot-visual"><span class="garden-plant-art" aria-hidden="true">🌱</span></span>
+          <span class="garden-plot-name">Grządka ${plot}</span>
+          <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · rośnie` : "Pusta"}</span>
+        </button>`;
+    }).join("");
+
+    host.querySelectorAll("[data-garden-plot]").forEach(button => {
+      button.addEventListener("click",()=>{
+        gardenSelectedPlot = Number(button.dataset.gardenPlot) || 1;
+        gardenRenderPlots();
+        gardenRenderEditor();
+      });
+    });
+  }
+
+  function gardenMedian(values) {
+    const sorted = (values || [])
+      .map(Number)
+      .filter(Number.isFinite)
+      .sort((a,b)=>a-b);
+    if (!sorted.length) return 0;
+    const mid = Math.floor(sorted.length/2);
+    return sorted.length % 2
+      ? sorted[mid]
+      : (sorted[mid-1]+sorted[mid])/2;
+  }
+
+  function gardenDirectionForDimension(combo,dimension) {
+    const rows = (gardenData.results || []).filter(item =>
+      item &&
+      item.plant === combo.plant &&
+      Number(item.durationMs) > 0
+    );
+
+    // Przy kilku pierwszych pomiarach nie udajemy, że znamy optimum.
+    if (rows.length < 5) {
+      return {direction:"unknown",strength:"",count:rows.length};
+    }
+
+    const ranges = {sun:100,water:100,ph:14};
+    const other = ["sun","water","ph"].filter(key => key !== dimension);
+    const range = ranges[dimension];
+    const weighted = [];
+
+    rows.forEach(item => {
+      const x = Number(item[dimension]);
+      const y = Number(item.durationMs);
+      if (!Number.isFinite(x) || !Number.isFinite(y) || y <= 0) return;
+
+      // Porównania najbardziej podobne w pozostałych dwóch parametrach
+      // dostają największą wagę. Dzięki temu np. zmiana pH nie jest
+      // mylona z dużą zmianą podlewania.
+      let otherDistanceSq = 0;
+      other.forEach(key => {
+        const diff = (Number(item[key]) - Number(combo[key])) / ranges[key];
+        otherDistanceSq += diff*diff;
+      });
+
+      const targetDiff = Math.abs(x-Number(combo[dimension]))/range;
+      const weight = Math.exp(-10*otherDistanceSq) * Math.exp(-1.5*targetDiff);
+      if (weight > 0.015) weighted.push({x:x/range,y,w:weight});
+    });
+
+    if (weighted.length < 4) {
+      return {direction:"unknown",strength:"",count:weighted.length};
+    }
+
+    const sw = weighted.reduce((s,p)=>s+p.w,0);
+    const sw2 = weighted.reduce((s,p)=>s+p.w*p.w,0);
+    const effectiveN = sw2 > 0 ? (sw*sw)/sw2 : 0;
+    if (sw <= 0 || effectiveN < 3.2) {
+      return {direction:"unknown",strength:"",count:Math.round(effectiveN)};
+    }
+
+    const mx = weighted.reduce((s,p)=>s+p.w*p.x,0)/sw;
+    const my = weighted.reduce((s,p)=>s+p.w*p.y,0)/sw;
+    let varX=0,varY=0,cov=0;
+    weighted.forEach(p=>{
+      const dx=p.x-mx;
+      const dy=p.y-my;
+      varX += p.w*dx*dx;
+      varY += p.w*dy*dy;
+      cov += p.w*dx*dy;
+    });
+
+    if (varX < 0.001 || varY <= 0) {
+      return {direction:"unknown",strength:"",count:Math.round(effectiveN)};
+    }
+
+    const slope = cov/varX; // ms zmiany czasu na pełny zakres suwaka
+    const corr = cov/Math.sqrt(varX*varY);
+    const typical = gardenMedian(weighted.map(p=>p.y)) || my;
+    const effect10 = typical > 0 ? Math.abs(slope)*0.10/typical : 0;
+
+    // Kierunek pokazujemy dopiero, gdy zależność ma sensowną siłę.
+    if (!Number.isFinite(corr) || Math.abs(corr) < 0.18 || effect10 < 0.01) {
+      return {direction:"unknown",strength:"",count:Math.round(effectiveN)};
+    }
+
+    // Dodatni slope = większa wartość wydłuża czas -> idź w dół.
+    const direction = slope < 0 ? "more" : "less";
+    const confidence = Math.min(1,effectiveN/10) *
+      Math.min(1,Math.abs(corr)/0.55) *
+      Math.min(1,effect10/0.05);
+
+    let strength = "słaba";
+    if (confidence >= 0.62) strength = "mocna";
+    else if (confidence >= 0.34) strength = "średnia";
+
+    return {
+      direction,
+      strength,
+      count:Math.round(effectiveN),
+      correlation:Math.abs(corr),
+      effect10
+    };
+  }
+
+  function gardenAdviceHtml(combo) {
+    const configs = [
+      ["sun","☀️ Nasłonecznienie"],
+      ["water","💧 Podlewanie"],
+      ["ph","🧪 pH"]
+    ];
+    const completed = (gardenData.results || []).filter(item =>
+      item && item.plant === combo.plant && Number(item.durationMs) > 0
+    ).length;
+
+    const rows = configs.map(([key,label]) => {
+      const advice = gardenDirectionForDimension(combo,key);
+      if (advice.direction === "more") {
+        return `<div class="garden-advice-row"><span>${label}</span><strong class="garden-advice-more">więcej →</strong><small>${escapeHtml(advice.strength)} wskazówka</small></div>`;
+      }
+      if (advice.direction === "less") {
+        return `<div class="garden-advice-row"><span>${label}</span><strong class="garden-advice-less">← mniej</strong><small>${escapeHtml(advice.strength)} wskazówka</small></div>`;
+      }
+      return `<div class="garden-advice-row"><span>${label}</span><strong>?</strong><small>za mało danych</small></div>`;
+    }).join("");
+
+    return `
+      <div class="garden-advice">
+        <div class="garden-advice-title">📊 Kierunek z dotychczasowych badań</div>
+        ${rows}
+        <div class="garden-advice-note">Na podstawie ${completed} zakończonych ${completed===1 ? "badania" : "badań"} tej rośliny. Tool nie zgaduje optimum — wskazówki zmieniają się wraz z wynikami graczy.</div>
+      </div>`;
+  }
+
+  function gardenRenderComboStatus() {
+    const box = el("garden-combo-status");
+    const start = el("garden-start");
+    if (!box || !start) return;
+
+    const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
+    if (own) return;
+
+    const combo = gardenCurrentControls();
+    const result = gardenLatestResultFor(combo);
+    const active = gardenActiveFor(combo);
+    const lines = [];
+
+    if (result) {
+      lines.push(`<div class="garden-known">✅ Uzyskany czas: ${escapeHtml(gardenFormatDuration(result.durationMs))}</div>`);
+    } else {
+      lines.push(`<div>🔬 Brak zapisanego wyniku dla tych ustawień.</div>`);
+    }
+
+    lines.push(gardenAdviceHtml(combo));
+
+    if (active.length) {
+      active.forEach(item => {
+        lines.push(`<div class="garden-reserved">🌱 ${escapeHtml(item.nick)} bada to ustawienie · trwa ${escapeHtml(gardenFormatDuration(Date.now()-Number(item.startedAt || 0)))}</div>`);
+      });
+      start.textContent = "⚠️ Zacznij mimo rezerwacji";
+    } else {
+      lines.push(`<div>🟢 Nikt aktualnie nie bada tej kombinacji.</div>`);
+      start.textContent = "🌱 Zacznij uprawę";
+    }
+
+    box.innerHTML = lines.join("");
+    start.disabled = !gardenDataLoaded;
+  }
+
+  function gardenRenderEditor() {
+    const editor = el("garden-editor");
+    if (!editor) return;
+    editor.hidden = false;
+
+    const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
+    el("garden-editor-title").textContent = `Grządka ${gardenSelectedPlot}`;
+    el("garden-editor-mode").textContent = own ? "rośnie" : "pusta";
+
+    const controls = [el("garden-plant"),el("garden-sun"),el("garden-water"),el("garden-ph")];
+    controls.forEach(control => { if (control) control.disabled = Boolean(own); });
+
+    if (own) {
+      el("garden-plant").value = own.plant;
+      el("garden-sun").value = String(own.sun);
+      el("garden-water").value = String(own.water);
+      el("garden-ph").value = Number(own.ph).toFixed(1);
+    }
+
+    el("garden-sun-value").textContent = `${Math.round(Number(el("garden-sun").value) || 0)}%`;
+    el("garden-water-value").textContent = `${Math.round(Number(el("garden-water").value) || 0)}%`;
+    el("garden-ph-value").textContent = (Math.round((Number(el("garden-ph").value)||0)*10)/10).toFixed(1);
+
+    el("garden-start").hidden = Boolean(own);
+    el("garden-finish").hidden = !own;
+    el("garden-cancel").hidden = !own;
+    el("garden-active-time").hidden = !own;
+
+    if (own) {
+      el("garden-combo-status").innerHTML =
+        `<div class="garden-reserved">🌱 ${escapeHtml(own.plant)} · ☀️ ${own.sun}% · 💧 ${own.water}% · pH ${Number(own.ph).toFixed(1)}</div>`;
+      gardenUpdateClock();
+    } else {
+      gardenRenderComboStatus();
+    }
+  }
+
+  function gardenUpdateClock() {
+    const box = el("garden-active-time");
+    if (!box || box.hidden) return;
+    const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
+    if (!own) return;
+    box.textContent = `⏱️ Rośnie już: ${gardenFormatDuration(Date.now()-Number(own.startedAt || 0))}`;
+  }
+
+  async function gardenFetchData(options={}) {
+    const payload = await jsonp("gardenData",{
+      sessionToken:playerAccountSessionToken() || ""
+    });
+    if (!payload || !payload.ok) {
+      if (payload && payload.authRequired) {
+        await showModuleAccountGate("garden");
+        return false;
+      }
+      throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać Ogrodu.");
+    }
+    gardenData = {
+      plants:Array.isArray(payload.plants) ? payload.plants : ["Cebula"],
+      active:Array.isArray(payload.active) ? payload.active : [],
+      results:Array.isArray(payload.results) ? payload.results : []
+    };
+    gardenDataLoaded = true;
+    gardenRenderPlots();
+    gardenRenderEditor();
+    return true;
+  }
+
+  async function gardenResolveNick() {
+    const accountNick = cachedAccountNick();
+    if (accountNick) return accountNick;
+    const saved = localStorage.getItem(NICK_KEY) || "";
+    const entered = window.prompt("Podaj nick, do którego przypisać tę uprawę:",saved);
+    if (entered === null) return "";
+    const nick = String(entered || "").trim();
+    if (nick) localStorage.setItem(NICK_KEY,nick);
+    return nick;
+  }
+
+  async function gardenStartCultivation() {
+    const button = el("garden-start");
+    const status = el("garden-action-status");
+    if (!button || button.disabled) return;
+
+    const nick = await gardenResolveNick();
+    if (!nick) return;
+    const combo = gardenCurrentControls();
+
+    button.disabled = true;
+    if (status) status.textContent = "⏳ Sprawdzam i rozpoczynam uprawę…";
+
+    const request = async forceDuplicate => jsonp("gardenStart",{
+      ...combo,
+      plot:gardenSelectedPlot,
+      nick,
+      sessionToken:playerAccountSessionToken() || "",
+      forceDuplicate:forceDuplicate ? "1" : "0"
+    });
+
+    try {
+      let result = await request(false);
+
+      if (result && result.duplicate) {
+        // Najpierw pokazujemy użytkownikowi aktualną rezerwację.
+        const active = Array.isArray(result.active) ? result.active : [];
+        gardenData.active = [
+          ...(gardenData.active || []).filter(item => gardenComboKey(item)!==gardenComboKey(combo)),
+          ...active
+        ];
+        gardenRenderComboStatus();
+
+        const who = active.map(item=>item.nick).filter(Boolean).join(", ") || "Inny gracz";
+        const accepted = window.confirm(`${who} bada już to ustawienie.\n\nInformacja o rezerwacji jest pokazana nad przyciskiem. Czy mimo to chcesz rozpocząć własną uprawę?`);
+        if (!accepted) {
+          if (status) status.textContent = "";
+          return;
+        }
+        result = await request(true);
+      }
+
+      if (!result || !result.ok) {
+        throw new Error(result && result.error ? result.error : "Nie udało się rozpocząć uprawy.");
+      }
+
+      gardenSetLocalPlot(gardenSelectedPlot,{
+        id:result.experiment.id,
+        ownerToken:result.ownerToken || ""
+      });
+      if (status) status.textContent = "✅ Uprawa rozpoczęta. Kombinacja została automatycznie zarezerwowana.";
+      await gardenFetchData({force:true});
+    } catch (err) {
+      if (status) status.textContent = `❌ ${err && err.message ? err.message : "Błąd."}`;
+    } finally {
+      gardenRenderComboStatus();
+    }
+  }
+
+  async function gardenFinishCultivation() {
+    const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
+    if (!own) return;
+    if (!window.confirm("Potwierdź, że roślina w grze już wyrosła i została zebrana.")) return;
+
+    const status = el("garden-action-status");
+    if (status) status.textContent = "⏳ Zapisuję czas wzrostu…";
+    try {
+      const result = await jsonp("gardenFinish",{
+        id:own.id,
+        ownerToken:own.ownerToken || "",
+        sessionToken:playerAccountSessionToken() || ""
+      });
+      if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Nie udało się zapisać wyniku.");
+      gardenSetLocalPlot(gardenSelectedPlot,null);
+      if (status) status.textContent = `✅ Zapisano wynik: ${gardenFormatDuration(result.durationMs)}.`;
+      await gardenFetchData({force:true});
+    } catch (err) {
+      if (status) status.textContent = `❌ ${err && err.message ? err.message : "Błąd."}`;
+    }
+  }
+
+  async function gardenCancelCultivation() {
+    const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
+    if (!own) return;
+    if (!window.confirm("Anulować tę uprawę? Nie zostanie zapisana jako wynik.")) return;
+
+    const status = el("garden-action-status");
+    if (status) status.textContent = "⏳ Anuluję uprawę…";
+    try {
+      const result = await jsonp("gardenCancel",{
+        id:own.id,
+        ownerToken:own.ownerToken || "",
+        sessionToken:playerAccountSessionToken() || ""
+      });
+      if (!result || !result.ok) throw new Error(result && result.error ? result.error : "Nie udało się anulować uprawy.");
+      gardenSetLocalPlot(gardenSelectedPlot,null);
+      if (status) status.textContent = "✅ Uprawa anulowana.";
+      await gardenFetchData({force:true});
+    } catch (err) {
+      if (status) status.textContent = `❌ ${err && err.message ? err.message : "Błąd."}`;
+    }
+  }
+
+  function setupGarden() {
+    if (!el("garden-plots")) return;
+    ["garden-sun","garden-water","garden-ph","garden-plant"].forEach(id => {
+      el(id)?.addEventListener("input",gardenRenderEditor);
+      el(id)?.addEventListener("change",gardenRenderEditor);
+    });
+    el("garden-start")?.addEventListener("click",gardenStartCultivation);
+    el("garden-finish")?.addEventListener("click",gardenFinishCultivation);
+    el("garden-cancel")?.addEventListener("click",gardenCancelCultivation);
+    gardenRenderPlots();
+    gardenRenderEditor();
+
+    if (!gardenClockTimer) {
+      gardenClockTimer = setInterval(()=>{
+        gardenUpdateClock();
+        if (activeToolModule === "garden" && !gardenOwnExperimentForPlot(gardenSelectedPlot)) {
+          gardenRenderComboStatus();
+        }
+      },30000);
+    }
+  }
+
+  async function openGardenModule() {
+    if (!(await ensureModuleAccess("garden"))) return;
+
+    showModuleLoading("garden","🌱 Ładowanie Ogrodu…","Pobieram aktywne uprawy, rezerwacje i zapisane wyniki.");
+    if (!moduleOpenInFlight.garden) {
+      moduleOpenInFlight.garden = gardenFetchData({force:true});
+    }
+    try {
+      const ok = await moduleOpenInFlight.garden;
+      if (!ok) return;
+    } finally {
+      moduleOpenInFlight.garden = null;
+    }
+
+    showToolView("garden-view","garden");
+    gardenRenderPlots();
+    gardenRenderEditor();
+
+    if (gardenRefreshTimer) clearInterval(gardenRefreshTimer);
+    gardenRefreshTimer = setInterval(()=>{
+      if (activeToolModule !== "garden") return;
+      gardenFetchData({force:true}).catch(err=>console.warn("Ogród — odświeżenie:",err));
+    },20000);
+  }
+
   async function openBuildModule() {
     if (
       !(await ensureModuleAccess(
@@ -12190,6 +12718,11 @@ function setupAdmin() {
         return;
       }
 
+      if (moduleName === "garden") {
+        await openGardenModule();
+        return;
+      }
+
       if (moduleName === "gang") {
         await openGangLanding();
         return;
@@ -12285,6 +12818,7 @@ function setupAdmin() {
 setupSubmissionForm();
 setupRecipeBatchImport();
 setupBuildCreator();
+  setupGarden();
 setupPayments();
 setupAdmin();
 
