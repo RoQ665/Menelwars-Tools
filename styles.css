@@ -2905,3 +2905,36 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   }
 }
 
+
+
+/* =========================================================
+   v20.97 — mobile: całe menu przewija się razem ze stroną
+   ========================================================= */
+@media(max-width:700px){
+  .topbar{
+    position:static!important;
+    top:auto!important;
+  }
+
+  #main-tabs.main-nav-groups{
+    position:static!important;
+    top:auto!important;
+  }
+}
+
+
+/* =========================================================
+   v20.98 — mobile: topbar sticky, dolne menu przewijane
+   ========================================================= */
+@media(max-width:700px){
+  .topbar,
+  body.mobile-form-focus .topbar{
+    position:sticky!important;
+    top:0!important;
+  }
+
+  #main-tabs.main-nav-groups{
+    position:static!important;
+    top:auto!important;
+  }
+}
