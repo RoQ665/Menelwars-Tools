@@ -11575,7 +11575,7 @@ function setupAdmin() {
 
 
   // ============================================================
-  // OGRÓD v20.93 — ręczny czas startu + kierunkowe wskazówki z wyników
+  // OGRÓD v20.94 — natychmiastowa synchronizacja pól + ręczny czas startu
   // ============================================================
 
   const GARDEN_LOCAL_KEY = "menelwars_garden_plots_v1";
@@ -11637,12 +11637,16 @@ function setupAdmin() {
     return Number(rounded.toFixed(precision));
   }
 
-  function gardenSyncManualInput(kind,source) {
-    const config = {
+  function gardenManualConfig(kind) {
+    return {
       sun:{range:"garden-sun",input:"garden-sun-input",min:0,max:100,step:1,fallback:50},
       water:{range:"garden-water",input:"garden-water-input",min:0,max:100,step:1,fallback:50},
       ph:{range:"garden-ph",input:"garden-ph-input",min:0,max:14,step:0.1,fallback:7}
-    }[kind];
+    }[kind] || null;
+  }
+
+  function gardenSyncManualInput(kind,source) {
+    const config = gardenManualConfig(kind);
     if (!config) return;
 
     const range = el(config.range);
@@ -11655,10 +11659,72 @@ function setupAdmin() {
     input.value = kind === "ph" ? value.toFixed(1) : String(Math.round(value));
   }
 
+  // Synchronizacja podczas wpisywania: pole liczbowe jest źródłem prawdy już
+  // po każdym znaku. Dzięki temu suwak nigdy nie zostaje ze starą wartością.
+  function gardenSyncManualInputLive(kind) {
+    const config = gardenManualConfig(kind);
+    if (!config) return;
+
+    const range = el(config.range);
+    const input = el(config.input);
+    if (!range || !input) return;
+
+    let raw = String(input.value == null ? "" : input.value).trim();
+
+    // Minus nie jest dozwolony. Dotyczy też wartości wklejonych ze schowka.
+    if (raw.startsWith("-")) {
+      const value = config.min;
+      range.value = String(value);
+      input.value = kind === "ph" ? value.toFixed(1) : String(Math.round(value));
+      gardenRenderComboStatus();
+      return;
+    }
+
+    if (kind === "ph") {
+      raw = raw.replace(/,/g,".").replace(/[^0-9.]/g,"");
+      const dot = raw.indexOf(".");
+      if (dot !== -1) {
+        raw = raw.slice(0,dot+1) + raw.slice(dot+1).replace(/\./g,"");
+        // pH w Ogrodzie ma dokładność 0,1 — nie przyjmujemy dalszych cyfr.
+        raw = raw.slice(0,dot+2);
+      }
+      if (raw.startsWith(".")) raw = `0${raw}`;
+      input.value = raw;
+      if (!raw || raw === ".") return;
+
+      const numericRaw = raw.endsWith(".") ? raw.slice(0,-1) : raw;
+      const number = Number(numericRaw);
+      if (!Number.isFinite(number)) return;
+
+      const value = gardenClampValue(number,config.min,config.max,config.step,config.fallback);
+      range.value = String(value);
+      if (number > config.max || number < config.min) input.value = value.toFixed(1);
+      gardenRenderComboStatus();
+      return;
+    }
+
+    raw = raw.replace(/[^0-9]/g,"");
+    input.value = raw;
+    if (!raw) return;
+
+    const number = Number(raw);
+    if (!Number.isFinite(number)) return;
+    const value = gardenClampValue(number,config.min,config.max,config.step,config.fallback);
+    range.value = String(value);
+    input.value = String(Math.round(value));
+    gardenRenderComboStatus();
+  }
+
   function gardenSyncAllManualInputs() {
     gardenSyncManualInput("sun","range");
     gardenSyncManualInput("water","range");
     gardenSyncManualInput("ph","range");
+  }
+
+  function gardenCommitAllManualInputs() {
+    gardenSyncManualInput("sun","input");
+    gardenSyncManualInput("water","input");
+    gardenSyncManualInput("ph","input");
   }
 
   function gardenCurrentControls() {
@@ -11970,9 +12036,8 @@ function setupAdmin() {
       el("garden-sun").value = String(own.sun);
       el("garden-water").value = String(own.water);
       el("garden-ph").value = Number(own.ph).toFixed(1);
+      gardenSyncAllManualInputs();
     }
-
-    gardenSyncAllManualInputs();
 
     el("garden-start").hidden = Boolean(own);
     el("garden-finish").hidden = !own;
@@ -12040,6 +12105,10 @@ function setupAdmin() {
 
     const nick = await gardenResolveNick();
     if (!nick) return;
+
+    // Ostatnie zabezpieczenie przed wysłaniem: nawet jeśli telefon nie zdążył
+    // wywołać blur/change, bierzemy dokładnie wartości widoczne w polach.
+    gardenCommitAllManualInputs();
     const combo = gardenCurrentControls();
     let timing;
     try {
@@ -12202,21 +12271,31 @@ function setupAdmin() {
         gardenRenderEditor();
       });
 
-      // Podczas pisania zostawiamy użytkownikowi możliwość wpisania np. „12.3”.
-      // Walidacja i obcięcie do zakresu następuje przy zatwierdzeniu pola.
+      // Pole ręczne i suwak są synchronizowane natychmiast po każdym znaku.
+      input?.addEventListener("input",()=>{
+        gardenSyncManualInputLive(kind);
+      });
       input?.addEventListener("change",()=>{
         gardenSyncManualInput(kind,"input");
-        gardenRenderEditor();
+        gardenRenderComboStatus();
       });
       input?.addEventListener("blur",()=>{
         gardenSyncManualInput(kind,"input");
-        gardenRenderEditor();
+        gardenRenderComboStatus();
       });
       input?.addEventListener("keydown",event=>{
+        if (["-","+","e","E"].includes(event.key)) {
+          event.preventDefault();
+          return;
+        }
+        if (kind !== "ph" && [".",","].includes(event.key)) {
+          event.preventDefault();
+          return;
+        }
         if (event.key !== "Enter") return;
         event.preventDefault();
         gardenSyncManualInput(kind,"input");
-        gardenRenderEditor();
+        gardenRenderComboStatus();
         input.blur();
       });
     });

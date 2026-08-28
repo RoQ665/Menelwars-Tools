@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=20.93">
+  <link rel="stylesheet" href="styles.css?v=20.94">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1074,7 +1074,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             <div class="garden-slider-head">
               <span>☀️ Nasłonecznienie</span>
               <label class="garden-number-wrap" aria-label="Nasłonecznienie procent">
-                <input id="garden-sun-input" type="number" min="0" max="100" step="1" value="50" inputmode="numeric">
+                <input id="garden-sun-input" type="text" value="50" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
                 <span>%</span>
               </label>
             </div>
@@ -1085,7 +1085,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             <div class="garden-slider-head">
               <span>💧 Podlewanie</span>
               <label class="garden-number-wrap" aria-label="Podlewanie procent">
-                <input id="garden-water-input" type="number" min="0" max="100" step="1" value="50" inputmode="numeric">
+                <input id="garden-water-input" type="text" value="50" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
                 <span>%</span>
               </label>
             </div>
@@ -1096,7 +1096,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             <div class="garden-slider-head">
               <span>🧪 Odczyn pH</span>
               <label class="garden-number-wrap garden-number-wrap-ph" aria-label="Odczyn pH">
-                <input id="garden-ph-input" type="number" min="0" max="14" step="0.1" value="7.0" inputmode="decimal">
+                <input id="garden-ph-input" type="text" value="7.0" inputmode="decimal" autocomplete="off">
               </label>
             </div>
             <input id="garden-ph" type="range" min="0" max="14" step="0.1" value="7" aria-label="Odczyn pH">
@@ -1906,6 +1906,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ</footer>
 
 <script src="data.js"></script>
-<script src="app.js?v=20.93"></script>
+<script src="app.js?v=20.94"></script>
 </body>
 </html>
