@@ -11583,6 +11583,8 @@ function setupAdmin() {
   let gardenSelectedPlot = 1;
   let gardenRefreshTimer = null;
   let gardenClockTimer = null;
+  let gardenLiveRefreshInFlight = null;
+  let gardenLiveRefreshBound = false;
 
   function gardenLoadLocalPlots() {
     try {
@@ -11626,12 +11628,45 @@ function setupAdmin() {
     return parts.join(" ");
   }
 
+  function gardenClampValue(value,min,max,step,fallback) {
+    let number = Number(value);
+    if (!Number.isFinite(number)) number = Number(fallback);
+    number = Math.max(min,Math.min(max,number));
+    const precision = step < 1 ? 1 : 0;
+    const rounded = Math.round(number/step)*step;
+    return Number(rounded.toFixed(precision));
+  }
+
+  function gardenSyncManualInput(kind,source) {
+    const config = {
+      sun:{range:"garden-sun",input:"garden-sun-input",min:0,max:100,step:1,fallback:50},
+      water:{range:"garden-water",input:"garden-water-input",min:0,max:100,step:1,fallback:50},
+      ph:{range:"garden-ph",input:"garden-ph-input",min:0,max:14,step:0.1,fallback:7}
+    }[kind];
+    if (!config) return;
+
+    const range = el(config.range);
+    const input = el(config.input);
+    if (!range || !input) return;
+
+    const raw = source === "range" ? range.value : input.value;
+    const value = gardenClampValue(raw,config.min,config.max,config.step,range.value || config.fallback);
+    range.value = String(value);
+    input.value = kind === "ph" ? value.toFixed(1) : String(Math.round(value));
+  }
+
+  function gardenSyncAllManualInputs() {
+    gardenSyncManualInput("sun","range");
+    gardenSyncManualInput("water","range");
+    gardenSyncManualInput("ph","range");
+  }
+
   function gardenCurrentControls() {
     return {
       plant:el("garden-plant")?.value || "Cebula",
-      sun:Math.round(Number(el("garden-sun")?.value) || 0),
-      water:Math.round(Number(el("garden-water")?.value) || 0),
-      ph:Math.round((Number(el("garden-ph")?.value) || 0)*10)/10
+      sun:gardenClampValue(el("garden-sun")?.value,0,100,1,0),
+      water:gardenClampValue(el("garden-water")?.value,0,100,1,0),
+      ph:gardenClampValue(el("garden-ph")?.value,0,14,0.1,0)
     };
   }
 
@@ -11865,7 +11900,10 @@ function setupAdmin() {
     el("garden-editor-title").textContent = `Grządka ${gardenSelectedPlot}`;
     el("garden-editor-mode").textContent = own ? "rośnie" : "pusta";
 
-    const controls = [el("garden-plant"),el("garden-sun"),el("garden-water"),el("garden-ph")];
+    const controls = [
+      el("garden-plant"),el("garden-sun"),el("garden-water"),el("garden-ph"),
+      el("garden-sun-input"),el("garden-water-input"),el("garden-ph-input")
+    ];
     controls.forEach(control => { if (control) control.disabled = Boolean(own); });
 
     if (own) {
@@ -11875,9 +11913,7 @@ function setupAdmin() {
       el("garden-ph").value = Number(own.ph).toFixed(1);
     }
 
-    el("garden-sun-value").textContent = `${Math.round(Number(el("garden-sun").value) || 0)}%`;
-    el("garden-water-value").textContent = `${Math.round(Number(el("garden-water").value) || 0)}%`;
-    el("garden-ph-value").textContent = (Math.round((Number(el("garden-ph").value)||0)*10)/10).toFixed(1);
+    gardenSyncAllManualInputs();
 
     el("garden-start").hidden = Boolean(own);
     el("garden-finish").hidden = !own;
@@ -11954,17 +11990,35 @@ function setupAdmin() {
       forceDuplicate:forceDuplicate ? "1" : "0"
     });
 
+    let overlayActive = false;
+    const showStartOverlay = () => {
+      if (overlayActive) return;
+      criticalOperationStart(
+        "🌱 Rozpoczynam uprawę…",
+        "Zapisuję rezerwację i przygotowuję grządkę. Poczekaj, aż pojawi się sadzonka."
+      );
+      overlayActive = true;
+    };
+    const hideStartOverlay = () => {
+      if (!overlayActive) return;
+      criticalOperationFinish();
+      overlayActive = false;
+    };
+
     try {
+      showStartOverlay();
       let result = await request(false);
 
       if (result && result.duplicate) {
-        // Najpierw pokazujemy użytkownikowi aktualną rezerwację.
+        // Najpierw pokazujemy aktualną rezerwację, a dopiero potem pozwalamy
+        // użytkownikowi świadomie rozpocząć duplikat.
         const active = Array.isArray(result.active) ? result.active : [];
         gardenData.active = [
           ...(gardenData.active || []).filter(item => gardenComboKey(item)!==gardenComboKey(combo)),
           ...active
         ];
         gardenRenderComboStatus();
+        hideStartOverlay();
 
         const who = active.map(item=>item.nick).filter(Boolean).join(", ") || "Inny gracz";
         const accepted = window.confirm(`${who} bada już to ustawienie.\n\nInformacja o rezerwacji jest pokazana nad przyciskiem. Czy mimo to chcesz rozpocząć własną uprawę?`);
@@ -11972,6 +12026,8 @@ function setupAdmin() {
           if (status) status.textContent = "";
           return;
         }
+
+        showStartOverlay();
         result = await request(true);
       }
 
@@ -11983,11 +12039,18 @@ function setupAdmin() {
         id:result.experiment.id,
         ownerToken:result.ownerToken || ""
       });
-      if (status) status.textContent = "✅ Uprawa rozpoczęta. Kombinacja została automatycznie zarezerwowana.";
+      if (status) status.textContent = "";
+
+      // Overlay znika dopiero po ponownym pobraniu danych i wyrenderowaniu
+      // stanu „rośnie”, dzięki czemu nie da się kliknąć drugi raz zanim
+      // użytkownik zobaczy sadzonkę.
       await gardenFetchData({force:true});
+      gardenRenderPlots();
+      gardenRenderEditor();
     } catch (err) {
       if (status) status.textContent = `❌ ${err && err.message ? err.message : "Błąd."}`;
     } finally {
+      hideStartOverlay();
       gardenRenderComboStatus();
     }
   }
@@ -12036,12 +12099,59 @@ function setupAdmin() {
     }
   }
 
+  async function gardenLiveRefresh() {
+    if (activeToolModule !== "garden") return false;
+    if (gardenLiveRefreshInFlight) return gardenLiveRefreshInFlight;
+
+    gardenLiveRefreshInFlight = gardenFetchData({force:true})
+      .catch(err => {
+        console.warn("Ogród — odświeżenie na żywo:",err);
+        return false;
+      })
+      .finally(() => {
+        gardenLiveRefreshInFlight = null;
+      });
+
+    return gardenLiveRefreshInFlight;
+  }
+
   function setupGarden() {
     if (!el("garden-plots")) return;
-    ["garden-sun","garden-water","garden-ph","garden-plant"].forEach(id => {
-      el(id)?.addEventListener("input",gardenRenderEditor);
-      el(id)?.addEventListener("change",gardenRenderEditor);
+
+    ["sun","water","ph"].forEach(kind => {
+      const range = el(`garden-${kind}`);
+      const input = el(`garden-${kind}-input`);
+
+      range?.addEventListener("input",()=>{
+        gardenSyncManualInput(kind,"range");
+        gardenRenderEditor();
+      });
+      range?.addEventListener("change",()=>{
+        gardenSyncManualInput(kind,"range");
+        gardenRenderEditor();
+      });
+
+      // Podczas pisania zostawiamy użytkownikowi możliwość wpisania np. „12.3”.
+      // Walidacja i obcięcie do zakresu następuje przy zatwierdzeniu pola.
+      input?.addEventListener("change",()=>{
+        gardenSyncManualInput(kind,"input");
+        gardenRenderEditor();
+      });
+      input?.addEventListener("blur",()=>{
+        gardenSyncManualInput(kind,"input");
+        gardenRenderEditor();
+      });
+      input?.addEventListener("keydown",event=>{
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        gardenSyncManualInput(kind,"input");
+        gardenRenderEditor();
+        input.blur();
+      });
     });
+
+    el("garden-plant")?.addEventListener("input",gardenRenderEditor);
+    el("garden-plant")?.addEventListener("change",gardenRenderEditor);
     el("garden-start")?.addEventListener("click",gardenStartCultivation);
     el("garden-finish")?.addEventListener("click",gardenFinishCultivation);
     el("garden-cancel")?.addEventListener("click",gardenCancelCultivation);
@@ -12055,6 +12165,20 @@ function setupAdmin() {
           gardenRenderComboStatus();
         }
       },30000);
+    }
+
+    // Gdy użytkownik wraca do karty / okna, natychmiast sprawdzamy,
+    // czy ktoś rozpoczął albo zakończył badanie tej kombinacji.
+    if (!gardenLiveRefreshBound) {
+      gardenLiveRefreshBound = true;
+      document.addEventListener("visibilitychange",()=>{
+        if (document.visibilityState === "visible" && activeToolModule === "garden") {
+          gardenLiveRefresh();
+        }
+      });
+      window.addEventListener("focus",()=>{
+        if (activeToolModule === "garden") gardenLiveRefresh();
+      });
     }
   }
 
@@ -12077,10 +12201,12 @@ function setupAdmin() {
     gardenRenderEditor();
 
     if (gardenRefreshTimer) clearInterval(gardenRefreshTimer);
+    // Ogród działa jako wspólna tablica badań, więc podczas otwartej zakładki
+    // sprawdzamy zmiany często. Dzięki temu nowa rezerwacja innego gracza
+    // pojawi się bez ręcznego odświeżania strony.
     gardenRefreshTimer = setInterval(()=>{
-      if (activeToolModule !== "garden") return;
-      gardenFetchData({force:true}).catch(err=>console.warn("Ogród — odświeżenie:",err));
-    },20000);
+      gardenLiveRefresh();
+    },5000);
   }
 
   async function openBuildModule() {

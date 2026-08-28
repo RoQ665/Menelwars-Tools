@@ -2725,7 +2725,12 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .garden-editor{border:1px solid var(--border,#d8d8d8);border-radius:14px;padding:14px;background:var(--card,#fff)}
 .garden-editor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
 .garden-field,.garden-slider-row{display:block;margin:12px 0}
-.garden-field>span,.garden-slider-row>span{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-weight:600}
+.garden-field>span{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;font-weight:600}
+.garden-slider-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px;font-weight:600}
+.garden-number-wrap{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto}
+.garden-number-wrap input{width:72px;min-height:38px;padding:6px 8px;text-align:right;font:inherit;font-weight:700;border:1px solid var(--border,#d8d8d8);border-radius:8px;background:var(--card,#fff);color:inherit}
+.garden-number-wrap-ph input{width:78px}
+.garden-number-wrap input:disabled{opacity:.7;background:rgba(127,127,127,.08)}
 .garden-field select{width:100%;min-height:44px}
 .garden-slider-row input[type="range"]{width:100%;accent-color:var(--accent,#7467ef)}
 .garden-combo-status{margin-top:14px;padding:12px;border-radius:11px;background:rgba(127,127,127,.08);border:1px solid var(--border,#ddd);line-height:1.45}
@@ -2735,7 +2740,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .garden-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .garden-actions button{flex:1 1 180px;min-height:44px}
 .garden-plot.growing .garden-plot-visual{background:linear-gradient(#b9d9e7 0 45%,#8cab70 45% 52%,#60472f 52% 100%)}
-@media (max-width:700px){.garden-plots{grid-template-columns:repeat(2,minmax(0,1fr))}.garden-plot-visual{height:100px}}
+@media (max-width:700px){.garden-plots{grid-template-columns:repeat(2,minmax(0,1fr))}.garden-plot-visual{height:100px}.garden-number-wrap input{width:68px}}
 
 /* v20.87 — Ogród dodaje czwarty moduł publiczny. */
 #main-tabs .main-tabs-public{grid-template-columns:repeat(4,minmax(0,1fr))!important}
