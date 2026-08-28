@@ -2801,3 +2801,97 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .garden-plot-stats span{padding:3px 4px}
   .garden-plot-time{font-size:.65rem}
 }
+
+/* OGRÓD v20.93 — wybór czasu rozpoczęcia */
+.garden-start-time{
+  margin:14px 0 0;
+  padding:0;
+  border:0;
+  min-width:0;
+}
+.garden-start-time legend{
+  margin-bottom:7px;
+  padding:0;
+  font-weight:800;
+}
+.garden-start-time-options{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.garden-start-time-options label{
+  position:relative;
+  display:block;
+  min-width:0;
+  cursor:pointer;
+}
+.garden-start-time-options input{
+  position:absolute;
+  opacity:0;
+  pointer-events:none;
+}
+.garden-start-time-options span{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:42px;
+  padding:8px 12px;
+  border:1px solid var(--border,#d8d8d8);
+  border-radius:9px;
+  background:var(--card,#fff);
+  font-weight:700;
+  text-align:center;
+}
+.garden-start-time-options input:checked + span{
+  border-color:var(--accent,#7467ef);
+  outline:2px solid color-mix(in srgb,var(--accent,#7467ef) 22%,transparent);
+  background:color-mix(in srgb,var(--accent,#7467ef) 8%,var(--card,#fff));
+}
+.garden-start-time-options input:focus-visible + span{
+  outline:2px solid var(--accent,#7467ef);
+  outline-offset:2px;
+}
+.garden-start-earlier-wrap{
+  display:block;
+  margin-top:9px;
+}
+.garden-start-earlier-wrap > span{
+  display:block;
+  margin-bottom:5px;
+  font-weight:700;
+}
+.garden-start-earlier-wrap input[type="datetime-local"]{
+  display:block;
+  width:100%;
+  box-sizing:border-box;
+  min-height:44px;
+  padding:8px 10px;
+  border:1px solid var(--border,#d8d8d8);
+  border-radius:9px;
+  background:var(--card,#fff);
+  color:inherit;
+  font:inherit;
+  font-size:16px;
+}
+.garden-start-earlier-wrap small{
+  display:block;
+  margin-top:5px;
+  opacity:.68;
+  line-height:1.35;
+}
+.garden-start-source-manual{
+  margin-top:6px;
+  font-size:.82rem;
+  font-weight:600;
+}
+.garden-manual-hint{
+  display:inline-block;
+  margin-left:6px;
+  font-size:.76rem;
+  font-weight:600;
+  opacity:.78;
+}
+@media (max-width:480px){
+  .garden-start-time-options{gap:6px}
+  .garden-start-time-options span{padding:8px 7px}
+}

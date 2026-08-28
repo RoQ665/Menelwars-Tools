@@ -11575,7 +11575,7 @@ function setupAdmin() {
 
 
   // ============================================================
-  // OGRÓD v20.88 — kierunkowe wskazówki z wyników
+  // OGRÓD v20.93 — ręczny czas startu + kierunkowe wskazówki z wyników
   // ============================================================
 
   const GARDEN_LOCAL_KEY = "menelwars_garden_plots_v1";
@@ -11667,6 +11667,47 @@ function setupAdmin() {
       sun:gardenClampValue(el("garden-sun")?.value,0,100,1,0),
       water:gardenClampValue(el("garden-water")?.value,0,100,1,0),
       ph:gardenClampValue(el("garden-ph")?.value,0,14,0.1,0)
+    };
+  }
+
+  function gardenLocalDateTimeValue(ms) {
+    const date = new Date(Number(ms) || Date.now());
+    const pad = value => String(value).padStart(2,"0");
+    return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function gardenRefreshStartTimeControls() {
+    const fieldset = el("garden-start-time");
+    const earlier = el("garden-start-earlier");
+    const wrap = el("garden-start-earlier-wrap");
+    const input = el("garden-start-datetime");
+    if (!fieldset || !earlier || !wrap || !input) return;
+
+    const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
+    fieldset.hidden = Boolean(own);
+    if (own) return;
+
+    const nowValue = gardenLocalDateTimeValue(Date.now());
+    input.max = nowValue;
+    wrap.hidden = !earlier.checked;
+    if (earlier.checked && !input.value) input.value = nowValue;
+  }
+
+  function gardenStartTimingPayload() {
+    const earlier = Boolean(el("garden-start-earlier")?.checked);
+    if (!earlier) return {startMode:"now"};
+
+    const input = el("garden-start-datetime");
+    const raw = String(input?.value || "").trim();
+    if (!raw) throw new Error("Podaj datę i godzinę zasadzenia w grze.");
+
+    const startedAtMs = new Date(raw).getTime();
+    if (!Number.isFinite(startedAtMs)) throw new Error("Nieprawidłowa data lub godzina zasadzenia.");
+    if (startedAtMs > Date.now()+60000) throw new Error("Czas zasadzenia nie może być w przyszłości.");
+
+    return {
+      startMode:"manual",
+      startedAtMs:String(Math.round(startedAtMs))
     };
   }
 
@@ -11782,7 +11823,8 @@ function setupAdmin() {
       });
 
       const targetDiff = Math.abs(x-Number(combo[dimension]))/range;
-      const weight = Math.exp(-10*otherDistanceSq) * Math.exp(-1.5*targetDiff);
+      const sourceWeight = String(item.startSource || "LIVE").toUpperCase() === "MANUAL" ? 0.65 : 1;
+      const weight = Math.exp(-10*otherDistanceSq) * Math.exp(-1.5*targetDiff) * sourceWeight;
       if (weight > 0.015) weighted.push({x:x/range,y,w:weight});
     });
 
@@ -11884,7 +11926,10 @@ function setupAdmin() {
     const lines = [];
 
     if (result) {
-      lines.push(`<div class="garden-known">✅ Uzyskany czas: ${escapeHtml(gardenFormatDuration(result.durationMs))}</div>`);
+      const manualHint = String(result.startSource || "").toUpperCase() === "MANUAL"
+        ? ` <small class="garden-manual-hint">🟡 start wpisany ręcznie</small>`
+        : "";
+      lines.push(`<div class="garden-known">✅ Uzyskany czas: ${escapeHtml(gardenFormatDuration(result.durationMs))}${manualHint}</div>`);
     } else {
       lines.push(`<div>🔬 Brak zapisanego wyniku dla tych ustawień.</div>`);
     }
@@ -11933,10 +11978,14 @@ function setupAdmin() {
     el("garden-finish").hidden = !own;
     el("garden-cancel").hidden = !own;
     el("garden-active-time").hidden = !own;
+    gardenRefreshStartTimeControls();
 
     if (own) {
+      const startHint = String(own.startSource || "").toUpperCase() === "MANUAL"
+        ? `<div class="garden-start-source-manual">🟡 Start uprawy został wpisany ręcznie.</div>`
+        : "";
       el("garden-combo-status").innerHTML =
-        `<div class="garden-reserved">🌱 ${escapeHtml(own.plant)} · ☀️ ${own.sun}% · 💧 ${own.water}% · pH ${Number(own.ph).toFixed(1)}</div>`;
+        `<div class="garden-reserved">🌱 ${escapeHtml(own.plant)} · ☀️ ${own.sun}% · 💧 ${own.water}% · pH ${Number(own.ph).toFixed(1)}</div>${startHint}`;
       gardenUpdateClock();
     } else {
       gardenRenderComboStatus();
@@ -11992,6 +12041,13 @@ function setupAdmin() {
     const nick = await gardenResolveNick();
     if (!nick) return;
     const combo = gardenCurrentControls();
+    let timing;
+    try {
+      timing = gardenStartTimingPayload();
+    } catch (err) {
+      if (status) status.textContent = `❌ ${err && err.message ? err.message : "Nieprawidłowy czas startu."}`;
+      return;
+    }
 
     button.disabled = true;
     if (status) status.textContent = "⏳ Sprawdzam i rozpoczynam uprawę…";
@@ -12000,6 +12056,7 @@ function setupAdmin() {
       ...combo,
       plot:gardenSelectedPlot,
       nick,
+      ...timing,
       sessionToken:playerAccountSessionToken() || "",
       forceDuplicate:forceDuplicate ? "1" : "0"
     });
@@ -12166,6 +12223,23 @@ function setupAdmin() {
 
     el("garden-plant")?.addEventListener("input",gardenRenderEditor);
     el("garden-plant")?.addEventListener("change",gardenRenderEditor);
+
+    [el("garden-start-now"),el("garden-start-earlier")].forEach(radio => {
+      radio?.addEventListener("change",()=>{
+        gardenRefreshStartTimeControls();
+        const status = el("garden-action-status");
+        if (status) status.textContent = "";
+      });
+    });
+    el("garden-start-datetime")?.addEventListener("change",()=>{
+      const input = el("garden-start-datetime");
+      if (!input) return;
+      input.max = gardenLocalDateTimeValue(Date.now());
+      if (input.value && new Date(input.value).getTime() > Date.now()) {
+        input.value = input.max;
+      }
+    });
+
     el("garden-start")?.addEventListener("click",gardenStartCultivation);
     el("garden-finish")?.addEventListener("click",gardenFinishCultivation);
     el("garden-cancel")?.addEventListener("click",gardenCancelCultivation);
