@@ -2763,3 +2763,41 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .garden-advice-row{grid-template-columns:minmax(0,1fr) auto}
   .garden-advice-row small{grid-column:1/-1;margin-top:-3px}
 }
+
+
+/* OGRÓD v20.91 — parametry i czas bezpośrednio na grządce */
+.garden-plot-visual{padding:7px;box-sizing:border-box}
+.garden-plot-stats{
+  position:absolute;left:6px;right:6px;top:6px;z-index:3;
+  display:flex;justify-content:center;gap:5px;flex-wrap:wrap;
+  font-size:.68rem;font-weight:800;line-height:1;
+}
+.garden-plot-stats span{
+  padding:4px 5px;border-radius:999px;
+  background:rgba(255,255,255,.88);
+  color:#2f2f2f;
+  box-shadow:0 1px 2px rgba(0,0,0,.12);
+}
+.garden-plot-time{
+  position:absolute;left:6px;right:6px;bottom:5px;z-index:3;
+  display:block;padding:4px 6px;border-radius:7px;
+  background:rgba(45,31,20,.82);color:#fff;
+  font-size:.69rem;font-weight:800;line-height:1.1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.garden-plot.growing .garden-plant-art{transform:translateY(11px)}
+#garden-cancel{
+  border:1px solid #b85a55!important;
+  background:linear-gradient(180deg,#fff6f5 0%,#f7d9d6 100%)!important;
+  color:#7f221e!important;
+  font-weight:800!important;
+  box-shadow:0 1px 0 rgba(255,255,255,.8) inset,0 1px 2px rgba(0,0,0,.08);
+}
+#garden-cancel:hover{background:linear-gradient(180deg,#ffeceb 0%,#efc5c1 100%)!important}
+#garden-cancel:active{transform:translateY(1px)}
+#garden-cancel:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+@media(max-width:700px){
+  .garden-plot-stats{gap:3px;font-size:.64rem}
+  .garden-plot-stats span{padding:3px 4px}
+  .garden-plot-time{font-size:.65rem}
+}

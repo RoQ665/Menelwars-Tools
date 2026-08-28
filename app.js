@@ -11707,9 +11707,23 @@ function setupAdmin() {
 
     host.innerHTML = [1,2,3,4].map(plot => {
       const active = gardenOwnExperimentForPlot(plot);
+      const growingFor = active
+        ? gardenFormatDuration(Date.now()-Number(active.startedAt || 0))
+        : "";
+      const stats = active
+        ? `<span class="garden-plot-stats">
+             <span>☀️ ${Number(active.sun)}%</span>
+             <span>💧 ${Number(active.water)}%</span>
+             <span>🧪 ${Number(active.ph).toFixed(1)}</span>
+           </span>
+           <span class="garden-plot-time">⏱️ ${escapeHtml(growingFor)}</span>`
+        : "";
       return `
         <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">
-          <span class="garden-plot-visual"><span class="garden-plant-art" aria-hidden="true">🌱</span></span>
+          <span class="garden-plot-visual">
+            <span class="garden-plant-art" aria-hidden="true">🌱</span>
+            ${stats}
+          </span>
           <span class="garden-plot-name">Grządka ${plot}</span>
           <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · rośnie` : "Pusta"}</span>
         </button>`;
@@ -12161,8 +12175,12 @@ function setupAdmin() {
     if (!gardenClockTimer) {
       gardenClockTimer = setInterval(()=>{
         gardenUpdateClock();
-        if (activeToolModule === "garden" && !gardenOwnExperimentForPlot(gardenSelectedPlot)) {
-          gardenRenderComboStatus();
+        if (activeToolModule === "garden") {
+          // Czas wzrostu jest widoczny także bezpośrednio na czterech grządkach.
+          gardenRenderPlots();
+          if (!gardenOwnExperimentForPlot(gardenSelectedPlot)) {
+            gardenRenderComboStatus();
+          }
         }
       },30000);
     }
