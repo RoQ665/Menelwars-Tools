@@ -14744,7 +14744,7 @@ function setupAdmin() {
       maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
       bleeding:null,stunned:false,firstAttack:true,
       metrics:{
-        damage:0,crit:0,double:0,counter:0,bleed:0,stun:0,execute:0,evade:0,miss:0,lifesteal:0,regen:0,
+        damage:0,crit:0,double:0,counter:0,bleed:0,stun:0,execute:0,evade:0,miss:0,hit:0,hitAttempts:0,lifesteal:0,regen:0,
         normalHitDamage:0,normalHitCount:0,critDamage:0,critHitCount:0,counterDamage:0,counterHitCount:0,
         critOpportunities:0,critChanceSum:0,doubleOpportunities:0,doubleChanceSum:0,
         counterOpportunities:0,counterChanceSum:0,bleedOpportunities:0,bleedChanceSum:0,
@@ -14813,7 +14813,9 @@ function setupAdmin() {
     }
 
     const finalHit=pvpClamp((Number(attacker.stats.accuracy)||0)-(Number(defender.stats.evasion)||0),5,99);
+    attacker.metrics.hitAttempts++;
     if (!pvpChance(finalHit)) {
+      attacker.metrics.miss++;
       defender.metrics.evade++;
       if (allowCounter) {
         const counterChance=pvpClamp(Number(defender.stats.counter)||0,0,100);
@@ -14829,6 +14831,7 @@ function setupAdmin() {
       return {killed:false,cause:"evade"};
     }
 
+    attacker.metrics.hit++;
     const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-(Number(defender.stats.critResist)||0));
     attacker.metrics.critOpportunities++;
     attacker.metrics.critChanceSum+=pvpClamp(critChance,0,100);
@@ -14975,7 +14978,7 @@ function setupAdmin() {
       hpBucketsA:[0,0,0,0,0],hpBucketsB:[0,0,0,0,0],
       eventsA:emptyEvents(),eventsB:emptyEvents(),
       eventFightsA:emptyEvents(),eventFightsB:emptyEvents(),
-      utilityA:{evade:0,evadeFights:0,lifesteal:0,regen:0},utilityB:{evade:0,evadeFights:0,lifesteal:0,regen:0},
+      utilityA:{evade:0,evadeFights:0,lifesteal:0,regen:0,hit:0,miss:0,hitAttempts:0},utilityB:{evade:0,evadeFights:0,lifesteal:0,regen:0,hit:0,miss:0,hitAttempts:0},
       detailA:{},detailB:{},eventTurnsA:Object.fromEntries(eventKeys.map(k=>[k,[]])),eventTurnsB:Object.fromEntries(eventKeys.map(k=>[k,[]])),
       causes:{},causesByWinner:{A:{},B:{},tie:{}}
     };
@@ -14998,6 +15001,8 @@ function setupAdmin() {
       agg.damageB+=result.b.metrics.damage;
       agg.utilityA.evade+=Number(result.a.metrics.evade)||0; if ((Number(result.a.metrics.evade)||0)>0) agg.utilityA.evadeFights++;
       agg.utilityB.evade+=Number(result.b.metrics.evade)||0; if ((Number(result.b.metrics.evade)||0)>0) agg.utilityB.evadeFights++;
+      agg.utilityA.hit+=Number(result.a.metrics.hit)||0; agg.utilityA.miss+=Number(result.a.metrics.miss)||0; agg.utilityA.hitAttempts+=Number(result.a.metrics.hitAttempts)||0;
+      agg.utilityB.hit+=Number(result.b.metrics.hit)||0; agg.utilityB.miss+=Number(result.b.metrics.miss)||0; agg.utilityB.hitAttempts+=Number(result.b.metrics.hitAttempts)||0;
       agg.utilityA.lifesteal+=Number(result.a.metrics.lifesteal)||0; agg.utilityB.lifesteal+=Number(result.b.metrics.lifesteal)||0;
       agg.utilityA.regen+=Number(result.a.metrics.regen)||0; agg.utilityB.regen+=Number(result.b.metrics.regen)||0;
 
@@ -15114,15 +15119,19 @@ function setupAdmin() {
 
   function pvpInsightCards(label,events,eventFights,detail,turns,runs,utility) {
     const card=(icon,name,value,sub)=>`<div class="pvp-insight-card"><span>${icon} ${name}</span><b>${value}</b>${sub?`<small>${sub}</small>`:""}</div>`;
-    const totalIncoming=(Number(detail.incomingHits)||0);
-    const executeRate=detail.executeChecks?pvpPct(events.execute||0,detail.executeChecks):"—";
+    const healed=(utility.lifesteal||0)+(utility.regen||0);
+    const hitAttempts=Number(utility.hitAttempts||0), hits=Number(utility.hit||0), misses=Number(utility.miss||0);
+    const hitPct=hitAttempts?pvpPct(hits,hitAttempts):"—";
+    const missPct=hitAttempts?pvpPct(misses,hitAttempts):"—";
     const items=[
       card("💥","Krytyk",pvpPct(eventFights.crit||0,runs),`${pvpAvg(events.crit||0,runs,2)}/walkę · ${turns.crit?.length?pvpTurnBand(turns.crit):"nie wystąpił"}`),
-      card("⚡","Double",pvpPct(eventFights.double||0,runs),`${pvpAvg(events.double||0,runs,2)}/walkę · ${turns.double?.length?pvpTurnBand(turns.double):"nie wystąpił"}`),
-      card("↩️","Kontra",pvpPct(eventFights.counter||0,runs),`${pvpAvg(events.counter||0,runs,2)}/walkę · ${turns.counter?.length?pvpTurnBand(turns.counter):"nie wystąpiła"}`),
-      card("🌀","Unik",pvpPct(utility.evadeFights||0,runs),`${pvpAvg(utility.evade||0,runs,2)} uników / walkę`),
-      card("☠️","Execute",pvpPct(eventFights.execute||0,runs),`${pvpAvg(events.execute||0,runs,2)}/walkę · skuteczność kontroli progu ${executeRate}`),
-      card("💚","Odzyskane HP",Math.round(((utility.lifesteal||0)+(utility.regen||0))/Math.max(1,runs)).toLocaleString("pl-PL"),`/ walkę · lifesteal ${Math.round((utility.lifesteal||0)/Math.max(1,runs))} · regen ${Math.round((utility.regen||0)/Math.max(1,runs))}`)
+      card("⚡","Podwójne uderzenie",pvpPct(eventFights.double||0,runs),`${pvpAvg(events.double||0,runs,2)}/walkę · ${turns.double?.length?pvpTurnBand(turns.double):"nie wystąpiło"}`),
+      card("↩️","Kontratak",pvpPct(eventFights.counter||0,runs),`${pvpAvg(events.counter||0,runs,2)}/walkę · ${turns.counter?.length?pvpTurnBand(turns.counter):"nie wystąpił"}`),
+      card("💧","Unik",pvpPct(utility.evadeFights||0,runs),`${pvpAvg(utility.evade||0,runs,2)} uników / walkę`),
+      card("🩸","Krwawienie",pvpPct(eventFights.bleed||0,runs),`${pvpAvg(events.bleed||0,runs,2)}/walkę · ${turns.bleed?.length?pvpTurnBand(turns.bleed):"nie wystąpiło"}`),
+      card("💫","Ogłuszenie",pvpPct(eventFights.stun||0,runs),`${pvpAvg(events.stun||0,runs,2)}/walkę · ${turns.stun?.length?pvpTurnBand(turns.stun):"nie wystąpiło"}`),
+      card("💚","Odzyskane HP",Math.round(healed/Math.max(1,runs)).toLocaleString("pl-PL"),`/ walkę · lifesteal ${Math.round((utility.lifesteal||0)/Math.max(1,runs))} · regen ${Math.round((utility.regen||0)/Math.max(1,runs))}`),
+      card("🎯","Trafienie / pudło",`${hitPct} / ${missPct}`,`${pvpAvg(hits,runs,2)} trafień · ${pvpAvg(misses,runs,2)} pudeł / walkę`)
     ];
     return `<div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(label)}</div><div class="pvp-insight-grid">${items.join("")}</div></div>`;
   }
@@ -15142,33 +15151,13 @@ function setupAdmin() {
       </div>
 
       <details class="pvp-result-details" open>
-        <summary>❤️ Stan po walce</summary>
-        <div class="pvp-result-details-body">
-          <div class="pvp-state-grid">
-            <div class="pvp-state-card"><span>${escapeHtml(leftLabel)}</span><b>${(agg.endHpA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% HP</b><small>śr. obrażenia: ${(agg.damageA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</small></div>
-            <div class="pvp-state-card"><span>${escapeHtml(rightLabel)}</span><b>${(agg.endHpB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% HP</b><small>śr. obrażenia: ${(agg.damageB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</small></div>
-          </div>
-          <div class="pvp-hp-box"><b>${escapeHtml(leftLabel)}</b><div class="pvp-hp-bars">${pvpHpDistributionLine(agg.hpBucketsA,agg.runs)}</div></div>
-          <div class="pvp-hp-box"><b>${escapeHtml(rightLabel)}</b><div class="pvp-hp-bars">${pvpHpDistributionLine(agg.hpBucketsB,agg.runs)}</div></div>
-        </div>
+        <summary>🏆 Jak kończyły się zwycięstwa</summary>
+        <div class="pvp-result-details-body">${pvpWinFinishCard(leftLabel,agg.causesByWinner.A,agg.winsA)}${pvpWinFinishCard(rightLabel,agg.causesByWinner.B,agg.winsB)}</div>
       </details>
 
       <details class="pvp-result-details" open>
         <summary>🥊 Obrażenia pojedynczych ciosów</summary>
         <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA)}${pvpDamageCard(rightLabel,agg.detailB)}</div>
-      </details>
-
-      <details class="pvp-result-details pvp-mechanics-details">
-        <summary>⚙️ Szczegóły mechanik</summary>
-        <div class="pvp-result-details-body">
-          <div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(leftLabel)}</div>${pvpMechanicRows(agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs)}</div>
-          <div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(rightLabel)}</div>${pvpMechanicRows(agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs)}</div>
-        </div>
-      </details>
-
-      <details class="pvp-result-details" open>
-        <summary>🏆 Jak kończyły się zwycięstwa</summary>
-        <div class="pvp-result-details-body">${pvpWinFinishCard(leftLabel,agg.causesByWinner.A,agg.winsA)}${pvpWinFinishCard(rightLabel,agg.causesByWinner.B,agg.winsB)}</div>
       </details>
 
       <details class="pvp-result-details" open>
