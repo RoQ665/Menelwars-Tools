@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=21.00.4">
+  <link rel="stylesheet" href="styles.css?v=21.00.5">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1174,8 +1174,19 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             <span class="accordion-chevron">⌄</span>
           </summary>
           <div class="content-accordion-body">
-            <div class="muted garden-race-explainer">
-              Porównujemy wiek roślin potrzebny do osiągnięcia tej samej klatki atlasu. Klatka 7 nie oznacza 70%.
+            <div class="garden-race-toolbar">
+              <div class="muted garden-race-explainer">
+                Porównujemy wiek roślin potrzebny do osiągnięcia tego samego etapu. Numer etapu nie jest procentem postępu.
+              </div>
+              <label class="garden-race-sort">
+                <span>Sortuj</span>
+                <select id="garden-race-sort">
+                  <option value="stage">Etap + czas wejścia</option>
+                  <option value="entry">Najszybsze wejście w etap</option>
+                  <option value="age">Najmłodsza uprawa</option>
+                  <option value="nick">Nick</option>
+                </select>
+              </label>
             </div>
             <div id="garden-race"></div>
           </div>
@@ -1189,7 +1200,14 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <div class="panel-head">🛠 Buildy PvP</div>
       <div class="panel-body">
 
-        <div class="build-intro">
+        <div id="build-tabs" class="build-tabs" role="tablist" aria-label="Sekcje Buildów">
+          <button type="button" class="build-tab active" data-build-tab="editor">🛠 Kreator</button>
+          <button type="button" class="build-tab" data-build-tab="sim">🥊 Symulator</button>
+          <button type="button" class="build-tab" data-build-tab="public">🌍 Publiczne</button>
+          <button type="button" class="build-tab" data-build-tab="mine">🔒 Moje buildy</button>
+        </div>
+
+        <div class="build-intro" id="build-editor-intro">
           <div>
             <strong>Stwórz własny build</strong>
             <div class="muted">
@@ -1334,7 +1352,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
           <div id="build-save-status" class="submit-status"></div>
         </div>
 
-        <details class="content-accordion" open>
+        <details id="build-public-section" class="content-accordion" open hidden>
           <summary>
             <span>🌍 Publiczne buildy graczy</span>
             <span class="accordion-chevron">⌄</span>
@@ -1424,7 +1442,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
         <div id="build-viewer" class="build-viewer" hidden></div>
 
-        <details id="pvp-simulator-section" class="content-accordion pvp-simulator-section">
+        <details id="pvp-simulator-section" class="content-accordion pvp-simulator-section" open hidden>
           <summary>
             <span>🥊 Symulator walk — 🧪 Eksperymentalny</span>
             <span class="accordion-chevron">⌄</span>
@@ -2039,6 +2057,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ</footer>
 
 <script src="data.js?v=21.00"></script>
-<script src="app.js?v=21.00.4"></script>
+<script src="app.js?v=21.00.5"></script>
 </body>
 </html>

@@ -3624,3 +3624,185 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     min-width:170px;
   }
 }
+
+
+/* ============================================================
+   v21.00.5 — Build tabs / PvP cards / race sorting / compact model
+   ============================================================ */
+.build-tabs{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:7px;
+  margin:0 0 12px;
+}
+.build-tab{
+  min-height:42px;
+  border:1px solid #ccb998;
+  border-radius:9px;
+  background:#f3ead8;
+  color:#4c3a28;
+  font-weight:800;
+  cursor:pointer;
+  padding:8px 10px;
+}
+.build-tab.active{
+  background:#6a5136;
+  border-color:#6a5136;
+  color:#fff;
+}
+#build-editor-intro[hidden],
+#build-editor[hidden],
+#build-public-section[hidden],
+#build-my-section[hidden],
+#pvp-simulator-section[hidden]{display:none!important}
+
+.pvp-simulator-section{
+  margin-top:0;
+}
+.pvp-result-scorecards{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 95px;
+  gap:7px;
+  margin:8px 0;
+}
+.pvp-result-scorecard{
+  padding:9px 10px;
+  border:1px solid #ddcfb8;
+  border-radius:10px;
+  background:#f9f1e3;
+  min-width:0;
+}
+.pvp-result-scorecard span{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:.78rem;
+}
+.pvp-result-scorecard strong{
+  display:block;
+  margin-top:3px;
+  font-size:1.25rem;
+}
+.pvp-result-scorecard.winner-a{background:#f4ead6}
+.pvp-result-details{
+  margin-top:8px;
+  border:1px solid #ddcfb8;
+  border-radius:10px;
+  background:#fffdf8;
+  overflow:hidden;
+}
+.pvp-result-details>summary{
+  cursor:pointer;
+  padding:9px 11px;
+  font-weight:800;
+  background:#f8f0e3;
+}
+.pvp-result-details-body{
+  display:grid;
+  gap:7px;
+  padding:10px;
+  line-height:1.35;
+}
+.pvp-result-line{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+}
+.pvp-result-line span{color:#746652}
+.pvp-result-line b{text-align:right}
+.pvp-proc-card{
+  padding:8px 9px;
+  border-radius:8px;
+  background:#f9f4ea;
+}
+.pvp-sim-assumptions{
+  margin:10px 0;
+  border:1px solid #dbc16e;
+  border-radius:10px;
+  background:#fff5d5;
+  overflow:hidden;
+}
+.pvp-sim-assumptions>summary{
+  padding:9px 11px;
+  cursor:pointer;
+  font-weight:800;
+}
+.pvp-sim-assumptions>div{
+  padding:0 11px 10px;
+  line-height:1.4;
+}
+.pvp-side-note{margin:8px 0}
+
+.garden-race-toolbar{
+  display:flex;
+  gap:12px;
+  justify-content:space-between;
+  align-items:flex-end;
+  margin-bottom:9px;
+}
+.garden-race-explainer{margin:0;flex:1}
+.garden-race-sort{
+  display:grid;
+  gap:3px;
+  flex:0 0 180px;
+}
+.garden-race-sort>span{
+  font-size:.74rem;
+  font-weight:800;
+}
+.garden-race-sort select{
+  width:100%;
+  border:1px solid #ccb998;
+  border-radius:8px;
+  background:#fffdf8;
+  padding:7px 8px;
+  font:inherit;
+  font-size:.8rem;
+}
+
+/* Model Destylarni: mniejszy również na desktopie, a szczególnie mobile. */
+.distillery-recommendation{gap:5px;padding:10px}
+.distillery-rec-yield{font-size:1.28rem}
+.distillery-rec-top>b{font-size:.78rem}
+.distillery-rec-recipe{gap:4px}
+.distillery-rec-recipe>span{padding:2px 5px;font-size:.73rem}
+.distillery-rec-recipe>strong{font-size:.86rem}
+.distillery-recommendation small{font-size:.72rem}
+
+@media(max-width:700px){
+  .build-tabs{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+  }
+  .build-tab{min-height:44px;font-size:.84rem}
+  .pvp-sim-result-card{padding:10px}
+  .pvp-result-scorecards{
+    grid-template-columns:1fr 1fr;
+  }
+  .pvp-result-scorecard.compact{
+    grid-column:1/-1;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .pvp-result-scorecard.compact strong{margin:0}
+  .pvp-result-line{display:grid;gap:2px}
+  .pvp-result-line b{text-align:left}
+  .garden-race-toolbar{display:grid;gap:7px}
+  .garden-race-sort{width:100%;flex:none}
+  .distillery-model-box{padding:10px}
+  .distillery-model-info{margin:7px 0 8px;padding:7px 8px}
+  .distillery-recommendation-grid{gap:7px}
+  .distillery-recommendation{
+    padding:9px 10px;
+    gap:4px;
+  }
+  .distillery-rec-yield{font-size:1.25rem}
+  .distillery-rec-top>b{font-size:.77rem}
+  .distillery-confidence{padding:3px 6px;font-size:.67rem}
+  .distillery-rec-recipe>strong{font-size:.84rem}
+  .distillery-rec-recipe>span{font-size:.7rem}
+  .distillery-recommendation small{font-size:.68rem}
+}

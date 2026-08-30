@@ -12852,7 +12852,7 @@ function setupAdmin() {
     }
 
     const accountNick = cachedAccountNick();
-    if (mySection) mySection.hidden = !accountNick;
+    if (mySection) mySection.hidden = !accountNick || buildActiveTab!=="mine";
 
     if (myHost && accountNick) {
       myHost.innerHTML = buildMyItems.length
@@ -13782,9 +13782,13 @@ function setupAdmin() {
       if (!current || row.upper<current.upper) bestByFrame.set(f,row);
     });
 
+    const raceSort=String(el("garden-race-sort")?.value||"stage");
     rows.sort((a,b)=>{
       const af=a.summary.lastFrame?Number(a.summary.lastFrame.atlasFrame):-1;
       const bf=b.summary.lastFrame?Number(b.summary.lastFrame.atlasFrame):-1;
+      if (raceSort==="entry") return (a.upper??Infinity)-(b.upper??Infinity) || bf-af || a.age-b.age;
+      if (raceSort==="age") return a.age-b.age || bf-af || (a.upper??Infinity)-(b.upper??Infinity);
+      if (raceSort==="nick") return String(a.item.nick||"").localeCompare(String(b.item.nick||""),"pl",{sensitivity:"base"}) || bf-af;
       return bf-af || (a.upper??Infinity)-(b.upper??Infinity) || a.age-b.age;
     });
 
@@ -13797,7 +13801,7 @@ function setupAdmin() {
       let label="mało danych";
       if (leader) label="lider tego etapu";
       else if (best && row.upper!=null && row.upper<=best.upper*1.15) label="obiecujące";
-      const interval=frame==null?"brak raportu etapu":`wejście w etap ${frame}: ${gardenFormatDuration(row.lower||0)}–${gardenFormatDuration(row.upper||0)}`;
+      const interval=frame==null?"brak raportu etapu":`wejście w etap ${gardenDisplayStage(frame)}: ${gardenFormatDuration(row.lower||0)}–${gardenFormatDuration(row.upper||0)}`;
       return `<div class="garden-race-row ${leader?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.nick)} · ☀️${item.sun} 💧${item.water} pH${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>wiek ${escapeHtml(gardenFormatDuration(row.age))}</span><span>${escapeHtml(interval)}</span><span>${escapeHtml(String(item.startSource||"LIVE"))}</span><span>${summary.ready?"✅ READY":"READY: nie"}</span></div></div><span class="garden-race-label">${escapeHtml(label)}</span></div>`;
     }).join("")}</div>`;
   }
@@ -14371,6 +14375,7 @@ function setupAdmin() {
       const picker=el("garden-phase-picker");
       if (picker) picker.hidden=!picker.hidden;
     });
+    el("garden-race-sort")?.addEventListener("change",gardenRenderRace);
     el("garden-ready")?.addEventListener("click",gardenRecordReady);
     gardenRenderPlots();
     gardenRenderEditor();
@@ -14590,32 +14595,32 @@ function setupAdmin() {
       {
         id:"glass",name:"Glass Cannon",weights:[5,1,1,1,4],choices:"AB",
         description:"Przeciwnik treningowy / wygenerowany. Testuje przeżycie burstu, krytyków, first strike i Execute.",
-        bonuses:[["Atak","attackPct",18],["Kryt","critChance",14],["Crit dmg","critDmg",28],["Pierwszy cios","firstStrike",8],["Egzekucja","execute",7]]
+        bonuses:[["Atak","attackPct",22],["Kryt","critChance",17],["Crit dmg","critDmg",34],["Pierwszy cios","firstStrike",8],["Egzekucja","execute",7]]
       },
       {
         id:"tank",name:"Tank",weights:[1,5,1,5,1],choices:"BA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje sustain, przebicie, Execute i odporności.",
-        bonuses:[["Obrona","defensePct",28],["Maks. HP","maxHpPct",24],["Redukcja obrażeń","damageReduction",12],["Odp. kryt","critResist",14],["Regeneracja","hpRegen",7,false],["Odp. krwawienie","bleedResist",10]]
+        bonuses:[["Obrona","defensePct",34],["Maks. HP","maxHpPct",30],["Redukcja obrażeń","damageReduction",15],["Odp. kryt","critResist",14],["Regeneracja","hpRegen",7,false],["Odp. krwawienie","bleedResist",10]]
       },
       {
         id:"dodge",name:"Dodge / Counter",weights:[1,2,5,2,2],choices:"ABBA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje Celność, Unik, Kontratak i Double Strike.",
-        bonuses:[["Unik","evasion",14],["Kontratak","counter",17],["Podwójne","doubleStrike",11],["Celność","accuracy",8]]
+        bonuses:[["Unik","evasion",18],["Kontratak","counter",21],["Podwójne","doubleStrike",14],["Celność","accuracy",8]]
       },
       {
         id:"bleed",name:"Bleed",weights:[4,1,3,2,3],choices:"AABB",
         description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na krwawienie i tempo zabicia pod DoT.",
-        bonuses:[["Krwawienie","bleed",20],["Obrażenia krwawienia","bleedDamage",55],["Atak","attackPct",10],["Kradzież życia","lifesteal",7]]
+        bonuses:[["Krwawienie","bleed",24],["Obrażenia krwawienia","bleedDamage",65],["Atak","attackPct",10],["Kradzież życia","lifesteal",7]]
       },
       {
         id:"control",name:"Control / Stun",weights:[2,2,2,2,5],choices:"BABA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na ogłuszenie, Celność i presję Execute.",
-        bonuses:[["Ogłuszenie","stun",16],["Celność","accuracy",12],["Redukcja leczenia","healingReduction",14],["Odp. ogłuszenie","stunResist",12],["Egzekucja","execute",6]]
+        bonuses:[["Ogłuszenie","stun",20],["Celność","accuracy",16],["Redukcja leczenia","healingReduction",14],["Odp. ogłuszenie","stunResist",12],["Egzekucja","execute",6]]
       },
       {
         id:"sustain",name:"Sustain / Wampir",weights:[2,3,1,5,2],choices:"BBAA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje długą walkę, lifesteal, regen i Healing Reduction.",
-        bonuses:[["Maks. HP","maxHpPct",18],["Kradzież życia","lifesteal",13],["Regeneracja","hpRegen",8,false],["Redukcja obrażeń","damageReduction",8],["Redukcja leczenia","healingReduction",8]]
+        bonuses:[["Maks. HP","maxHpPct",23],["Kradzież życia","lifesteal",17],["Regeneracja","hpRegen",8,false],["Redukcja obrażeń","damageReduction",8],["Redukcja leczenia","healingReduction",8]]
       }
     ];
 
@@ -14633,13 +14638,16 @@ function setupAdmin() {
             perks[attrKey][tier] = arch.choices[(tier+index+archIndex)%arch.choices.length];
           }
         });
+        // Treningowe buildy mają jawnie mocniejszy profil bazowy niż wcześniej.
+        // To nie jest ukryty mnożnik w silniku — wartości trafiają normalnie
+        // do stat blocku przeciwnika i przechodzą przez te same formuły co gracz.
         const profile = {
           characterLevel:level,
-          attack:Math.round(190+level*4.2),
-          defense:Math.round(230+level*5.0),
-          baseHp:112,
-          petHp:Math.round(level*4.4),
-          eqHp:Math.round(level*3.4),
+          attack:Math.round(220+level*5.0),
+          defense:Math.round(275+level*6.0),
+          baseHp:125,
+          petHp:Math.round(level*5.2),
+          eqHp:Math.round(level*4.2),
           provided:{characterLevel:true,attack:true,defense:true,baseHp:true,petHp:true,eqHp:true},
           bonusesConfirmed:true
         };
@@ -14981,15 +14989,47 @@ function setupAdmin() {
   }
 
   function pvpRenderAggregate(agg,leftLabel,rightLabel,title) {
+    const leftWin=pvpPct(agg.winsA,agg.runs);
+    const rightWin=pvpPct(agg.winsB,agg.runs);
+    const ties=pvpPct(agg.ties,agg.runs);
     return `<section class="pvp-sim-result-card">
       <h4>${escapeHtml(title)}</h4>
-      <div class="pvp-sim-score"><b>${escapeHtml(leftLabel)}: ${pvpPct(agg.winsA,agg.runs)}</b><span>${escapeHtml(rightLabel)}: ${pvpPct(agg.winsB,agg.runs)}</span><span>remis ${pvpPct(agg.ties,agg.runs)}</span></div>
-      <div class="pvp-sim-kpis"><span>Śr. rund: <b>${agg.avgRounds.toLocaleString("pl-PL",{maximumFractionDigits:1})}</b></span><span>Mediana: <b>${agg.medianRounds.toLocaleString("pl-PL",{maximumFractionDigits:1})}</b></span><span>Timeout: <b>${pvpPct(agg.timeouts,agg.runs)}</b></span></div>
-      <div class="muted">Końcowe HP średnio: ${escapeHtml(leftLabel)} ${(agg.endHpA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% · ${escapeHtml(rightLabel)} ${(agg.endHpB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}%</div>
-      <div class="pvp-hp-distribution"><b>Rozkład końcowego HP — ${escapeHtml(leftLabel)}:</b> ${pvpHpDistributionLine(agg.hpBucketsA,agg.runs)}<br><b>${escapeHtml(rightLabel)}:</b> ${pvpHpDistributionLine(agg.hpBucketsB,agg.runs)}</div>
-      <div class="muted">Śr. zadane obrażenia: ${(agg.damageA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})} / ${(agg.damageB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</div>
-      <div class="pvp-sim-procs"><b>${escapeHtml(leftLabel)}</b>: ${pvpMetricLine(agg.eventsA,agg.eventFightsA,agg.runs)}<br><b>${escapeHtml(rightLabel)}</b>: ${pvpMetricLine(agg.eventsB,agg.eventFightsB,agg.runs)}</div>
-      <div class="muted"><b>Przyczyny wygranych ${escapeHtml(leftLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.A,Math.max(1,agg.winsA))}<br><b>Przyczyny wygranych ${escapeHtml(rightLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.B,Math.max(1,agg.winsB))}<br><b>Remisy/timeouty:</b> ${pvpCauseLine(agg.causesByWinner.tie,Math.max(1,agg.ties))}</div>
+      <div class="pvp-result-scorecards">
+        <div class="pvp-result-scorecard winner-a"><span>${escapeHtml(leftLabel)}</span><strong>${leftWin}</strong></div>
+        <div class="pvp-result-scorecard"><span>${escapeHtml(rightLabel)}</span><strong>${rightWin}</strong></div>
+        <div class="pvp-result-scorecard compact"><span>Remis</span><strong>${ties}</strong></div>
+      </div>
+      <div class="pvp-sim-kpis">
+        <span>Śr. rund <b>${agg.avgRounds.toLocaleString("pl-PL",{maximumFractionDigits:1})}</b></span>
+        <span>Mediana <b>${agg.medianRounds.toLocaleString("pl-PL",{maximumFractionDigits:1})}</b></span>
+        <span>Timeout <b>${pvpPct(agg.timeouts,agg.runs)}</b></span>
+      </div>
+
+      <details class="pvp-result-details" open>
+        <summary>❤️ HP i obrażenia</summary>
+        <div class="pvp-result-details-body">
+          <div class="pvp-result-line"><span>Średnie końcowe HP</span><b>${escapeHtml(leftLabel)} ${(agg.endHpA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% · ${escapeHtml(rightLabel)} ${(agg.endHpB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}%</b></div>
+          <div class="pvp-result-line"><span>Śr. zadane obrażenia</span><b>${(agg.damageA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})} / ${(agg.damageB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</b></div>
+          <div class="pvp-hp-distribution"><b>${escapeHtml(leftLabel)}</b><br>${pvpHpDistributionLine(agg.hpBucketsA,agg.runs)}<br><b>${escapeHtml(rightLabel)}</b><br>${pvpHpDistributionLine(agg.hpBucketsB,agg.runs)}</div>
+        </div>
+      </details>
+
+      <details class="pvp-result-details">
+        <summary>⚡ Procki i efekty</summary>
+        <div class="pvp-result-details-body">
+          <div class="pvp-proc-card"><b>${escapeHtml(leftLabel)}</b><div>${pvpMetricLine(agg.eventsA,agg.eventFightsA,agg.runs)}</div></div>
+          <div class="pvp-proc-card"><b>${escapeHtml(rightLabel)}</b><div>${pvpMetricLine(agg.eventsB,agg.eventFightsB,agg.runs)}</div></div>
+        </div>
+      </details>
+
+      <details class="pvp-result-details">
+        <summary>🏆 Przyczyny wygranych</summary>
+        <div class="pvp-result-details-body">
+          <div><b>${escapeHtml(leftLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.A,Math.max(1,agg.winsA))}</div>
+          <div><b>${escapeHtml(rightLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.B,Math.max(1,agg.winsB))}</div>
+          <div><b>Remisy/timeouty:</b> ${pvpCauseLine(agg.causesByWinner.tie,Math.max(1,agg.ties))}</div>
+        </div>
+      </details>
     </section>`;
   }
 
@@ -15025,7 +15065,7 @@ function setupAdmin() {
         blocks.push(pvpRenderAggregate(agg,leftItem.label,rightItem.label,mode==="defense"?"Ja bronię":"Ja atakuję"));
       }
 
-      host.innerHTML=`<div class="pvp-sim-assumptions">🧪 Założenia nieznanego silnika: hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Brak ukrytych mnożników atakujący/broniący.</div>${sideNote}${blocks.join("")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Brak ukrytych mnożników atakujący/broniący.</div></details>${sideNote}${blocks.join("")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
@@ -15060,8 +15100,45 @@ function setupAdmin() {
   }
 
 
+  let buildActiveTab="editor";
+
+  function setBuildTab(tab,options={}) {
+    const wanted=["editor","sim","public","mine"].includes(tab)?tab:"editor";
+    buildActiveTab=wanted;
+
+    const intro=el("build-editor-intro");
+    const editor=el("build-editor");
+    const publicSection=el("build-public-section");
+    const mineSection=el("build-my-section");
+    const simSection=el("pvp-simulator-section");
+
+    if (intro) intro.hidden=wanted!=="editor";
+    if (editor) editor.hidden=wanted!=="editor";
+    if (publicSection) publicSection.hidden=wanted!=="public";
+    if (mineSection) mineSection.hidden=wanted!=="mine";
+    if (simSection) simSection.hidden=wanted!=="sim";
+
+    document.querySelectorAll("[data-build-tab]").forEach(button=>{
+      button.classList.toggle("active",button.dataset.buildTab===wanted);
+      button.setAttribute("aria-selected",button.dataset.buildTab===wanted?"true":"false");
+    });
+
+    if (wanted==="sim") {
+      pvpPopulateSelectors();
+      pvpUpdateReadiness();
+    }
+    if ((wanted==="public" || wanted==="mine") && !options.noScroll) {
+      renderBuildLists();
+    }
+  }
+
   function setupBuildCreator() {
     if (!el("build-attributes")) return;
+
+    document.querySelectorAll("[data-build-tab]").forEach(button=>{
+      button.addEventListener("click",()=>setBuildTab(button.dataset.buildTab));
+    });
+    setBuildTab("editor",{noScroll:true});
 
     el("build-new")?.addEventListener("click",newBuild);
     el("build-game-import")?.addEventListener("click",buildImportOfficialString);
