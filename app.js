@@ -2777,15 +2777,41 @@ function mapRenderRouteResult() {
   async function fetchModuleAccessPolicy(
     options={}
   ) {
-    const force =
-      Boolean(options.force);
+    const force = Boolean(options.force);
+    const hasKnownPolicy = moduleAccessPolicyAt > 0;
+    const isFresh =
+      hasKnownPolicy &&
+      Date.now() - moduleAccessPolicyAt < MODULE_ACCESS_POLICY_TTL_MS;
 
-    if (
-      !force &&
-      moduleAccessPolicyAt &&
-      Date.now() - moduleAccessPolicyAt <
-        MODULE_ACCESS_POLICY_TTL_MS
-    ) {
+    if (!force && isFresh) {
+      return moduleAccessPolicyCache;
+    }
+
+    // v21.00.3 — stale-while-revalidate. Po pierwszym poprawnym pobraniu
+    // polityki kolejne kliknięcie nie czeka na sieć tylko dlatego, że minął TTL.
+    if (!force && hasKnownPolicy) {
+      if (!moduleAccessPolicyInFlight) {
+        moduleAccessPolicyInFlight = (async () => {
+          try {
+            const payload = await jsonp("moduleAccessPolicy",{});
+            if (payload && payload.ok && payload.policy) {
+              moduleAccessPolicyCache = {
+                distillery:Boolean(payload.policy.distillery),
+                garden:Boolean(payload.policy.garden),
+                builds:Boolean(payload.policy.builds),
+                map:Boolean(payload.policy.map)
+              };
+              moduleAccessPolicyAt = Date.now();
+            }
+          } catch (err) {
+            console.warn("[MenelWars Tools] Odświeżenie ustawień dostępu w tle:",err);
+          } finally {
+            moduleAccessPolicyInFlight = null;
+          }
+          return moduleAccessPolicyCache;
+        })();
+      }
+      moduleAccessPolicyInFlight.catch(() => {});
       return moduleAccessPolicyCache;
     }
 
@@ -2793,54 +2819,25 @@ function mapRenderRouteResult() {
       return moduleAccessPolicyInFlight;
     }
 
-    moduleAccessPolicyInFlight =
-      (async () => {
-        try {
-          const payload =
-            await jsonp(
-              "moduleAccessPolicy",
-              {}
-            );
-
-          if (
-            payload &&
-            payload.ok &&
-            payload.policy
-          ) {
-            moduleAccessPolicyCache = {
-              distillery:
-                Boolean(
-                  payload.policy.distillery
-                ),
-              garden:
-                Boolean(
-                  payload.policy.garden
-                ),
-              builds:
-                Boolean(
-                  payload.policy.builds
-                ),
-              map:
-                Boolean(
-                  payload.policy.map
-                )
-            };
-
-            moduleAccessPolicyAt =
-              Date.now();
-          }
-        } catch (err) {
-          console.warn(
-            "[MenelWars Tools] Ustawienia dostępu do modułów:",
-            err
-          );
-        } finally {
-          moduleAccessPolicyInFlight =
-            null;
+    moduleAccessPolicyInFlight = (async () => {
+      try {
+        const payload = await jsonp("moduleAccessPolicy",{});
+        if (payload && payload.ok && payload.policy) {
+          moduleAccessPolicyCache = {
+            distillery:Boolean(payload.policy.distillery),
+            garden:Boolean(payload.policy.garden),
+            builds:Boolean(payload.policy.builds),
+            map:Boolean(payload.policy.map)
+          };
+          moduleAccessPolicyAt = Date.now();
         }
-
-        return moduleAccessPolicyCache;
-      })();
+      } catch (err) {
+        console.warn("[MenelWars Tools] Ustawienia dostępu do modułów:",err);
+      } finally {
+        moduleAccessPolicyInFlight = null;
+      }
+      return moduleAccessPolicyCache;
+    })();
 
     return moduleAccessPolicyInFlight;
   }
@@ -2884,6 +2881,19 @@ function mapRenderRouteResult() {
       !policy ||
       !policy[moduleName]
     ) {
+      return true;
+    }
+
+    const token = playerAccountSessionToken();
+
+    // Znane, wcześniej potwierdzone konto otwiera moduł natychmiast.
+    // Odnowienie sesji odbywa się w tle; backend pozostaje autorytatywny.
+    if (
+      token &&
+      cachedAccountStatus &&
+      cachedAccountStatusToken === token
+    ) {
+      playerAccountStatus({force:false,strict:false}).catch(() => {});
       return true;
     }
 
@@ -3824,12 +3834,52 @@ function mapRenderRouteResult() {
     const force = Boolean(options.force);
     const strict = Boolean(options.strict);
 
-    if (
-      !force &&
-      cachedAccountStatus &&
-      cachedAccountStatusToken === token &&
-      Date.now() - cachedAccountStatusAt < 60000
-    ) {
+    const hasCachedAccount =
+      Boolean(
+        cachedAccountStatus &&
+        cachedAccountStatusToken === token
+      );
+    const cachedAccountFresh =
+      hasCachedAccount &&
+      Date.now() - cachedAccountStatusAt < 60000;
+
+    if (!force && cachedAccountFresh) {
+      return cachedAccountStatus;
+    }
+
+    // v21.00.3 — po wygaśnięciu 60 s nie blokujemy nawigacji.
+    // Zwracamy ostatni poprawny status i odnawiamy go w tle.
+    if (!force && hasCachedAccount) {
+      if (!accountStatusInFlight) {
+        accountStatusInFlight = (async () => {
+          try {
+            const result = await jsonp(
+              "playerAccountStatus",
+              {sessionToken:token}
+            );
+
+            if (!result || !result.ok || !result.authenticated) {
+              cachedAccountStatus = null;
+              cachedAccountStatusAt = 0;
+              cachedAccountStatusToken = "";
+              setPlayerAccountSessionToken("");
+              return null;
+            }
+
+            cachedAccountStatus = result;
+            cachedAccountStatusAt = Date.now();
+            cachedAccountStatusToken = token;
+            return result;
+          } catch (err) {
+            return cachedAccountStatusToken === token
+              ? cachedAccountStatus
+              : null;
+          } finally {
+            accountStatusInFlight = null;
+          }
+        })();
+      }
+      accountStatusInFlight.catch(() => {});
       return cachedAccountStatus;
     }
 
@@ -9277,7 +9327,7 @@ function renderAdminPaymentsPreview(payload) {
       <div style="border:1px solid ${border};background:${bg};border-radius:8px;padding:8px;margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(player.nick)}</strong><strong>${paymentPreviewMoney(player.newBalance)} zł</strong></div>
         <div class="muted" style="margin-top:3px">
-          ${baseline ? "Pierwszy odczyt · delta 0 zł" : waiting ? "Oczekiwanie na pierwszy odczyt" : `Nowe wpłaty: +${paymentPreviewMoney(player.delta)} zł · Obowiązek: -${paymentPreviewMoney(player.obligation)} zł (${Number(player.chargedDays)||0} dni)`}
+          ${baseline ? "Pierwszy odczyt · delta 0 zł" : waiting ? "Oczekiwanie na pierwszy odczyt" : `Nowe wpłaty: +${paymentPreviewMoney(player.delta)} zł · Obowiązek: -${paymentPreviewMoney(player.obligation)} zł (${Number(player.chargedDays)||0} dni)${Number(player.repairCredit) > 0 ? ` · Korekta karencji: +${paymentPreviewMoney(player.repairCredit)} zł` : ""}`}
         </div>
         ${player.previousTotal != null ? `<div class="muted">Suma: ${paymentPreviewMoney(player.previousTotal)} → ${paymentPreviewMoney(player.currentTotal)} zł · wpłaty: ${Number(player.previousCount)||0} → ${Number(player.currentCount)||0}</div>` : ""}
       </div>`;
