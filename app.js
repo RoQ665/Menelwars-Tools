@@ -14848,7 +14848,13 @@ function setupAdmin() {
       .reduce((sum,x)=>sum+(Number(x.amount)||0)*Math.max(0,round-1),0);
     const attack=attacker.primary.attack*(1+(condA.attackPct+dynamicPct)/100);
     const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
-    const defenseFactor=params.defenseK/(effectiveDefense+params.defenseK);
+    // Model ofensywny: wysoki ATK skuteczniej przełamuje DEF bez capowania
+    // którejkolwiek statystyki. Rozpęd pozostaje osobnym mnożnikiem obrażeń;
+    // nie zmienia K, aby nie naliczać tej samej premii podwójnie.
+    const defenseK=params.defenseModel === "attack"
+      ? Math.max(1,attacker.primary.attack*(Number(params.attackKScale)||0.8))
+      : params.defenseK;
+    const defenseFactor=defenseK/(effectiveDefense+defenseK);
     const damageReduction=pvpClamp((Number(defender.stats.damageReduction)||0)+condD.damageReduction,0,60);
     // Source mapa gry podaje drugą funkcję Evasion: pasywną redukcję obrażeń
     // równą evasion / 3.5. Backendowa kolejność względem zwykłego DR nie jest
@@ -15275,7 +15281,10 @@ function setupAdmin() {
     if (!leftItem || !rightItem) return;
     const lready=buildSimulationReadiness(leftItem.source), rready=buildSimulationReadiness(rightItem.source);
     if (!lready.ok || !rready.ok) { pvpUpdateReadiness(); return; }
+    const defenseModel=el("pvp-sim-defense-model")?.value === "fixed" ? "fixed" : "attack";
     const params={
+      defenseModel,
+      attackKScale:0.8,
       defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||300,50,5000),
       counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2)
     };
@@ -15286,7 +15295,10 @@ function setupAdmin() {
       // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia używają jawnego DEF K=${params.defenseK} (domyślnie 300: kompromis skalibrowany na nagraniu RoQ–xBuLax), counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      const defenseAssumption=params.defenseModel === "attack"
+        ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
+        : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ${defenseAssumption}, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
