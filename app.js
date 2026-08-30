@@ -1565,18 +1565,32 @@ function mapRenderRouteResult() {
 
     host.innerHTML = `
       <div class="distillery-model-head">
-        <strong>🧪 Eksperymentalny model Destylarni</strong>
-        <span>${model.knownCount} potwierdzonych wyników${meanRmse!=null ? ` · RMSE dopasowania ~${fmt(meanRmse)} l` : ""}</span>
+        <div>
+          <strong>🧪 Eksperymentalny model Destylarni</strong>
+          <div class="distillery-model-meta">${model.knownCount} potwierdzonych wyników${meanRmse!=null ? ` · RMSE ~${fmt(meanRmse)} l` : ""}</div>
+        </div>
+        <span class="distillery-model-badge">estymacja</span>
       </div>
-      <div class="muted">Model uczy osobne zależności składników dla każdego programu. To estymacja z danych gangu, nie ukryty wzór gry.</div>
+      <details class="distillery-model-info">
+        <summary>Jak czytać rekomendacje?</summary>
+        <div>Model uczy zależności składników osobno dla każdego programu. Wynik jest estymacją z danych gangu, nie ukrytym wzorem gry.</div>
+      </details>
       ${recommendations.length ? `
         <div class="distillery-recommendation-grid">
           ${recommendations.map((item,index)=>`
             <button type="button" class="distillery-recommendation" data-distillery-recommend="${escapeHtml(key(item.recipe.baza,item.recipe.drozdze,item.recipe.woda,item.recipe.program))}">
-              <b>${index===0 ? "🎯" : "🔬"} ${escapeHtml(displayName(item.recipe.baza))} · P${item.recipe.program}</b>
-              <span>${escapeHtml(displayName(item.recipe.drozdze))} · ${escapeHtml(displayName(item.recipe.woda))}</span>
-              <span>~${fmt(item.prediction.estimate)} l · pewność ${escapeHtml(item.prediction.confidence)}</span>
-              <small>${item.prediction.support <= 4 ? "Wartość informacyjna: mało danych dla co najmniej jednego składnika." : "Łączy obiecujący szacunek z wartością nowego pomiaru."}</small>
+              <span class="distillery-rec-top">
+                <b>${index===0 ? "🎯 Najciekawszy test" : "🔬 Warto zbadać"}</b>
+                <span class="distillery-confidence">${escapeHtml(item.prediction.confidence)}</span>
+              </span>
+              <span class="distillery-rec-yield">~${fmt(item.prediction.estimate)} l</span>
+              <span class="distillery-rec-recipe">
+                <strong>${escapeHtml(displayName(item.recipe.baza))}</strong>
+                <span>P${item.recipe.program}</span>
+                <span>${escapeHtml(displayName(item.recipe.drozdze))}</span>
+                <span>${escapeHtml(displayName(item.recipe.woda))}</span>
+              </span>
+              <small>${item.prediction.support <= 4 ? "Mało danych — pomiar mocno poprawi model." : "Dobry szacunek i wartościowy nowy pomiar."}</small>
             </button>`).join("")}
         </div>` : `<div class="empty">Za mało danych do bezpiecznej rekomendacji.</div>`}
     `;
@@ -13448,7 +13462,11 @@ function setupAdmin() {
     if (last) last.textContent=summary.lastFrame?`etap ${gardenDisplayStage(Number(summary.lastFrame.atlasFrame))}`:"brak raportu";
     if (grid) {
       grid.innerHTML=Array.from({length:10},(_,frame)=>`<button type="button" class="garden-phase-option ${summary.lastFrame&&Number(summary.lastFrame.atlasFrame)===frame?"selected":""}" data-garden-frame="${frame}">${gardenFrameSpriteHtml(frame)}<b>${gardenDisplayStage(frame)}</b></button>`).join("");
-      grid.querySelectorAll("[data-garden-frame]").forEach(button=>button.addEventListener("click",()=>gardenRecordPhase(Number(button.dataset.gardenFrame))));
+      grid.querySelectorAll("[data-garden-frame]").forEach(button=>button.addEventListener("click",()=>{
+        const picker=el("garden-phase-picker");
+        if (picker) picker.hidden=true;
+        gardenRecordPhase(Number(button.dataset.gardenFrame));
+      }));
     }
     if (readyButton) {
       readyButton.textContent=summary.ready?"✅ READY zapisane — potwierdź ponownie":"✅ Gra pokazuje: Gotowe do zbioru";
@@ -13805,7 +13823,7 @@ function setupAdmin() {
         : "";
       const frame = summary && summary.lastFrame ? Number(summary.lastFrame.atlasFrame) : null;
       const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite") : "";
-      const frameBadge = frame !== null ? `<span class="garden-plot-frame-badge">etap ${gardenDisplayStage(frame)}</span>` : "";
+      const frameBadge = "";
       const readyBadge = summary && summary.ready ? `<span class="garden-plot-ready-badge">✅ READY</span>` : "";
 
       return `
@@ -13817,7 +13835,7 @@ function setupAdmin() {
             ${stats}
           </span>
           <span class="garden-plot-name">Grządka ${plot}</span>
-          <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${summary&&summary.ready?"gotowe do zbioru":frame===null?"etap niepotwierdzony":"rośnie"}` : "Pusta"}</span>
+          <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${summary&&summary.ready?"gotowe":frame===null?"bez etapu":`etap ${gardenDisplayStage(frame)}`}` : "Pusta"}</span>
         </button>`;
     }).join("");
 
@@ -14987,7 +15005,7 @@ function setupAdmin() {
       counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2),
       firstMoverHigher:pvpClamp(Number(el("pvp-sim-first-mover")?.value)||0.60,0.5,1)
     };
-    const runs=[1000,5000,10000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):5000;
+    const runs=[10,100,1000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):1000;
     const mode=String(el("pvp-sim-mode")?.value||"both");
     button.disabled=true; if (readinessHost) readinessHost.textContent=`⏳ Symuluję ${runs.toLocaleString("pl-PL")} walk...`;
     try {

@@ -3443,3 +3443,184 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .garden-phase-sprite,.garden-plot-sprite{background-image:url("onion-growth-atlas.png?v=21.00.2")!important}
 .garden-plot-sprite{z-index:1;inset:0!important}
 .garden-phase-tools{margin:0 0 14px}
+
+
+/* ============================================================
+   v21.00.4 — responsive polish: PvP / Ogród / Destylarnia
+   ============================================================ */
+
+/* Symulator: przycisk nigdy nie pływa obok komunikatu ani na nim. */
+#pvp-sim-run{
+  display:block;
+  width:100%;
+  min-height:46px;
+  margin:12px 0 0;
+  white-space:normal;
+  text-align:center;
+}
+#pvp-sim-readiness{
+  display:block;
+  width:100%;
+  box-sizing:border-box;
+  margin:6px 0 0;
+  min-height:0;
+  line-height:1.3;
+  clear:both;
+}
+
+/* Ogród: miniatura ma być podglądem, nie pełnoekranową cebulą. */
+.garden-plot-visual::after{display:none!important}
+.garden-plot-sprite{
+  inset:16% 15% 11%!important;
+  width:auto!important;
+  height:auto!important;
+}
+.garden-plot-stats{
+  left:5px;right:5px;top:5px;
+  gap:4px;
+  flex-wrap:nowrap;
+  justify-content:center;
+}
+.garden-plot-stats span{
+  min-width:0;
+  padding:4px 6px;
+}
+.garden-plot-time{
+  left:8px;right:8px;bottom:6px;
+  padding:4px 6px;
+}
+.garden-plot-frame-badge{display:none!important}
+.garden-plot-ready-badge{top:auto;bottom:31px;left:7px}
+.garden-plot-meta{white-space:normal;line-height:1.2;min-height:1.2em}
+
+/* Destylarnia: rekomendacje są kartami danych, nie szarymi przyciskami tekstowymi. */
+.distillery-model-box{
+  padding:14px;
+  border-radius:14px;
+  line-height:1.35;
+}
+.distillery-model-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.distillery-model-head strong{
+  display:block;
+  font-size:1.05rem;
+}
+.distillery-model-meta{
+  margin-top:3px;
+  color:#76654f;
+  font-size:.82rem;
+}
+.distillery-model-badge,
+.distillery-confidence{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  background:#efe2c3;
+  color:#654d2f;
+  padding:4px 8px;
+  font-size:.72rem;
+  font-weight:800;
+  white-space:nowrap;
+}
+.distillery-model-info{
+  margin:10px 0 12px;
+  padding:8px 10px;
+  border:1px solid #e1c985;
+  border-radius:9px;
+  background:rgba(255,255,255,.42);
+  font-size:.82rem;
+}
+.distillery-model-info summary{
+  cursor:pointer;
+  font-weight:800;
+}
+.distillery-model-info>div{margin-top:7px;color:#6d5c47}
+.distillery-recommendation-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+}
+.distillery-recommendation{
+  appearance:none;
+  width:100%;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:12px;
+  border:1px solid #d9c28a;
+  border-radius:12px;
+  background:#fffdf7;
+  color:#352b20;
+  text-align:left;
+  cursor:pointer;
+  font:inherit;
+}
+.distillery-recommendation:hover{background:#fff9e9;border-color:#c7a75d}
+.distillery-rec-top{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:7px;
+}
+.distillery-rec-top>b{font-size:.82rem;line-height:1.2}
+.distillery-rec-yield{
+  display:block;
+  font-size:1.5rem;
+  line-height:1;
+  font-weight:900;
+  color:#5c4427;
+}
+.distillery-rec-recipe{
+  display:flex;
+  flex-wrap:wrap;
+  gap:5px;
+  align-items:center;
+  line-height:1.25;
+}
+.distillery-rec-recipe>span{
+  padding:3px 6px;
+  border-radius:7px;
+  background:#f3ead8;
+  font-size:.78rem;
+}
+.distillery-rec-recipe>strong{
+  flex-basis:100%;
+  font-size:.92rem;
+}
+.distillery-recommendation small{
+  margin-top:auto;
+  color:#74634d;
+  line-height:1.3;
+}
+
+@media(max-width:700px){
+  .garden-plot{padding:6px}
+  .garden-plot-visual{height:112px}
+  .garden-plot-sprite{inset:20% 18% 13%!important}
+  .garden-plot-stats{font-size:.58rem;gap:2px}
+  .garden-plot-stats span{padding:3px 4px}
+  .garden-plot-time{font-size:.59rem;left:7px;right:7px}
+  .garden-plot-name{font-size:.92rem}
+  .garden-plot-meta{font-size:.74rem}
+  .garden-phase-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .garden-phase-option{min-height:0;aspect-ratio:1/1}
+  .distillery-model-box{padding:12px}
+  .distillery-model-head{gap:8px}
+  .distillery-model-head strong{font-size:1rem}
+  .distillery-model-badge{display:none}
+  .distillery-recommendation-grid{grid-template-columns:1fr}
+  .distillery-recommendation{padding:12px 13px}
+  .distillery-rec-yield{font-size:1.65rem}
+}
+
+@media(min-width:701px){
+  #pvp-sim-run{
+    width:auto;
+    min-width:170px;
+  }
+}
