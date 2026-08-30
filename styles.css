@@ -4070,12 +4070,14 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .pvp-damage-grid{
     grid-template-columns:repeat(3,minmax(0,1fr));
   }
+  /* 8 zdarzeń = dwa czytelne rzędy po 4 kafelki na PC. */
   .pvp-insight-grid{
-    grid-template-columns:repeat(auto-fit,minmax(112px,1fr));
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:8px;
   }
-}
-@media(min-width:1200px){
-  .pvp-insight-grid{grid-template-columns:repeat(8,minmax(0,1fr));}
+  .pvp-insight-card{
+    min-height:112px;
+  }
 }
 @media(max-width:800px){
   .pvp-fighter-report-title{white-space:normal;font-size:.92rem;}

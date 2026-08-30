@@ -14681,7 +14681,7 @@ function setupAdmin() {
     const left = el("pvp-sim-left"), right = el("pvp-sim-right");
     if (!left || !right) return;
     const sources = pvpSimulationSources();
-    const leftSources = sources.filter(item=>item.group!=="preset");
+    const leftSources = sources.filter(item=>item.group==="current" || item.group==="mine");
     const render = (select,items) => {
       const old = select.value;
       select.innerHTML = items.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("");
