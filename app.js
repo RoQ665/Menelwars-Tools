@@ -14743,7 +14743,14 @@ function setupAdmin() {
       source,label,calculated,stats:calculated.stats,primary,
       maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
       bleeding:null,stunned:false,firstAttack:true,
-      metrics:{damage:0,crit:0,double:0,counter:0,bleed:0,stun:0,execute:0,evade:0,miss:0,lifesteal:0,regen:0}
+      metrics:{
+        damage:0,crit:0,double:0,counter:0,bleed:0,stun:0,execute:0,evade:0,miss:0,lifesteal:0,regen:0,
+        normalHitDamage:0,normalHitCount:0,critDamage:0,critHitCount:0,counterDamage:0,counterHitCount:0,
+        critOpportunities:0,critChanceSum:0,doubleOpportunities:0,doubleChanceSum:0,
+        counterOpportunities:0,counterChanceSum:0,bleedOpportunities:0,bleedChanceSum:0,
+        stunOpportunities:0,stunChanceSum:0,executeChecks:0,
+        eventTurns:{crit:[],double:[],counter:[],bleed:[],stun:[],execute:[]}
+      }
     };
   }
 
@@ -14796,30 +14803,55 @@ function setupAdmin() {
     const isFirst=Boolean(attacker.firstAttack && options.consumeFirst!==false);
     if (options.consumeFirst!==false) attacker.firstAttack=false;
 
-    if (allowExecute && 100*defender.hp/defender.maxHp < (Number(attacker.stats.execute)||0)) {
-      defender.hp=0; attacker.metrics.execute++;
-      return {killed:true,cause:"execute"};
+    if (allowExecute) {
+      attacker.metrics.executeChecks++;
+      if (100*defender.hp/defender.maxHp < (Number(attacker.stats.execute)||0)) {
+        defender.hp=0; attacker.metrics.execute++;
+        attacker.metrics.eventTurns.execute.push(round);
+        return {killed:true,cause:"execute"};
+      }
     }
 
     const finalHit=pvpClamp((Number(attacker.stats.accuracy)||0)-(Number(defender.stats.evasion)||0),5,99);
     if (!pvpChance(finalHit)) {
       defender.metrics.evade++;
-      if (allowCounter && pvpChance(Number(defender.stats.counter)||0)) {
-        defender.metrics.counter++;
-        const counterResult=pvpStrike(defender,attacker,round,params,{allowExecute:false,allowCounter:false,consumeFirst:false,damageMultiplier:params.counterMult});
-        if (counterResult.killed) return {killed:true,cause:"counter"};
+      if (allowCounter) {
+        const counterChance=pvpClamp(Number(defender.stats.counter)||0,0,100);
+        defender.metrics.counterOpportunities++;
+        defender.metrics.counterChanceSum+=counterChance;
+        if (pvpChance(counterChance)) {
+          defender.metrics.counter++;
+          defender.metrics.eventTurns.counter.push(round);
+          const counterResult=pvpStrike(defender,attacker,round,params,{allowExecute:false,allowCounter:false,consumeFirst:false,damageMultiplier:params.counterMult,isCounter:true});
+          if (counterResult.killed) return {killed:true,cause:"counter"};
+        }
       }
       return {killed:false,cause:"evade"};
     }
 
     const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-(Number(defender.stats.critResist)||0));
+    attacker.metrics.critOpportunities++;
+    attacker.metrics.critChanceSum+=pvpClamp(critChance,0,100);
     const crit=pvpChance(critChance);
-    if (crit) attacker.metrics.crit++;
+    if (crit) {
+      attacker.metrics.crit++;
+      attacker.metrics.eventTurns.crit.push(round);
+    }
     let damage=pvpDamageFormula(attacker,defender,round,params,crit,isFirst);
     if (Number.isFinite(options.damageMultiplier)) damage=Math.max(1,Math.round(damage*options.damageMultiplier));
     const actual=Math.min(defender.hp,damage);
     defender.hp-=actual;
     attacker.metrics.damage+=actual;
+    if (options.isCounter) {
+      attacker.metrics.counterDamage+=actual;
+      attacker.metrics.counterHitCount++;
+    } else if (crit) {
+      attacker.metrics.critDamage+=actual;
+      attacker.metrics.critHitCount++;
+    } else {
+      attacker.metrics.normalHitDamage+=actual;
+      attacker.metrics.normalHitCount++;
+    }
 
     if (actual>0 && Number(attacker.stats.lifesteal)>0) {
       pvpHeal(attacker,actual*(Number(attacker.stats.lifesteal)||0)/100,defender,"lifesteal");
@@ -14832,12 +14864,22 @@ function setupAdmin() {
     // bleedChance - bleedResist.
     const autoBleed = crit && Number(attacker.stats.appliesBleed) > 0;
     const bleedChance=Math.max(0,(Number(attacker.stats.bleed)||0)-(Number(defender.stats.bleedResist)||0));
+    attacker.metrics.bleedOpportunities++;
+    attacker.metrics.bleedChanceSum+=autoBleed?100:pvpClamp(bleedChance,0,100);
     if (autoBleed || pvpChance(bleedChance)) {
-      if (!defender.bleeding) attacker.metrics.bleed++;
+      if (!defender.bleeding) {
+        attacker.metrics.bleed++;
+        attacker.metrics.eventTurns.bleed.push(round);
+      }
       defender.bleeding=attacker;
     }
     const stunChance=Math.max(0,(Number(attacker.stats.stun)||0)-(Number(defender.stats.stunResist)||0));
-    if (pvpChance(stunChance)) { defender.stunned=true; attacker.metrics.stun++; }
+    attacker.metrics.stunOpportunities++;
+    attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
+    if (pvpChance(stunChance)) {
+      defender.stunned=true; attacker.metrics.stun++;
+      attacker.metrics.eventTurns.stun.push(round);
+    }
     return {killed:false,cause:crit?"crit":"hit"};
   }
 
@@ -14856,8 +14898,12 @@ function setupAdmin() {
     // kolejnych tur z HP=0.
     if (actor.hp<=0) return {winner:enemy,cause:main.cause||"counter"};
 
-    if (pvpChance(Number(actor.stats.doubleStrike)||0)) {
+    const doubleChance=pvpClamp(Number(actor.stats.doubleStrike)||0,0,100);
+    actor.metrics.doubleOpportunities++;
+    actor.metrics.doubleChanceSum+=doubleChance;
+    if (pvpChance(doubleChance)) {
       actor.metrics.double++;
+      actor.metrics.eventTurns.double.push(round);
       const second=pvpStrike(actor,enemy,round,params,{allowExecute:false,allowCounter:true,consumeFirst:false});
       if (enemy.hp<=0) return {winner:actor,cause:second.cause||"double"};
       if (actor.hp<=0) return {winner:enemy,cause:second.cause||"counter"};
@@ -14929,6 +14975,7 @@ function setupAdmin() {
       hpBucketsA:[0,0,0,0,0],hpBucketsB:[0,0,0,0,0],
       eventsA:emptyEvents(),eventsB:emptyEvents(),
       eventFightsA:emptyEvents(),eventFightsB:emptyEvents(),
+      detailA:{},detailB:{},eventTurnsA:Object.fromEntries(eventKeys.map(k=>[k,[]])),eventTurnsB:Object.fromEntries(eventKeys.map(k=>[k,[]])),
       causes:{},causesByWinner:{A:{},B:{},tie:{}}
     };
 
@@ -14958,6 +15005,17 @@ function setupAdmin() {
         if (countB>0) agg.eventFightsB[key]++;
       });
 
+      ["normalHitDamage","normalHitCount","critDamage","critHitCount","counterDamage","counterHitCount",
+        "critOpportunities","critChanceSum","doubleOpportunities","doubleChanceSum","counterOpportunities","counterChanceSum",
+        "bleedOpportunities","bleedChanceSum","stunOpportunities","stunChanceSum","executeChecks"].forEach(key=>{
+          agg.detailA[key]=(agg.detailA[key]||0)+(Number(result.a.metrics[key])||0);
+          agg.detailB[key]=(agg.detailB[key]||0)+(Number(result.b.metrics[key])||0);
+        });
+      eventKeys.forEach(key=>{
+        agg.eventTurnsA[key].push(...(result.a.metrics.eventTurns[key]||[]));
+        agg.eventTurnsB[key].push(...(result.b.metrics.eventTurns[key]||[]));
+      });
+
       pvpAddCause(agg.causes,result.cause);
       pvpAddCause(agg.causesByWinner[result.winner]||agg.causesByWinner.tie,result.cause);
       if (i && i%500===0) await new Promise(resolve=>setTimeout(resolve,0));
@@ -14974,16 +15032,54 @@ function setupAdmin() {
 
   function pvpPct(n,d) { return d ? (100*n/d).toLocaleString("pl-PL",{maximumFractionDigits:1})+"%" : "0%"; }
 
-  function pvpMetricLine(events,eventFights,runs) {
-    const item=(key,label)=>`${label} ${pvpPct(eventFights[key],runs)} walk (${Number(events[key]/runs).toLocaleString("pl-PL",{maximumFractionDigits:2})}/walkę)`;
+  function pvpAvg(n,d,digits=1) {
+    return d ? (Number(n)/Number(d)).toLocaleString("pl-PL",{maximumFractionDigits:digits}) : "—";
+  }
+
+  function pvpAvgTurn(turns) {
+    if (!turns?.length) return "—";
+    return (turns.reduce((a,b)=>a+b,0)/turns.length).toLocaleString("pl-PL",{maximumFractionDigits:1});
+  }
+
+  function pvpTurnBand(turns) {
+    if (!turns?.length) return "nie wystąpiło";
+    const sorted=[...turns].sort((a,b)=>a-b);
+    const pick=q=>sorted[Math.min(sorted.length-1,Math.floor((sorted.length-1)*q))];
+    return `śr. tura ${pvpAvgTurn(sorted)} · połowa do T${pick(.5)} · 75% do T${pick(.75)}`;
+  }
+
+  function pvpMechanicRows(events,eventFights,detail,turns,runs) {
+    const chance=(sum,opp)=>opp?pvpAvg(sum,opp,1)+"%":"—";
+    const row=(icon,label,key,oppKey,chanceKey,extra="")=>{
+      const count=Number(events[key]||0), opp=Number(detail[oppKey]||0);
+      return `<div class="pvp-mechanic-row">
+        <div class="pvp-mechanic-name">${icon} <b>${label}</b></div>
+        <div><span>Szansa</span><b>${chance(detail[chanceKey]||0,opp)}</b></div>
+        <div><span>Okazje</span><b>${pvpAvg(opp,runs,2)}/walkę</b></div>
+        <div><span>Weszło</span><b>${pvpPct(eventFights[key]||0,runs)} walk · ${pvpAvg(count,runs,2)}/walkę</b></div>
+        <div class="pvp-mechanic-turn"><span>Kiedy</span><b>${pvpTurnBand(turns[key])}</b></div>
+        ${extra}
+      </div>`;
+    };
     return [
-      item("crit","kryt"),
-      item("double","double"),
-      item("counter","counter"),
-      item("bleed","bleed"),
-      item("stun","stun"),
-      item("execute","execute")
-    ].join(" · ");
+      row("💥","Krytyk","crit","critOpportunities","critChanceSum"),
+      row("⚡","Double","double","doubleOpportunities","doubleChanceSum"),
+      row("↩️","Kontratak","counter","counterOpportunities","counterChanceSum"),
+      row("🩸","Krwawienie","bleed","bleedOpportunities","bleedChanceSum"),
+      row("💫","Ogłuszenie","stun","stunOpportunities","stunChanceSum")
+    ].join("");
+  }
+
+  function pvpDamageCard(label,detail) {
+    const metric=(icon,name,total,count)=>`<div class="pvp-damage-metric"><span>${icon} ${name}</span><b>${count?pvpAvg(total,count,0)+" dmg":"—"}</b><small>${count?Number(count).toLocaleString("pl-PL")+" trafień":"brak trafień"}</small></div>`;
+    return `<div class="pvp-fighter-report">
+      <div class="pvp-fighter-report-title">${escapeHtml(label)}</div>
+      <div class="pvp-damage-grid">
+        ${metric("👊","Normalny cios",detail.normalHitDamage||0,detail.normalHitCount||0)}
+        ${metric("💥","Krytyk",detail.critDamage||0,detail.critHitCount||0)}
+        ${metric("↩️","Kontra",detail.counterDamage||0,detail.counterHitCount||0)}
+      </div>
+    </div>`;
   }
 
   function pvpHpDistributionLine(buckets,runs) {
@@ -14991,11 +15087,43 @@ function setupAdmin() {
     return labels.map((label,index)=>`${label}: ${pvpPct(buckets[index]||0,runs)}`).join(" · ");
   }
 
-  function pvpCauseLine(causes,total) {
-    return Object.entries(causes||{})
-      .sort((a,b)=>b[1]-a[1])
-      .map(([key,value])=>`${escapeHtml(key)} ${pvpPct(value,total)}`)
-      .join(" · ") || "—";
+  function pvpWinFinishCard(label,causes,wins) {
+    const total=Math.max(1,wins);
+    const timeout=(causes.timeout_hp||0)+(causes.timeout_defender||0);
+    const hpZero=Math.max(0,wins-timeout);
+    const finishing=[
+      ["☠️ Execute",causes.execute||0],
+      ["↩️ Kontra",causes.counter||0],
+      ["🩸 Krwawienie",causes.bleed||0],
+      ["👊 Cios / obrażenia",(causes.damage||0)+(causes.crit||0)+(causes.double||0)]
+    ].filter(([,v])=>v>0);
+    return `<div class="pvp-win-card">
+      <div class="pvp-fighter-report-title">${escapeHtml(label)} · ${Number(wins).toLocaleString("pl-PL")} zwycięstw</div>
+      <div class="pvp-win-main">
+        <div><span>❤️ HP przeciwnika spadło do 0</span><b>${hpZero.toLocaleString("pl-PL")} · ${pvpPct(hpZero,total)}</b></div>
+        <div><span>⏱️ Limit rund / wyższy % HP</span><b>${timeout.toLocaleString("pl-PL")} · ${pvpPct(timeout,total)}</b></div>
+      </div>
+      ${finishing.length?`<div class="pvp-finisher"><span>Czym zakończono walkę przy HP = 0</span>${finishing.map(([k,v])=>`<b>${k}: ${v.toLocaleString("pl-PL")} · ${pvpPct(v,Math.max(1,hpZero))}</b>`).join("")}</div>`:""}
+    </div>`;
+  }
+
+  function pvpInsight(label,events,eventFights,detail,turns,runs,causes,wins) {
+    const candidates=[
+      {key:"crit",label:"krytyk",f:eventFights.crit||0},
+      {key:"double",label:"double",f:eventFights.double||0},
+      {key:"counter",label:"kontra",f:eventFights.counter||0},
+      {key:"bleed",label:"krwawienie",f:eventFights.bleed||0},
+      {key:"stun",label:"ogłuszenie",f:eventFights.stun||0}
+    ].sort((a,b)=>b.f-a.f);
+    const top=candidates[0];
+    const timeout=(causes.timeout_hp||0)+(causes.timeout_defender||0);
+    const hpZero=Math.max(0,wins-timeout);
+    let text=`${escapeHtml(label)}: `;
+    if (top?.f) text+=`${top.label} pojawia się w ${pvpPct(top.f,runs)} walk (${pvpTurnBand(turns[top.key])}). `;
+    else text+="żaden z głównych proców nie pojawiał się regularnie. ";
+    if (wins) text+=`${pvpPct(hpZero,wins)} zwycięstw kończy się wyzerowaniem HP przeciwnika`;
+    if (timeout) text+=`, a ${pvpPct(timeout,wins)} po limicie rund`;
+    return text+".";
   }
 
   function pvpRenderAggregate(agg,leftLabel,rightLabel,title) {
@@ -15014,7 +15142,7 @@ function setupAdmin() {
       </div>
 
       <details class="pvp-result-details" open>
-        <summary>❤️ HP i obrażenia</summary>
+        <summary>❤️ HP i wynik</summary>
         <div class="pvp-result-details-body">
           <div class="pvp-result-line"><span>Średnie końcowe HP</span><b>${escapeHtml(leftLabel)} ${(agg.endHpA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% · ${escapeHtml(rightLabel)} ${(agg.endHpB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}%</b></div>
           <div class="pvp-result-line"><span>Śr. zadane obrażenia</span><b>${(agg.damageA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})} / ${(agg.damageB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</b></div>
@@ -15022,20 +15150,44 @@ function setupAdmin() {
         </div>
       </details>
 
-      <details class="pvp-result-details">
-        <summary>⚡ Procki i efekty</summary>
+      <details class="pvp-result-details" open>
+        <summary>🥊 Obrażenia pojedynczych ciosów</summary>
         <div class="pvp-result-details-body">
-          <div class="pvp-proc-card"><b>${escapeHtml(leftLabel)}</b><div>${pvpMetricLine(agg.eventsA,agg.eventFightsA,agg.runs)}</div></div>
-          <div class="pvp-proc-card"><b>${escapeHtml(rightLabel)}</b><div>${pvpMetricLine(agg.eventsB,agg.eventFightsB,agg.runs)}</div></div>
+          ${pvpDamageCard(leftLabel,agg.detailA)}
+          ${pvpDamageCard(rightLabel,agg.detailB)}
+          <div class="pvp-report-note">„Normalny cios” = trafienie bez krytyka i bez kontry. Pokazana wartość to średnie faktycznie zadane obrażenia po obronie przeciwnika.</div>
+        </div>
+      </details>
+
+      <details class="pvp-result-details" open>
+        <summary>⚡ Mechaniki w walce</summary>
+        <div class="pvp-result-details-body">
+          <div class="pvp-fighter-report">
+            <div class="pvp-fighter-report-title">${escapeHtml(leftLabel)}</div>
+            ${pvpMechanicRows(agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs)}
+          </div>
+          <div class="pvp-fighter-report">
+            <div class="pvp-fighter-report-title">${escapeHtml(rightLabel)}</div>
+            ${pvpMechanicRows(agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs)}
+          </div>
+        </div>
+      </details>
+
+      <details class="pvp-result-details" open>
+        <summary>🏆 Jak kończyły się zwycięstwa</summary>
+        <div class="pvp-result-details-body">
+          ${pvpWinFinishCard(leftLabel,agg.causesByWinner.A,agg.winsA)}
+          ${pvpWinFinishCard(rightLabel,agg.causesByWinner.B,agg.winsB)}
+          <div class="pvp-report-note">Execute, kontra i zwykły cios nie są osobnymi warunkami zwycięstwa — jeśli sprowadziły HP do zera, należą do „HP przeciwnika spadło do 0”. Są pokazane niżej tylko jako sposób zadania kończącego efektu.</div>
+          <div class="pvp-report-note"><b>Timeouty:</b> ${pvpPct(agg.timeouts,agg.runs)} · przy limicie rund wygrywa wyższy % HP, a przy identycznym % HP obrońca.</div>
         </div>
       </details>
 
       <details class="pvp-result-details">
-        <summary>🏆 Przyczyny wygranych</summary>
-        <div class="pvp-result-details-body">
-          <div><b>${escapeHtml(leftLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.A,Math.max(1,agg.winsA))}</div>
-          <div><b>${escapeHtml(rightLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.B,Math.max(1,agg.winsB))}</div>
-          <div><b>Timeouty:</b> ${pvpPct(agg.timeouts,agg.runs)} · przy limicie rund wygrywa wyższy % HP, a przy identycznym % HP obrońca.</div>
+        <summary>🔎 Co najczęściej działo się w walce</summary>
+        <div class="pvp-result-details-body pvp-insights">
+          <div>${pvpInsight(leftLabel,agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs,agg.causesByWinner.A,agg.winsA)}</div>
+          <div>${pvpInsight(rightLabel,agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs,agg.causesByWinner.B,agg.winsB)}</div>
         </div>
       </details>
     </section>`;
