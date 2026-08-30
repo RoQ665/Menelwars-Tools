@@ -2772,7 +2772,7 @@ function mapRenderRouteResult() {
   let moduleAccessPolicyInFlight = null;
 
   const MODULE_ACCESS_POLICY_TTL_MS =
-    5 * 1000;
+    60 * 1000;
 
   async function fetchModuleAccessPolicy(
     options={}
@@ -2909,10 +2909,20 @@ function mapRenderRouteResult() {
     target="optimizer-view",
     options={}
   ) {
+    // Natychmiastowa reakcja na klik. Kontrola dostępu może wymagać sieci,
+    // więc loader musi pojawić się PRZED pierwszym await.
+    if (!distilleryDataLoaded) {
+      showModuleLoading(
+        "distillery",
+        "⚗ Ładowanie Destylarni...",
+        "Pobieram aktualne receptury i rezerwacje."
+      );
+    }
+
     if (
       !(await ensureModuleAccess(
         "distillery",
-        {force:true}
+        {force:false}
       ))
     ) {
       return;
@@ -2921,11 +2931,27 @@ function mapRenderRouteResult() {
     const forceRefresh =
       Boolean(options.forceRefresh);
 
-    if (
-      distilleryDataLoaded &&
-      !forceRefresh
-    ) {
+    // Stale-while-revalidate: jeśli dane już są, pokazujemy je bez czekania.
+    // Świeży request nie może blokować przełączania podzakładek.
+    if (distilleryDataLoaded) {
       showToolView(target,"distillery");
+
+      if (forceRefresh && !moduleOpenInFlight.distillery) {
+        moduleOpenInFlight.distillery = (async () => {
+          await fetchApprovedRecipes({force:true});
+          renderAll();
+          distilleryDataLoaded = true;
+        })();
+
+        moduleOpenInFlight.distillery
+          .catch(err => {
+            console.warn("Nie udało się odświeżyć Destylarni w tle:",err);
+          })
+          .finally(() => {
+            moduleOpenInFlight.distillery = null;
+          });
+      }
+
       return;
     }
 
@@ -2934,12 +2960,6 @@ function mapRenderRouteResult() {
       showToolView(target,"distillery");
       return;
     }
-
-    showModuleLoading(
-      "distillery",
-      "⚗ Ładowanie Destylarni...",
-      "Pobieram aktualne receptury i rezerwacje."
-    );
 
     moduleOpenInFlight.distillery = (async () => {
       await fetchApprovedRecipes({force:true});
@@ -2957,20 +2977,27 @@ function mapRenderRouteResult() {
   }
 
   async function openMapModule() {
+    if (!mapModuleLoaded) {
+      showModuleLoading(
+        "map",
+        "🗺 Ładowanie mapy...",
+        "Przygotowuję mapę i oznaczenia dzielnic."
+      );
+    }
+
     if (
       !(await ensureModuleAccess(
         "map",
-        {force:true}
+        {force:false}
       ))
     ) {
       return;
     }
 
-    showModuleLoading(
-      "map",
-      "🗺 Ładowanie mapy...",
-      "Przygotowuję mapę i oznaczenia dzielnic."
-    );
+    if (mapModuleLoaded) {
+      showToolView("map-view","map");
+      return;
+    }
 
     if (!moduleOpenInFlight.map) {
       moduleOpenInFlight.map = (async () => {
@@ -14277,9 +14304,32 @@ function setupAdmin() {
   }
 
   async function openGardenModule() {
-    if (!(await ensureModuleAccess("garden",{force:true}))) return;
+    if (!gardenDataLoaded) {
+      showModuleLoading("garden","🌱 Ładowanie Ogrodu…","Pobieram aktywne uprawy, rezerwacje i zapisane wyniki.");
+    }
 
-    showModuleLoading("garden","🌱 Ładowanie Ogrodu…","Pobieram aktywne uprawy, rezerwacje i zapisane wyniki.");
+    if (!(await ensureModuleAccess("garden",{force:false}))) return;
+
+    // Przy ponownym wejściu nie chowamy działającego Ogrodu za loaderem.
+    // Pokazujemy ostatni stan od razu, a świeże dane dociągamy w tle.
+    if (gardenDataLoaded) {
+      showToolView("garden-view","garden");
+      gardenRenderPlots();
+      gardenRenderEditor();
+
+      if (!moduleOpenInFlight.garden) {
+        moduleOpenInFlight.garden = gardenFetchData({force:true});
+        moduleOpenInFlight.garden
+          .catch(err => {
+            console.warn("Nie udało się odświeżyć Ogrodu w tle:",err);
+          })
+          .finally(() => {
+            moduleOpenInFlight.garden = null;
+          });
+      }
+      return;
+    }
+
     if (!moduleOpenInFlight.garden) {
       moduleOpenInFlight.garden = gardenFetchData({force:true});
     }
@@ -14297,20 +14347,41 @@ function setupAdmin() {
   }
 
   async function openBuildModule() {
+    if (!buildListsLoaded) {
+      showModuleLoading(
+        "builds",
+        "🛠 Ładowanie Buildów...",
+        "Pobieram aktualne publiczne buildy i dane Twojego konta."
+      );
+    }
+
     if (
       !(await ensureModuleAccess(
         "builds",
-        {force:true}
+        {force:false}
       ))
     ) {
       return;
     }
 
-    showModuleLoading(
-      "builds",
-      "🛠 Ładowanie Buildów...",
-      "Pobieram aktualne publiczne buildy i dane Twojego konta."
-    );
+    // Lista już istnieje: pokaż ją natychmiast i odśwież po cichu.
+    if (buildListsLoaded) {
+      showToolView("builds-view","builds");
+      renderBuildAccountState();
+      renderBuildLists();
+
+      if (!moduleOpenInFlight.builds) {
+        moduleOpenInFlight.builds = fetchBuildLists(true);
+        moduleOpenInFlight.builds
+          .catch(err => {
+            console.warn("Nie udało się odświeżyć Buildów w tle:",err);
+          })
+          .finally(() => {
+            moduleOpenInFlight.builds = null;
+          });
+      }
+      return;
+    }
 
     if (!moduleOpenInFlight.builds) {
       moduleOpenInFlight.builds = (async () => {
@@ -15399,8 +15470,7 @@ function setupAdmin() {
     // nie wykonuje kolejnego requestu ani nie pokazuje ekranu ładowania.
     if (
       isPaymentsOrCompany &&
-      latestGangPayload &&
-      !forceRefresh
+      latestGangPayload
     ) {
       el("gang-tabs").hidden = false;
 
@@ -15421,6 +15491,7 @@ function setupAdmin() {
       // >= 10 min: stary widok pokazujemy od razu,
       // a świeże dane pobieramy po cichu w tle.
       if (
+        forceRefresh ||
         !latestGangPayloadAt ||
         payloadAge >= GANG_PAYLOAD_TTL_MS
       ) {
