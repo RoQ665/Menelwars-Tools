@@ -3870,3 +3870,186 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .pvp-mechanic-row{padding:10px}
   .pvp-fighter-report-title{white-space:normal}
 }
+
+
+/* v21.03 — pełny layout raportu PvP na desktopie + responsywność */
+.pvp-fighter-report{
+  border:1px solid #decfb8;
+  border-radius:11px;
+  background:#fffdf8;
+  overflow:hidden;
+  min-width:0;
+}
+.pvp-fighter-report-title{
+  padding:10px 12px;
+  background:#f4e7d2;
+  border-bottom:1px solid #e3d4bd;
+  font-weight:800;
+  line-height:1.3;
+}
+.pvp-damage-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  padding:10px;
+}
+.pvp-damage-metric{
+  padding:10px;
+  border:1px solid #e4d8c5;
+  border-radius:9px;
+  background:#fffaf2;
+  min-width:0;
+}
+.pvp-damage-metric span,
+.pvp-damage-metric small{
+  display:block;
+}
+.pvp-damage-metric span{
+  color:#756650;
+  font-size:.82rem;
+}
+.pvp-damage-metric b{
+  display:block;
+  margin:4px 0 2px;
+  font-size:1.18rem;
+}
+.pvp-damage-metric small{
+  color:#81735f;
+  font-size:.75rem;
+}
+
+.pvp-mechanic-row{
+  display:grid;
+  grid-template-columns:minmax(110px,.9fr) repeat(2,minmax(90px,.65fr)) minmax(180px,1.35fr);
+  gap:8px 12px;
+  align-items:start;
+  padding:10px 12px;
+  border-bottom:1px solid #eadfce;
+}
+.pvp-mechanic-row:last-child{border-bottom:0}
+.pvp-mechanic-row>strong{
+  font-size:.95rem;
+  line-height:1.3;
+}
+.pvp-mechanic-row>div{
+  min-width:0;
+}
+.pvp-mechanic-row span,
+.pvp-mechanic-row small{
+  display:block;
+}
+.pvp-mechanic-row span{
+  color:#7a6c58;
+  font-size:.72rem;
+  margin-bottom:2px;
+}
+.pvp-mechanic-row b{
+  display:block;
+  font-size:.92rem;
+  line-height:1.25;
+}
+.pvp-mechanic-row small{
+  color:#81735f;
+  font-size:.72rem;
+  line-height:1.3;
+}
+
+.pvp-win-card{
+  border:1px solid #decfb8;
+  border-radius:11px;
+  background:#fffdf8;
+  overflow:hidden;
+}
+.pvp-win-main{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  padding:10px;
+}
+.pvp-win-main>div{
+  padding:10px;
+  border-radius:9px;
+  background:#fffaf2;
+  border:1px solid #eee3d3;
+}
+.pvp-win-main span,
+.pvp-win-main b{
+  display:block;
+}
+.pvp-win-main span{
+  color:#746652;
+  margin-bottom:4px;
+}
+.pvp-win-main b{
+  font-size:1rem;
+}
+.pvp-finisher{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  padding:10px 12px;
+  border-top:1px solid #e6d9c6;
+  background:#fffaf1;
+}
+.pvp-finisher>span{
+  flex-basis:100%;
+  color:#7c6e5a;
+  font-size:.8rem;
+}
+.pvp-finisher>b{
+  font-size:.86rem;
+}
+
+/* Główne sekcje raportu na PC wykorzystują szerokość zamiast rosnąć w dół */
+@media(min-width:801px){
+  .pvp-result-details-body{
+    gap:10px;
+  }
+  .pvp-result-details:has(.pvp-state-grid) .pvp-result-details-body{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .pvp-result-details:has(.pvp-state-grid) .pvp-state-grid{
+    grid-column:1/-1;
+  }
+  .pvp-result-details:has(.pvp-fighter-report) .pvp-result-details-body{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    align-items:start;
+  }
+  .pvp-mechanics-details .pvp-result-details-body{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .pvp-mechanics-details .pvp-mechanic-row{
+    grid-template-columns:minmax(105px,.85fr) repeat(2,minmax(75px,.6fr));
+  }
+  .pvp-mechanics-details .pvp-mechanic-row>div:last-child{
+    grid-column:1/-1;
+    padding-left:0;
+  }
+  .pvp-insight-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .pvp-win-card{
+    min-height:100%;
+  }
+}
+
+@media(max-width:800px){
+  .pvp-damage-grid{grid-template-columns:1fr}
+  .pvp-mechanic-row{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .pvp-mechanic-row>strong,
+  .pvp-mechanic-row>div:last-child{
+    grid-column:1/-1;
+  }
+  .pvp-win-main{grid-template-columns:1fr}
+}
+
+@media(max-width:600px){
+  .pvp-fighter-report-title{padding:9px 10px}
+  .pvp-damage-grid{padding:8px;gap:6px}
+  .pvp-damage-metric{padding:9px}
+  .pvp-mechanic-row{padding:9px 10px;gap:7px 10px}
+  .pvp-finisher{display:grid;grid-template-columns:1fr;gap:5px;padding:9px 10px}
+  .pvp-insight-card{padding:8px}
+}

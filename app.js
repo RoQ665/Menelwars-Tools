@@ -15158,8 +15158,8 @@ function setupAdmin() {
         <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA)}${pvpDamageCard(rightLabel,agg.detailB)}</div>
       </details>
 
-      <details class="pvp-result-details" open>
-        <summary>⚡ Mechaniki w walce</summary>
+      <details class="pvp-result-details pvp-mechanics-details">
+        <summary>⚙️ Szczegóły mechanik</summary>
         <div class="pvp-result-details-body">
           <div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(leftLabel)}</div>${pvpMechanicRows(agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs)}</div>
           <div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(rightLabel)}</div>${pvpMechanicRows(agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs)}</div>
