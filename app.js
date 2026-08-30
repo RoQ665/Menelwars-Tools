@@ -14595,32 +14595,32 @@ function setupAdmin() {
       {
         id:"glass",name:"Glass Cannon",weights:[5,1,1,1,4],choices:"AB",
         description:"Przeciwnik treningowy / wygenerowany. Testuje przeżycie burstu, krytyków, first strike i Execute.",
-        bonuses:[["Atak","attackPct",22],["Kryt","critChance",17],["Crit dmg","critDmg",34],["Pierwszy cios","firstStrike",8],["Egzekucja","execute",7]]
+        bonuses:[["Atak","attackPct",25],["Kryt","critChance",18],["Crit dmg","critDmg",38],["Pierwszy cios","firstStrike",8],["Egzekucja","execute",6]]
       },
       {
         id:"tank",name:"Tank",weights:[1,5,1,5,1],choices:"BA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje sustain, przebicie, Execute i odporności.",
-        bonuses:[["Obrona","defensePct",34],["Maks. HP","maxHpPct",30],["Redukcja obrażeń","damageReduction",15],["Odp. kryt","critResist",14],["Regeneracja","hpRegen",7,false],["Odp. krwawienie","bleedResist",10]]
+        bonuses:[["Obrona","defensePct",38],["Maks. HP","maxHpPct",34],["Redukcja obrażeń","damageReduction",18],["Odp. kryt","critResist",16],["Regeneracja","hpRegen",7,false],["Odp. krwawienie","bleedResist",12]]
       },
       {
-        id:"dodge",name:"Dodge / Counter",weights:[1,2,5,2,2],choices:"ABBA",
+        id:"dodge",name:"Dodge / Counter",weights:[1,2,4,2,3],choices:"ABBA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje Celność, Unik, Kontratak i Double Strike.",
-        bonuses:[["Unik","evasion",18],["Kontratak","counter",21],["Podwójne","doubleStrike",14],["Celność","accuracy",8]]
+        bonuses:[["Unik","evasion",12],["Kontratak","counter",10],["Podwójne","doubleStrike",8],["Celność","accuracy",10]]
       },
       {
         id:"bleed",name:"Bleed",weights:[4,1,3,2,3],choices:"AABB",
         description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na krwawienie i tempo zabicia pod DoT.",
-        bonuses:[["Krwawienie","bleed",24],["Obrażenia krwawienia","bleedDamage",65],["Atak","attackPct",10],["Kradzież życia","lifesteal",7]]
+        bonuses:[["Krwawienie","bleed",28],["Obrażenia krwawienia","bleedDamage",75],["Atak","attackPct",12],["Kradzież życia","lifesteal",8]]
       },
       {
         id:"control",name:"Control / Stun",weights:[2,2,2,2,5],choices:"BABA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na ogłuszenie, Celność i presję Execute.",
-        bonuses:[["Ogłuszenie","stun",20],["Celność","accuracy",16],["Redukcja leczenia","healingReduction",14],["Odp. ogłuszenie","stunResist",12],["Egzekucja","execute",6]]
+        bonuses:[["Ogłuszenie","stun",17],["Celność","accuracy",18],["Redukcja leczenia","healingReduction",16],["Odp. ogłuszenie","stunResist",14],["Egzekucja","execute",5]]
       },
       {
         id:"sustain",name:"Sustain / Wampir",weights:[2,3,1,5,2],choices:"BBAA",
         description:"Przeciwnik treningowy / wygenerowany. Testuje długą walkę, lifesteal, regen i Healing Reduction.",
-        bonuses:[["Maks. HP","maxHpPct",23],["Kradzież życia","lifesteal",17],["Regeneracja","hpRegen",8,false],["Redukcja obrażeń","damageReduction",8],["Redukcja leczenia","healingReduction",8]]
+        bonuses:[["Maks. HP","maxHpPct",28],["Kradzież życia","lifesteal",18],["Regeneracja","hpRegen",8,false],["Redukcja obrażeń","damageReduction",12],["Redukcja leczenia","healingReduction",10]]
       }
     ];
 
@@ -15123,15 +15123,16 @@ function setupAdmin() {
     const hitAttempts=Number(utility.hitAttempts||0), hits=Number(utility.hit||0), misses=Number(utility.miss||0);
     const hitPct=hitAttempts?pvpPct(hits,hitAttempts):"—";
     const missPct=hitAttempts?pvpPct(misses,hitAttempts):"—";
+    const fights=value=>`${value} walk`;
     const items=[
-      card("💥","Krytyk",pvpPct(eventFights.crit||0,runs),`${pvpAvg(events.crit||0,runs,2)}/walkę · ${turns.crit?.length?pvpTurnBand(turns.crit):"nie wystąpił"}`),
-      card("⚡","Podwójne uderzenie",pvpPct(eventFights.double||0,runs),`${pvpAvg(events.double||0,runs,2)}/walkę · ${turns.double?.length?pvpTurnBand(turns.double):"nie wystąpiło"}`),
-      card("↩️","Kontratak",pvpPct(eventFights.counter||0,runs),`${pvpAvg(events.counter||0,runs,2)}/walkę · ${turns.counter?.length?pvpTurnBand(turns.counter):"nie wystąpił"}`),
-      card("💧","Unik",pvpPct(utility.evadeFights||0,runs),`${pvpAvg(utility.evade||0,runs,2)} uników / walkę`),
-      card("🩸","Krwawienie",pvpPct(eventFights.bleed||0,runs),`${pvpAvg(events.bleed||0,runs,2)}/walkę · ${turns.bleed?.length?pvpTurnBand(turns.bleed):"nie wystąpiło"}`),
-      card("💫","Ogłuszenie",pvpPct(eventFights.stun||0,runs),`${pvpAvg(events.stun||0,runs,2)}/walkę · ${turns.stun?.length?pvpTurnBand(turns.stun):"nie wystąpiło"}`),
-      card("💚","Odzyskane HP",Math.round(healed/Math.max(1,runs)).toLocaleString("pl-PL"),`/ walkę · lifesteal ${Math.round((utility.lifesteal||0)/Math.max(1,runs))} · regen ${Math.round((utility.regen||0)/Math.max(1,runs))}`),
-      card("🎯","Trafienie / pudło",`${hitPct} / ${missPct}`,`${pvpAvg(hits,runs,2)} trafień · ${pvpAvg(misses,runs,2)} pudeł / walkę`)
+      card("💥","Krytyk",fights(pvpPct(eventFights.crit||0,runs)),`${pvpAvg(events.crit||0,runs,2)}/walkę · ${turns.crit?.length?pvpTurnBand(turns.crit):"nie wystąpił"}`),
+      card("⚡","Podwójne uderzenie",fights(pvpPct(eventFights.double||0,runs)),`${pvpAvg(events.double||0,runs,2)}/walkę · ${turns.double?.length?pvpTurnBand(turns.double):"nie wystąpiło"}`),
+      card("↩️","Kontratak",fights(pvpPct(eventFights.counter||0,runs)),`${pvpAvg(events.counter||0,runs,2)}/walkę · ${turns.counter?.length?pvpTurnBand(turns.counter):"nie wystąpił"}`),
+      card("💧","Unik",fights(pvpPct(utility.evadeFights||0,runs)),`${pvpAvg(utility.evade||0,runs,2)} uników / walkę`),
+      card("🩸","Krwawienie",fights(pvpPct(eventFights.bleed||0,runs)),`${pvpAvg(events.bleed||0,runs,2)}/walkę · ${turns.bleed?.length?pvpTurnBand(turns.bleed):"nie wystąpiło"}`),
+      card("💫","Ogłuszenie",fights(pvpPct(eventFights.stun||0,runs)),`${pvpAvg(events.stun||0,runs,2)}/walkę · ${turns.stun?.length?pvpTurnBand(turns.stun):"nie wystąpiło"}`),
+      card("💚","Odzyskane HP",`${Math.round(healed/Math.max(1,runs)).toLocaleString("pl-PL")} / walkę`,`lifesteal ${Math.round((utility.lifesteal||0)/Math.max(1,runs))} · regen ${Math.round((utility.regen||0)/Math.max(1,runs))}`),
+      card("🎯","Trafienie / pudło",`${hitPct} trafień`,`pudła ${missPct} · ${pvpAvg(hits,runs,2)} trafień / ${pvpAvg(misses,runs,2)} pudeł na walkę`)
     ];
     return `<div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(label)}</div><div class="pvp-insight-grid">${items.join("")}</div></div>`;
   }

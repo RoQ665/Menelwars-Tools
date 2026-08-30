@@ -1,18 +1,18 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v21.05.1";
+const CACHE = "menelwars-tools-v21.06";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=21.05.1",
+  "./styles.css?v=21.06",
   "./data.js?v=21.05",
-  "./app.js?v=21.05.1",
+  "./app.js?v=21.06",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
   "./mapa-warszawa.png",
-  "./onion-growth-atlas.png?v=21.05.1",
-  "./empty-soil.png?v=21.05.1"
+  "./onion-growth-atlas.png?v=21.06",
+  "./empty-soil.png?v=21.06"
 ];
 
 async function cacheCoreBestEffort() {

@@ -4053,3 +4053,30 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .pvp-finisher{display:grid;grid-template-columns:1fr;gap:5px;padding:9px 10px}
   .pvp-insight-card{padding:8px}
 }
+
+
+/* v21.06 — PvP desktop: pełna szerokość gracza, responsywne kafelki */
+.pvp-fighter-report-title{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-size:.88rem;
+}
+@media(min-width:801px){
+  .pvp-result-details:has(.pvp-fighter-report) .pvp-result-details-body{
+    grid-template-columns:1fr;
+  }
+  .pvp-fighter-report{width:100%;}
+  .pvp-damage-grid{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+  .pvp-insight-grid{
+    grid-template-columns:repeat(auto-fit,minmax(112px,1fr));
+  }
+}
+@media(min-width:1200px){
+  .pvp-insight-grid{grid-template-columns:repeat(8,minmax(0,1fr));}
+}
+@media(max-width:800px){
+  .pvp-fighter-report-title{white-space:normal;font-size:.92rem;}
+}
