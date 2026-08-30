@@ -2859,7 +2859,7 @@ function mapRenderRouteResult() {
   const MODULE_ACCESS_LABELS = {
     distillery:"Destylarnia",
     garden:"Ogród",
-    builds:"Buildy",
+    builds:"PVP",
     map:"Mapa"
   };
 
@@ -7088,7 +7088,7 @@ async function loadAdminModuleAccess() {
       ],
       [
         "builds",
-        "🛠 Buildy",
+        "⚔️ PVP",
         "Kreator i publiczne buildy PvP."
       ],
       [
