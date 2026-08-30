@@ -1960,27 +1960,6 @@ function mapRenderRouteResult() {
         .join("");
 
     container.innerHTML = `
-      <div class="map-route-planner">
-        <strong>🧭 Planer przejazdu przez wszystkie dzielnice</strong>
-        <p class="muted" style="margin:5px 0 9px">
-          Normal minimalizuje sumę czasów. VIP liczy realne czekanie jako
-          <b>max(0, czas − ${MAP_VIP_FREE_MINUTES} min)</b> i może celowo wracać przez odwiedzone dzielnice.
-        </p>
-        <div class="map-route-controls">
-          <label>
-            <span>📍 Jestem tutaj</span>
-            <select id="map-route-start">
-              ${MAP_ROUTE_DISTRICTS.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
-            </select>
-          </label>
-          <div class="map-mode-switch">
-            <button type="button" data-map-mode="normal">Normal</button>
-            <button type="button" data-map-mode="vip" class="active">💎 VIP</button>
-          </div>
-        </div>
-        <div id="map-route-result" class="map-route-result"></div>
-      </div>
-
       <div style="max-width:420px;margin:0 auto">
         <div style="position:relative;width:100%">
           <img
@@ -2002,6 +1981,27 @@ function mapRenderRouteResult() {
           ⚪ Neutralny &nbsp;·&nbsp; 🙏 Błagalny &nbsp;·&nbsp;
           🤝 Przyjacielski &nbsp;·&nbsp; ⚔️ Agresywny
         </div>
+      </div>
+
+      <div class="map-route-planner">
+        <strong>🧭 Planer przejazdu przez wszystkie dzielnice</strong>
+        <p class="muted" style="margin:5px 0 9px">
+          Normal minimalizuje sumę czasów. VIP liczy realne czekanie jako
+          <b>max(0, czas − ${MAP_VIP_FREE_MINUTES} min)</b> i może celowo wracać przez odwiedzone dzielnice.
+        </p>
+        <div class="map-route-controls">
+          <label>
+            <span>📍 Jestem tutaj</span>
+            <select id="map-route-start">
+              ${MAP_ROUTE_DISTRICTS.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+            </select>
+          </label>
+          <div class="map-mode-switch">
+            <button type="button" data-map-mode="normal">Normal</button>
+            <button type="button" data-map-mode="vip" class="active">💎 VIP</button>
+          </div>
+        </div>
+        <div id="map-route-result" class="map-route-result"></div>
       </div>`;
 
     const startSelect = el("map-route-start");
@@ -13303,10 +13303,16 @@ function setupAdmin() {
     return {events,analysisEvents,frames,lastFrame,ready,entryLower,entryUpper};
   }
 
+  function gardenDisplayStage(frame) {
+    const number=Number(frame);
+    if (!Number.isInteger(number) || number<0 || number>9) return null;
+    return number+1;
+  }
+
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite") {
     const number=Number(frame);
     if (!Number.isInteger(number) || number<0 || number>9) return "";
-    return `<span class="${className}" style="--garden-frame:${number}" aria-label="Etap ${number}"></span>`;
+    return `<span class="${className}" style="--garden-frame:${number}" aria-label="Etap ${gardenDisplayStage(number)}"></span>`;
   }
 
   async function gardenPostAction(action,payload) {
@@ -13357,7 +13363,7 @@ function setupAdmin() {
         });
       }
       if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać etapu.");
-      if (status) status.textContent=result.correction?`✅ Zapisano korektę: etap ${atlasFrame}.`:`✅ Zapisano obserwację: etap ${atlasFrame}.`;
+      if (status) status.textContent=result.correction?`✅ Zapisano korektę: etap ${gardenDisplayStage(atlasFrame)}.`:`✅ Zapisano obserwację: etap ${gardenDisplayStage(atlasFrame)}.`;
       await gardenFetchData({force:true});
     } catch(err) {
       if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd zapisu etapu."}`;
@@ -13389,9 +13395,9 @@ function setupAdmin() {
     tools.hidden=!own;
     if (!own) { if (el("garden-phase-picker")) el("garden-phase-picker").hidden=true; return; }
     const summary=gardenPhaseSummary(own);
-    if (last) last.textContent=summary.lastFrame?`etap ${summary.lastFrame.atlasFrame}`:"brak raportu";
+    if (last) last.textContent=summary.lastFrame?`etap ${gardenDisplayStage(Number(summary.lastFrame.atlasFrame))}`:"brak raportu";
     if (grid) {
-      grid.innerHTML=Array.from({length:10},(_,frame)=>`<button type="button" class="garden-phase-option ${summary.lastFrame&&Number(summary.lastFrame.atlasFrame)===frame?"selected":""}" data-garden-frame="${frame}">${gardenFrameSpriteHtml(frame)}<b>${frame}</b></button>`).join("");
+      grid.innerHTML=Array.from({length:10},(_,frame)=>`<button type="button" class="garden-phase-option ${summary.lastFrame&&Number(summary.lastFrame.atlasFrame)===frame?"selected":""}" data-garden-frame="${frame}">${gardenFrameSpriteHtml(frame)}<b>${gardenDisplayStage(frame)}</b></button>`).join("");
       grid.querySelectorAll("[data-garden-frame]").forEach(button=>button.addEventListener("click",()=>gardenRecordPhase(Number(button.dataset.gardenFrame))));
     }
     if (readyButton) {
@@ -13749,7 +13755,7 @@ function setupAdmin() {
         : "";
       const frame = summary && summary.lastFrame ? Number(summary.lastFrame.atlasFrame) : null;
       const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite") : "";
-      const frameBadge = frame !== null ? `<span class="garden-plot-frame-badge">etap ${frame}</span>` : "";
+      const frameBadge = frame !== null ? `<span class="garden-plot-frame-badge">etap ${gardenDisplayStage(frame)}</span>` : "";
       const readyBadge = summary && summary.ready ? `<span class="garden-plot-ready-badge">✅ READY</span>` : "";
 
       return `
@@ -14414,7 +14420,7 @@ function setupAdmin() {
 
 
   // ============================================================
-  // v21.00 — PvP Lab / Monte Carlo (jawnie eksperymentalny)
+  // v21.00.2 — PvP Lab / symulacje (jawnie eksperymentalny)
   // Znane reguły są odtwarzane wprost, a brakujące elementy silnika
   // pozostają parametrami użytkownika. Nie jest to klon backendu gry.
   // ============================================================
@@ -14561,11 +14567,11 @@ function setupAdmin() {
         });
         const profile = {
           characterLevel:level,
-          attack:Math.round(175+level*3.8),
-          defense:Math.round(215+level*4.6),
-          baseHp:105,
-          petHp:Math.round(level*4),
-          eqHp:Math.round(level*3),
+          attack:Math.round(190+level*4.2),
+          defense:Math.round(230+level*5.0),
+          baseHp:112,
+          petHp:Math.round(level*4.4),
+          eqHp:Math.round(level*3.4),
           provided:{characterLevel:true,attack:true,defense:true,baseHp:true,petHp:true,eqHp:true},
           bonusesConfirmed:true
         };
@@ -14599,15 +14605,16 @@ function setupAdmin() {
     const left = el("pvp-sim-left"), right = el("pvp-sim-right");
     if (!left || !right) return;
     const sources = pvpSimulationSources();
-    const render = select => {
+    const leftSources = sources.filter(item=>item.group!=="preset");
+    const render = (select,items) => {
       const old = select.value;
-      select.innerHTML = sources.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("");
-      if (sources.some(x=>x.key===old)) select.value=old;
+      select.innerHTML = items.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("");
+      if (items.some(x=>x.key===old)) select.value=old;
     };
-    render(left); render(right);
-    if (!left.value) left.value = sources.some(x=>x.key==="current") ? "current" : sources[0]?.key || "";
+    render(left,leftSources); render(right,sources);
+    if (!left.value) left.value = leftSources.some(x=>x.key==="current") ? "current" : leftSources[0]?.key || "";
     if (!right.value || right.value===left.value) {
-      const preferred = sources.find(x=>x.group==="public") || sources.find(x=>x.group==="preset");
+      const preferred = sources.find(x=>x.group==="preset") || sources.find(x=>x.group==="public");
       if (preferred) right.value=preferred.key;
     }
     pvpUpdateReadiness();

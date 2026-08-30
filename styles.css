@@ -3429,3 +3429,17 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   line-height:1.45;
 }
 .pvp-side-note{margin-bottom:9px}
+
+/* ============================================================
+   v21.00.2 — UI / Ogród
+   ============================================================ */
+/* Drugie menu przewija się razem z dokumentem; sticky zostaje tylko dla topbara. */
+.tabs{position:static!important;top:auto!important;z-index:auto!important}
+
+/* Ogród: usuwamy starą rysowaną kopkę ziemi i wymuszamy aktualne assety. */
+.garden-plot-visual::after{display:none!important;content:none!important}
+.garden-plot-visual{background-image:url("empty-soil.png?v=21.00.2")!important;background-position:center!important;background-size:cover!important;background-repeat:no-repeat!important}
+.garden-phase-option{background:#6a5136 url("empty-soil.png?v=21.00.2") center/cover no-repeat!important}
+.garden-phase-sprite,.garden-plot-sprite{background-image:url("onion-growth-atlas.png?v=21.00.2")!important}
+.garden-plot-sprite{z-index:1;inset:0!important}
+.garden-phase-tools{margin:0 0 14px}

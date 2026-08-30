@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=21.00">
+  <link rel="stylesheet" href="styles.css?v=21.00.2">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1062,6 +1062,32 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
         <div id="garden-plots" class="garden-plots" aria-label="Grządki"></div>
 
+        <div id="garden-phase-tools" class="garden-phase-tools" hidden>
+          <div class="garden-phase-head">
+            <div>
+              <strong>🌿 Etap z gry</strong>
+              <div class="muted">Wybierz dokładny etap 1–10 widoczny w grze. To nie jest procent postępu.</div>
+            </div>
+            <span id="garden-phase-last" class="chip">brak raportu</span>
+          </div>
+
+          <button id="garden-open-phase-picker" type="button" class="secondary-btn">
+            🌿 Ustaw / potwierdź aktualny etap
+          </button>
+
+          <div id="garden-phase-picker" class="garden-phase-picker" hidden>
+            <div id="garden-phase-grid" class="garden-phase-grid" aria-label="Etapy wzrostu cebuli 1–10"></div>
+            <div class="muted garden-phase-note">
+              Powtórne potwierdzenie tego samego etapu również zapisujemy — zawęża ono czas przejścia do następnego etapu.
+            </div>
+          </div>
+
+          <button id="garden-ready" type="button" class="primary-btn garden-ready-btn">
+            ✅ Gra pokazuje: Gotowe do zbioru
+          </button>
+        </div>
+
+
         <div id="garden-editor" class="garden-editor" hidden>
           <div class="garden-editor-head">
             <strong id="garden-editor-title">Grządka 1</strong>
@@ -1134,31 +1160,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
           <div id="garden-recommendation" class="garden-recommendation" hidden></div>
 
-          <div id="garden-phase-tools" class="garden-phase-tools" hidden>
-            <div class="garden-phase-head">
-              <div>
-                <strong>🌿 Etap z gry</strong>
-                <div class="muted">Wybierz dokładną klatkę 0–9. To nie jest procent postępu.</div>
-              </div>
-              <span id="garden-phase-last" class="chip">brak raportu</span>
-            </div>
-
-            <button id="garden-open-phase-picker" type="button" class="secondary-btn">
-              🌿 Ustaw / potwierdź aktualny etap
-            </button>
-
-            <div id="garden-phase-picker" class="garden-phase-picker" hidden>
-              <div id="garden-phase-grid" class="garden-phase-grid" aria-label="Klatki wzrostu cebuli"></div>
-              <div class="muted garden-phase-note">
-                Powtórne potwierdzenie tej samej klatki również zapisujemy — zawęża ono czas przejścia do następnego etapu.
-              </div>
-            </div>
-
-            <button id="garden-ready" type="button" class="primary-btn garden-ready-btn">
-              ✅ Gra pokazuje: Gotowe do zbioru
-            </button>
-          </div>
-
           <div class="garden-actions">
             <button id="garden-start" type="button" class="primary-btn" disabled>🌱 Zacznij uprawę</button>
             <button id="garden-finish" type="button" class="primary-btn" hidden>🧺 Zebrane w grze — zakończ pomiar</button>
@@ -1207,13 +1208,12 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             </summary>
             <div class="content-accordion-body">
               <p class="muted">
-                Format gry: <b>STR/END/AGI/VIT/PRC</b>, a po dwukropku pięć slash-separated ciągów wyborów A/B/-.
+                Wklej build skopiowany z gry: <b>STR/END/AGI/VIT/PRC</b>, a po dwukropku pięć ciągów wyborów A/B/-.
               </p>
               <input id="build-game-string" type="text" spellcheck="false"
                 placeholder="np. 0/50/0/50/0:/ABBABABAAA//AAAAAABAAA/">
               <div class="build-bonus-actions">
                 <button id="build-game-import" type="button" class="secondary-btn">📥 Importuj build z MenelWars</button>
-                <button id="build-game-copy" type="button" class="secondary-btn">📋 Kopiuj build do MenelWars</button>
               </div>
               <div id="build-game-string-status" class="submit-status"></div>
             </div>
@@ -1452,11 +1452,11 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
                 </select>
               </label>
               <label>
-                <span>Monte Carlo</span>
+                <span>Ilość walk</span>
                 <select id="pvp-sim-runs">
-                  <option value="1000">1 000 walk</option>
-                  <option value="5000" selected>5 000 walk</option>
-                  <option value="10000">10 000 walk</option>
+                  <option value="10">10 walk</option>
+                  <option value="100">100 walk</option>
+                  <option value="1000" selected>1 000 walk</option>
                 </select>
               </label>
             </div>
@@ -2039,6 +2039,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ</footer>
 
 <script src="data.js?v=21.00"></script>
-<script src="app.js?v=21.00.1"></script>
+<script src="app.js?v=21.00.2"></script>
 </body>
 </html>
