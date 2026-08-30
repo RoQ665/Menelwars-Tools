@@ -15117,22 +15117,36 @@ function setupAdmin() {
     </div>`;
   }
 
-  function pvpInsightCards(label,events,eventFights,detail,turns,runs,utility) {
+  function pvpInsightCards(label,events,eventFights,detail,turns,runs,utility,enemyUtility) {
     const card=(icon,name,value,sub)=>`<div class="pvp-insight-card"><span>${icon} ${name}</span><b>${value}</b>${sub?`<small>${sub}</small>`:""}</div>`;
     const healed=(utility.lifesteal||0)+(utility.regen||0);
     const hitAttempts=Number(utility.hitAttempts||0), hits=Number(utility.hit||0), misses=Number(utility.miss||0);
     const hitPct=hitAttempts?pvpPct(hits,hitAttempts):"—";
     const missPct=hitAttempts?pvpPct(misses,hitAttempts):"—";
-    const fights=value=>`${value} walk`;
+    const targetedAttempts=Number(enemyUtility?.hitAttempts||0);
+    const evades=Number(utility.evade||0);
+    const proc=(key,oppKey)=>{
+      const count=Number(events[key]||0), opp=Number(detail[oppKey]||0);
+      return {
+        pct:opp?pvpPct(count,opp):"—",
+        sub:opp?`${count.toLocaleString("pl-PL")} / ${opp.toLocaleString("pl-PL")} okazji · ${pvpAvg(count,runs,2)}/walkę`:"brak okazji"
+      };
+    };
+    const crit=proc("crit","critOpportunities");
+    const dbl=proc("double","doubleOpportunities");
+    const counter=proc("counter","counterOpportunities");
+    const bleed=proc("bleed","bleedOpportunities");
+    const stun=proc("stun","stunOpportunities");
+    const evadePct=targetedAttempts?pvpPct(evades,targetedAttempts):"—";
     const items=[
-      card("💥","Krytyk",fights(pvpPct(eventFights.crit||0,runs)),`${pvpAvg(events.crit||0,runs,2)}/walkę · ${turns.crit?.length?pvpTurnBand(turns.crit):"nie wystąpił"}`),
-      card("⚡","Podwójne uderzenie",fights(pvpPct(eventFights.double||0,runs)),`${pvpAvg(events.double||0,runs,2)}/walkę · ${turns.double?.length?pvpTurnBand(turns.double):"nie wystąpiło"}`),
-      card("↩️","Kontratak",fights(pvpPct(eventFights.counter||0,runs)),`${pvpAvg(events.counter||0,runs,2)}/walkę · ${turns.counter?.length?pvpTurnBand(turns.counter):"nie wystąpił"}`),
-      card("💧","Unik",fights(pvpPct(utility.evadeFights||0,runs)),`${pvpAvg(utility.evade||0,runs,2)} uników / walkę`),
-      card("🩸","Krwawienie",fights(pvpPct(eventFights.bleed||0,runs)),`${pvpAvg(events.bleed||0,runs,2)}/walkę · ${turns.bleed?.length?pvpTurnBand(turns.bleed):"nie wystąpiło"}`),
-      card("💫","Ogłuszenie",fights(pvpPct(eventFights.stun||0,runs)),`${pvpAvg(events.stun||0,runs,2)}/walkę · ${turns.stun?.length?pvpTurnBand(turns.stun):"nie wystąpiło"}`),
+      card("💥","Krytyk",`${crit.pct} trafień`,`${crit.sub}${turns.crit?.length?` · ${pvpTurnBand(turns.crit)}`:""}`),
+      card("⚡","Podwójne uderzenie",`${dbl.pct} okazji`,`${dbl.sub}${turns.double?.length?` · ${pvpTurnBand(turns.double)}`:""}`),
+      card("↩️","Kontratak",`${counter.pct} okazji`,`${counter.sub}${turns.counter?.length?` · ${pvpTurnBand(turns.counter)}`:""}`),
+      card("💧","Unik",`${evadePct} ataków`,targetedAttempts?`${evades.toLocaleString("pl-PL")} / ${targetedAttempts.toLocaleString("pl-PL")} ciosów unikniętych · ${pvpAvg(evades,runs,2)}/walkę`:"brak ataków przeciwnika"),
+      card("🩸","Krwawienie",`${bleed.pct} okazji`,`${bleed.sub}${turns.bleed?.length?` · ${pvpTurnBand(turns.bleed)}`:""}`),
+      card("💫","Ogłuszenie",`${stun.pct} okazji`,`${stun.sub}${turns.stun?.length?` · ${pvpTurnBand(turns.stun)}`:""}`),
       card("💚","Odzyskane HP",`${Math.round(healed/Math.max(1,runs)).toLocaleString("pl-PL")} / walkę`,`lifesteal ${Math.round((utility.lifesteal||0)/Math.max(1,runs))} · regen ${Math.round((utility.regen||0)/Math.max(1,runs))}`),
-      card("🎯","Trafienie / pudło",`${hitPct} trafień`,`pudła ${missPct} · ${pvpAvg(hits,runs,2)} trafień / ${pvpAvg(misses,runs,2)} pudeł na walkę`)
+      card("🎯","Trafienie / pudło",`${hitPct} / ${missPct}`,hitAttempts?`${hits.toLocaleString("pl-PL")} trafień · ${misses.toLocaleString("pl-PL")} pudeł · ${hitAttempts.toLocaleString("pl-PL")} prób`:"brak prób ataku")
     ];
     return `<div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(label)}</div><div class="pvp-insight-grid">${items.join("")}</div></div>`;
   }
@@ -15163,7 +15177,7 @@ function setupAdmin() {
 
       <details class="pvp-result-details" open>
         <summary>🔎 Najczęstsze zdarzenia</summary>
-        <div class="pvp-result-details-body">${pvpInsightCards(leftLabel,agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs,agg.utilityA)}${pvpInsightCards(rightLabel,agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs,agg.utilityB)}</div>
+        <div class="pvp-result-details-body">${pvpInsightCards(leftLabel,agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs,agg.utilityA,agg.utilityB)}${pvpInsightCards(rightLabel,agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs,agg.utilityB,agg.utilityA)}</div>
       </details>
     </section>`;
   }
