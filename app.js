@@ -14842,7 +14842,10 @@ function setupAdmin() {
     const condD=pvpConditionalEffects(defender.calculated,100*defender.hp/defender.maxHp);
     const dynamicPct=(attacker.calculated.extras?.dynamic||[])
       .filter(x=>x.type==="attackPctPerTurn")
-      .reduce((sum,x)=>sum+(Number(x.amount)||0)*round,0);
+      // „Nabrany Rozpęd” jest przyznawany po ataku i działa na następny.
+      // Pierwsze uderzenie nie otrzymuje więc jeszcze premii; od T2 jest
+      // jedna warstwa +2% za każdy zakończony wcześniej atak/obrót.
+      .reduce((sum,x)=>sum+(Number(x.amount)||0)*Math.max(0,round-1),0);
     const attack=attacker.primary.attack*(1+(condA.attackPct+dynamicPct)/100);
     const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
     const defenseFactor=params.defenseK/(effectiveDefense+params.defenseK);
@@ -15273,7 +15276,7 @@ function setupAdmin() {
     const lready=buildSimulationReadiness(leftItem.source), rready=buildSimulationReadiness(rightItem.source);
     if (!lready.ok || !rready.ok) { pvpUpdateReadiness(); return; }
     const params={
-      defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||500,50,5000),
+      defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||300,50,5000),
       counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2)
     };
     const runs=[10,100,1000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):1000;
@@ -15283,7 +15286,7 @@ function setupAdmin() {
       // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia używają jawnego DEF K=${params.defenseK} (domyślnie 300: kompromis skalibrowany na nagraniu RoQ–xBuLax), counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
