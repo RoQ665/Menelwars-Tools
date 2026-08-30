@@ -3944,9 +3944,20 @@ function mapRenderRouteResult() {
 
   let accountViewRenderInFlight = null;
 
+  function adminPanelIsOpen() {
+    const panel = el("admin-view");
+    return Boolean(panel && !panel.hidden && panel.isConnected);
+  }
+
   async function renderAccountView(options={}) {
     const forceRefresh =
       Boolean(options.force);
+
+    // Panel Admina jest osadzony wewnątrz widoku Konta. Ponowne zbudowanie
+    // account-content usuwałoby go z DOM razem z otwartymi sekcjami i polami,
+    // przez co tekst kopiowany przez administratora znikał przy focus/return.
+    // Dane panelu odświeżają się wyłącznie ręcznym przyciskiem Admina.
+    if (adminPanelIsOpen() && playerAccountSessionToken()) return cachedAccountStatus;
 
     const box = el("account-content");
     const status = el("account-status");
@@ -10626,6 +10637,7 @@ function setupAdmin() {
     "szansa na kryt":{key:"critChance",label:"Szansa na kryt",unit:"pct"},
     "szansa na kryta":{key:"critChance",label:"Szansa na kryt",unit:"pct"},
     "obrazenia krytyczne":{key:"critDmg",label:"Obrażenia krytyczne",unit:"pct"},
+    "obrazenia kryt":{key:"critDmg",label:"Obrażenia krytyczne",unit:"pct"},
     "szansa krwawienia":{key:"bleed",label:"Szansa krwawienia",unit:"pct"},
     "szansa na krwawienie":{key:"bleed",label:"Szansa krwawienia",unit:"pct"},
     "obrazenia krwawienia":{key:"bleedDamage",label:"Obrażenia krwawienia",unit:"pct"},
@@ -12955,6 +12967,7 @@ function setupAdmin() {
         false
       );
       host.hidden = true;
+      setBuildTab("editor",{noScroll:true});
       el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
     });
 
@@ -12965,6 +12978,7 @@ function setupAdmin() {
         true
       );
       host.hidden = true;
+      setBuildTab("editor",{noScroll:true});
       el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
     });
 
@@ -12975,6 +12989,7 @@ function setupAdmin() {
         true
       );
       host.hidden = true;
+      setBuildTab("editor",{noScroll:true});
       el("build-editor")?.scrollIntoView({behavior:"smooth",block:"start"});
     });
 
@@ -14075,7 +14090,6 @@ function setupAdmin() {
 
     gardenRenderPhaseTools(own);
     gardenRenderRecommendation(own);
-    gardenRenderRace();
   }
 
   function gardenUpdateClock() {
@@ -14113,6 +14127,7 @@ function setupAdmin() {
     gardenDataLoaded = true;
     gardenRenderPlots();
     gardenRenderEditor();
+    gardenRenderRace();
     return true;
   }
 
@@ -14214,6 +14229,21 @@ function setupAdmin() {
       // stanu „rośnie”, dzięki czemu nie da się kliknąć drugi raz zanim
       // użytkownik zobaczy sadzonkę.
       await gardenFetchData({force:true});
+      const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
+      if (timing.startMode === "now" && own && !gardenPhaseSummary(own).lastFrame) {
+        if (status) status.textContent = "🌱 Posadzono. Zapisuję etap 1…";
+        try {
+          const phaseResult = await gardenPostAction("gardenPhase",{
+            id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
+            eventType:"FRAME",atlasFrame:0,correction:"0",observedAtMs:Date.now()
+          });
+          if (!phaseResult || !phaseResult.ok) throw new Error(phaseResult&&phaseResult.error?phaseResult.error:"Nie udało się zapisać etapu 1.");
+          await gardenFetchData({force:true});
+          if (status) status.textContent = "✅ Posadzono i zapisano etap 1.";
+        } catch (phaseError) {
+          if (status) status.textContent = `⚠️ Posadzono, ale etap 1 nie zapisał się automatycznie: ${phaseError&&phaseError.message?phaseError.message:"błąd."}`;
+        }
+      }
       gardenRenderPlots();
       gardenRenderEditor();
     } catch (err) {
@@ -14773,7 +14803,7 @@ function setupAdmin() {
     const attack=attacker.primary.attack*(1+(condA.attackPct+dynamicPct)/100);
     const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
     const defenseFactor=params.defenseK/(effectiveDefense+params.defenseK);
-    const damageReduction=pvpClamp((Number(defender.stats.damageReduction)||0)+condD.damageReduction,0,90);
+    const damageReduction=pvpClamp((Number(defender.stats.damageReduction)||0)+condD.damageReduction,0,60);
     // Source mapa gry podaje drugą funkcję Evasion: pasywną redukcję obrażeń
     // równą evasion / 3.5. Backendowa kolejność względem zwykłego DR nie jest
     // dostępna, więc w modelu eksperymentalnym stosujemy ją jako osobny
@@ -14917,17 +14947,15 @@ function setupAdmin() {
   function pvpPickFirst(a,b,params) {
     const ia=Number(a.stats.initiative)||0, ib=Number(b.stats.initiative)||0;
     if (Math.abs(ia-ib)<1e-9) return Math.random()<0.5 ? a : b;
-    const higher=ia>ib?a:b, lower=ia>ib?b:a;
-    return Math.random()<params.firstMoverHigher ? higher : lower;
+    return ia>ib ? a : b;
   }
 
   function pvpOneBattle(sourceA,sourceB,params,defenderSide="B") {
     const a=pvpPrepareFighter(sourceA,"A"), b=pvpPrepareFighter(sourceB,"B");
     let cause="timeout_hp", rounds=15, winner=null;
 
-    // firstMover jest zdarzeniem startu walki. Losujemy go raz na walkę,
-    // a nie ponownie w każdej turze. Algorytm wyboru pozostaje jawnie
-    // eksperymentalny, bo backend gry nie występuje w source mapie.
+    // Inicjatywa wyznacza pierwszy ruch; przy idealnym remisie losujemy raz
+    // na całą walkę.
     const first=pvpPickFirst(a,b,params);
     const second=first===a?b:a;
 
@@ -15191,8 +15219,7 @@ function setupAdmin() {
     if (!lready.ok || !rready.ok) { pvpUpdateReadiness(); return; }
     const params={
       defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||500,50,5000),
-      counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2),
-      firstMoverHigher:pvpClamp(Number(el("pvp-sim-first-mover")?.value)||0.60,0.5,1)
+      counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2)
     };
     const runs=[10,100,1000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):1000;
     const mode=String(el("pvp-sim-mode")?.value||"both");
@@ -15201,7 +15228,7 @@ function setupAdmin() {
       // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
@@ -16132,7 +16159,9 @@ fetchModuleAccessPolicy().catch(()=>{});
 
         if (activeToolModule === "account") {
           appRefreshAt.account = Date.now();
-          await renderAccountView({force:true});
+          if (!adminPanelIsOpen()) {
+            await renderAccountView({force:true});
+          }
           await refreshAdminBadgeOnAccount();
         }
       } catch (err) {
