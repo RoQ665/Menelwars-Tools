@@ -3806,3 +3806,31 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .distillery-rec-recipe>span{font-size:.7rem}
   .distillery-recommendation small{font-size:.68rem}
 }
+
+
+/* v21.00.6 — Distillery: clearer unknown-recipes estimate on mobile */
+.distillery-estimate-main,
+.distillery-estimate-meta{
+  display:inline;
+}
+.distillery-estimate-meta{
+  white-space:normal;
+}
+@media (max-width: 640px){
+  .distillery-estimate{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:2px;
+    line-height:1.25;
+  }
+  .distillery-estimate-main,
+  .distillery-estimate-meta{
+    display:block;
+    width:100%;
+  }
+  .distillery-estimate-meta{
+    font-size:.88em;
+    opacity:.88;
+  }
+}

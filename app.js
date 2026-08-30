@@ -1518,8 +1518,8 @@ function mapRenderRouteResult() {
     const prediction = distilleryPredict(recipe,model);
     if (!prediction) return compact ? "" : `<div class="distillery-estimate unavailable">🧪 Brak wystarczających danych do estymacji.</div>`;
     return `<div class="distillery-estimate confidence-${prediction.confidence}">
-      🧪 Szacunek: <b>~${fmt(prediction.estimate)} l</b>
-      <span>· pewność ${escapeHtml(prediction.confidence)} · P${recipe.program}: ${prediction.dataCount} wyników · wsparcie min. ${prediction.support}</span>
+      <span class="distillery-estimate-main">🧪 Szacunek: <b>~${fmt(prediction.estimate)} l</b> · pewność ${escapeHtml(prediction.confidence)}</span>
+      <span class="distillery-estimate-meta">P${recipe.program} · ${prediction.dataCount} wyników · wsparcie min. ${prediction.support}</span>
     </div>`;
   }
 
