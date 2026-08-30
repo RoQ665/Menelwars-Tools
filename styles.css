@@ -3846,98 +3846,27 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   }
 }
 
-
-/* v21.01 — czytelniejszy raport symulatora PvP */
-.pvp-fighter-report{
-  border:1px solid #e1d5c2;
-  border-radius:9px;
-  background:#fffaf1;
-  overflow:hidden;
-}
-.pvp-fighter-report-title{
-  padding:8px 10px;
-  font-weight:900;
-  background:#f3e7d3;
-  border-bottom:1px solid #e1d5c2;
-}
-.pvp-damage-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:7px;
-  padding:8px;
-}
-.pvp-damage-metric{
-  display:grid;
-  gap:2px;
-  padding:8px;
-  border-radius:8px;
-  background:#fffdf8;
-  border:1px solid #eadfce;
-}
-.pvp-damage-metric span{font-size:.78rem;color:#746652}
-.pvp-damage-metric b{font-size:1.05rem}
-.pvp-damage-metric small{font-size:.68rem;color:#8a7a64}
-.pvp-mechanic-row{
-  display:grid;
-  grid-template-columns:minmax(110px,1.05fr) minmax(70px,.65fr) minmax(80px,.75fr) minmax(150px,1.35fr) minmax(180px,1.6fr);
-  gap:6px;
-  align-items:center;
-  padding:8px 9px;
-  border-top:1px solid #eadfce;
-}
-.pvp-mechanic-row>div:not(.pvp-mechanic-name){
-  display:grid;
-  gap:1px;
-}
-.pvp-mechanic-row span{font-size:.66rem;color:#8a7a64}
-.pvp-mechanic-row b{font-size:.76rem}
-.pvp-mechanic-name b{font-size:.8rem}
-.pvp-mechanic-turn b{font-weight:700}
-.pvp-win-card{
-  border:1px solid #e1d5c2;
-  border-radius:9px;
-  background:#fffaf1;
-  overflow:hidden;
-}
-.pvp-win-main{display:grid;gap:5px;padding:8px}
-.pvp-win-main>div{
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  padding:7px 8px;
-  border-radius:7px;
-  background:#fffdf8;
-}
-.pvp-win-main span{color:#625642}
-.pvp-finisher{
-  display:flex;
-  flex-wrap:wrap;
-  gap:5px 10px;
-  padding:8px;
-  border-top:1px solid #eadfce;
-  font-size:.75rem;
-}
-.pvp-finisher span{width:100%;color:#8a7a64;font-size:.68rem}
-.pvp-report-note{
-  padding:8px 9px;
-  border-radius:8px;
-  background:#f8f0e3;
-  color:#6e604c;
-  font-size:.75rem;
-  line-height:1.4;
-}
-.pvp-insights>div{
-  padding:8px 9px;
-  border-radius:8px;
-  background:#fffaf1;
-  border:1px solid #e1d5c2;
-}
-
-@media(max-width:760px){
-  .pvp-mechanic-row{grid-template-columns:1fr 1fr}
-  .pvp-mechanic-name,.pvp-mechanic-turn{grid-column:1/-1}
-}
-@media(max-width:520px){
-  .pvp-damage-grid{grid-template-columns:1fr}
-  .pvp-win-main>div{display:grid;gap:3px}
+/* v21.02 — czytelniejszy raport PvP na telefonie */
+.pvp-state-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.pvp-state-card{padding:10px;border:1px solid #e1d5c2;border-radius:10px;background:#fffaf1;min-width:0}
+.pvp-state-card span,.pvp-state-card small{display:block;overflow:hidden;text-overflow:ellipsis}
+.pvp-state-card b{display:block;font-size:1.25rem;margin:4px 0}
+.pvp-hp-box{padding:9px 10px;border:1px solid #e1d5c2;border-radius:10px;background:#fffdf8}
+.pvp-hp-bars{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:7px}
+.pvp-hp-bars span{display:flex;flex-direction:column;align-items:center;padding:6px 2px;border-radius:7px;background:#f7efe2;font-size:.78rem;text-align:center}
+.pvp-hp-bars b{font-size:.68rem;color:#796a55;margin-bottom:2px}
+.pvp-insight-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:10px}
+.pvp-insight-card{padding:9px;border:1px solid #e1d5c2;border-radius:9px;background:#fffaf1;min-width:0}
+.pvp-insight-card span,.pvp-insight-card small{display:block}
+.pvp-insight-card span{font-size:.8rem;color:#756650}
+.pvp-insight-card b{display:block;font-size:1.12rem;margin:3px 0}
+.pvp-insight-card small{font-size:.72rem;line-height:1.3;color:#81735f}
+@media(max-width:600px){
+  .pvp-result-details-body{padding:8px;gap:8px}
+  .pvp-state-grid{grid-template-columns:1fr 1fr}
+  .pvp-hp-bars{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+  .pvp-hp-bars span{font-size:.7rem;padding:5px 1px}
+  .pvp-insight-grid{grid-template-columns:1fr 1fr;padding:8px;gap:6px}
+  .pvp-mechanic-row{padding:10px}
+  .pvp-fighter-report-title{white-space:normal}
 }

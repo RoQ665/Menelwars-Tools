@@ -14975,6 +14975,7 @@ function setupAdmin() {
       hpBucketsA:[0,0,0,0,0],hpBucketsB:[0,0,0,0,0],
       eventsA:emptyEvents(),eventsB:emptyEvents(),
       eventFightsA:emptyEvents(),eventFightsB:emptyEvents(),
+      utilityA:{evade:0,evadeFights:0,lifesteal:0,regen:0},utilityB:{evade:0,evadeFights:0,lifesteal:0,regen:0},
       detailA:{},detailB:{},eventTurnsA:Object.fromEntries(eventKeys.map(k=>[k,[]])),eventTurnsB:Object.fromEntries(eventKeys.map(k=>[k,[]])),
       causes:{},causesByWinner:{A:{},B:{},tie:{}}
     };
@@ -14995,6 +14996,10 @@ function setupAdmin() {
       agg.hpBucketsB[pvpHpBucketIndex(hpB)]++;
       agg.damageA+=result.a.metrics.damage;
       agg.damageB+=result.b.metrics.damage;
+      agg.utilityA.evade+=Number(result.a.metrics.evade)||0; if ((Number(result.a.metrics.evade)||0)>0) agg.utilityA.evadeFights++;
+      agg.utilityB.evade+=Number(result.b.metrics.evade)||0; if ((Number(result.b.metrics.evade)||0)>0) agg.utilityB.evadeFights++;
+      agg.utilityA.lifesteal+=Number(result.a.metrics.lifesteal)||0; agg.utilityB.lifesteal+=Number(result.b.metrics.lifesteal)||0;
+      agg.utilityA.regen+=Number(result.a.metrics.regen)||0; agg.utilityB.regen+=Number(result.b.metrics.regen)||0;
 
       eventKeys.forEach(key=>{
         const countA=Number(result.a.metrics[key])||0;
@@ -15084,7 +15089,7 @@ function setupAdmin() {
 
   function pvpHpDistributionLine(buckets,runs) {
     const labels=["0%","1–25%","26–50%","51–75%","76–100%"];
-    return labels.map((label,index)=>`${label}: ${pvpPct(buckets[index]||0,runs)}`).join(" · ");
+    return labels.map((label,index)=>`<span><b>${label}</b>${pvpPct(buckets[index]||0,runs)}</span>`).join("");
   }
 
   function pvpWinFinishCard(label,causes,wins) {
@@ -15107,28 +15112,23 @@ function setupAdmin() {
     </div>`;
   }
 
-  function pvpInsight(label,events,eventFights,detail,turns,runs,causes,wins) {
-    const candidates=[
-      {key:"crit",label:"krytyk",f:eventFights.crit||0},
-      {key:"double",label:"double",f:eventFights.double||0},
-      {key:"counter",label:"kontra",f:eventFights.counter||0},
-      {key:"bleed",label:"krwawienie",f:eventFights.bleed||0},
-      {key:"stun",label:"ogłuszenie",f:eventFights.stun||0}
-    ].sort((a,b)=>b.f-a.f);
-    const top=candidates[0];
-    const timeout=(causes.timeout_hp||0)+(causes.timeout_defender||0);
-    const hpZero=Math.max(0,wins-timeout);
-    let text=`${escapeHtml(label)}: `;
-    if (top?.f) text+=`${top.label} pojawia się w ${pvpPct(top.f,runs)} walk (${pvpTurnBand(turns[top.key])}). `;
-    else text+="żaden z głównych proców nie pojawiał się regularnie. ";
-    if (wins) text+=`${pvpPct(hpZero,wins)} zwycięstw kończy się wyzerowaniem HP przeciwnika`;
-    if (timeout) text+=`, a ${pvpPct(timeout,wins)} po limicie rund`;
-    return text+".";
+  function pvpInsightCards(label,events,eventFights,detail,turns,runs,utility) {
+    const card=(icon,name,value,sub)=>`<div class="pvp-insight-card"><span>${icon} ${name}</span><b>${value}</b>${sub?`<small>${sub}</small>`:""}</div>`;
+    const totalIncoming=(Number(detail.incomingHits)||0);
+    const executeRate=detail.executeChecks?pvpPct(events.execute||0,detail.executeChecks):"—";
+    const items=[
+      card("💥","Krytyk",pvpPct(eventFights.crit||0,runs),`${pvpAvg(events.crit||0,runs,2)}/walkę · ${turns.crit?.length?pvpTurnBand(turns.crit):"nie wystąpił"}`),
+      card("⚡","Double",pvpPct(eventFights.double||0,runs),`${pvpAvg(events.double||0,runs,2)}/walkę · ${turns.double?.length?pvpTurnBand(turns.double):"nie wystąpił"}`),
+      card("↩️","Kontra",pvpPct(eventFights.counter||0,runs),`${pvpAvg(events.counter||0,runs,2)}/walkę · ${turns.counter?.length?pvpTurnBand(turns.counter):"nie wystąpiła"}`),
+      card("🌀","Unik",pvpPct(utility.evadeFights||0,runs),`${pvpAvg(utility.evade||0,runs,2)} uników / walkę`),
+      card("☠️","Execute",pvpPct(eventFights.execute||0,runs),`${pvpAvg(events.execute||0,runs,2)}/walkę · skuteczność kontroli progu ${executeRate}`),
+      card("💚","Odzyskane HP",Math.round(((utility.lifesteal||0)+(utility.regen||0))/Math.max(1,runs)).toLocaleString("pl-PL"),`/ walkę · lifesteal ${Math.round((utility.lifesteal||0)/Math.max(1,runs))} · regen ${Math.round((utility.regen||0)/Math.max(1,runs))}`)
+    ];
+    return `<div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(label)}</div><div class="pvp-insight-grid">${items.join("")}</div></div>`;
   }
 
-  function pvpRenderAggregate(agg,leftLabel,rightLabel,title) {
-    const leftWin=pvpPct(agg.winsA,agg.runs);
-    const rightWin=pvpPct(agg.winsB,agg.runs);
+  function pvpRenderAggregate(agg,leftLabel,rightLabel,title="Wynik symulacji") {
+    const leftWin=pvpPct(agg.winsA,agg.runs), rightWin=pvpPct(agg.winsB,agg.runs);
     return `<section class="pvp-sim-result-card">
       <h4>${escapeHtml(title)}</h4>
       <div class="pvp-result-scorecards two-way">
@@ -15142,53 +15142,38 @@ function setupAdmin() {
       </div>
 
       <details class="pvp-result-details" open>
-        <summary>❤️ HP i wynik</summary>
+        <summary>❤️ Stan po walce</summary>
         <div class="pvp-result-details-body">
-          <div class="pvp-result-line"><span>Średnie końcowe HP</span><b>${escapeHtml(leftLabel)} ${(agg.endHpA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% · ${escapeHtml(rightLabel)} ${(agg.endHpB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}%</b></div>
-          <div class="pvp-result-line"><span>Śr. zadane obrażenia</span><b>${(agg.damageA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})} / ${(agg.damageB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</b></div>
-          <div class="pvp-hp-distribution"><b>${escapeHtml(leftLabel)}</b><br>${pvpHpDistributionLine(agg.hpBucketsA,agg.runs)}<br><b>${escapeHtml(rightLabel)}</b><br>${pvpHpDistributionLine(agg.hpBucketsB,agg.runs)}</div>
+          <div class="pvp-state-grid">
+            <div class="pvp-state-card"><span>${escapeHtml(leftLabel)}</span><b>${(agg.endHpA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% HP</b><small>śr. obrażenia: ${(agg.damageA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</small></div>
+            <div class="pvp-state-card"><span>${escapeHtml(rightLabel)}</span><b>${(agg.endHpB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% HP</b><small>śr. obrażenia: ${(agg.damageB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</small></div>
+          </div>
+          <div class="pvp-hp-box"><b>${escapeHtml(leftLabel)}</b><div class="pvp-hp-bars">${pvpHpDistributionLine(agg.hpBucketsA,agg.runs)}</div></div>
+          <div class="pvp-hp-box"><b>${escapeHtml(rightLabel)}</b><div class="pvp-hp-bars">${pvpHpDistributionLine(agg.hpBucketsB,agg.runs)}</div></div>
         </div>
       </details>
 
       <details class="pvp-result-details" open>
         <summary>🥊 Obrażenia pojedynczych ciosów</summary>
-        <div class="pvp-result-details-body">
-          ${pvpDamageCard(leftLabel,agg.detailA)}
-          ${pvpDamageCard(rightLabel,agg.detailB)}
-          <div class="pvp-report-note">„Normalny cios” = trafienie bez krytyka i bez kontry. Pokazana wartość to średnie faktycznie zadane obrażenia po obronie przeciwnika.</div>
-        </div>
+        <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA)}${pvpDamageCard(rightLabel,agg.detailB)}</div>
       </details>
 
       <details class="pvp-result-details" open>
         <summary>⚡ Mechaniki w walce</summary>
         <div class="pvp-result-details-body">
-          <div class="pvp-fighter-report">
-            <div class="pvp-fighter-report-title">${escapeHtml(leftLabel)}</div>
-            ${pvpMechanicRows(agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs)}
-          </div>
-          <div class="pvp-fighter-report">
-            <div class="pvp-fighter-report-title">${escapeHtml(rightLabel)}</div>
-            ${pvpMechanicRows(agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs)}
-          </div>
+          <div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(leftLabel)}</div>${pvpMechanicRows(agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs)}</div>
+          <div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(rightLabel)}</div>${pvpMechanicRows(agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs)}</div>
         </div>
       </details>
 
       <details class="pvp-result-details" open>
         <summary>🏆 Jak kończyły się zwycięstwa</summary>
-        <div class="pvp-result-details-body">
-          ${pvpWinFinishCard(leftLabel,agg.causesByWinner.A,agg.winsA)}
-          ${pvpWinFinishCard(rightLabel,agg.causesByWinner.B,agg.winsB)}
-          <div class="pvp-report-note">Execute, kontra i zwykły cios nie są osobnymi warunkami zwycięstwa — jeśli sprowadziły HP do zera, należą do „HP przeciwnika spadło do 0”. Są pokazane niżej tylko jako sposób zadania kończącego efektu.</div>
-          <div class="pvp-report-note"><b>Timeouty:</b> ${pvpPct(agg.timeouts,agg.runs)} · przy limicie rund wygrywa wyższy % HP, a przy identycznym % HP obrońca.</div>
-        </div>
+        <div class="pvp-result-details-body">${pvpWinFinishCard(leftLabel,agg.causesByWinner.A,agg.winsA)}${pvpWinFinishCard(rightLabel,agg.causesByWinner.B,agg.winsB)}</div>
       </details>
 
-      <details class="pvp-result-details">
-        <summary>🔎 Co najczęściej działo się w walce</summary>
-        <div class="pvp-result-details-body pvp-insights">
-          <div>${pvpInsight(leftLabel,agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs,agg.causesByWinner.A,agg.winsA)}</div>
-          <div>${pvpInsight(rightLabel,agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs,agg.causesByWinner.B,agg.winsB)}</div>
-        </div>
+      <details class="pvp-result-details" open>
+        <summary>🔎 Najczęstsze zdarzenia</summary>
+        <div class="pvp-result-details-body">${pvpInsightCards(leftLabel,agg.eventsA,agg.eventFightsA,agg.detailA,agg.eventTurnsA,agg.runs,agg.utilityA)}${pvpInsightCards(rightLabel,agg.eventsB,agg.eventFightsB,agg.detailB,agg.eventTurnsB,agg.runs,agg.utilityB)}</div>
       </details>
     </section>`;
   }
@@ -15209,25 +15194,10 @@ function setupAdmin() {
     const mode=String(el("pvp-sim-mode")?.value||"both");
     button.disabled=true; if (readinessHost) readinessHost.textContent=`⏳ Symuluję ${runs.toLocaleString("pl-PL")} walk...`;
     try {
-      const blocks=[];
-      let sideNote="";
-
-      // Poza rozstrzyganiem technicznego timeoutu nie mamy potwierdzonego
-      // ukrytego mnożnika atakujący/obrońca. Strona ma znaczenie tylko wtedy,
-      // gdy po limicie rund obaj mają identyczny procent pozostałego HP.
-      if (mode==="both") {
-        const attackAgg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
-        const defenseAgg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"A");
-        blocks.push(pvpRenderAggregate(attackAgg,leftItem.label,rightItem.label,"Ja atakuję"));
-        blocks.push(pvpRenderAggregate(defenseAgg,leftItem.label,rightItem.label,"Ja bronię"));
-        sideNote='<div class="pvp-side-note">ℹ️ Atak i obrona mają te same potwierdzone reguły walki. Różnica strony działa tylko przy technicznym timeoutcie: wygrywa wyższy % HP, a przy idealnym remisie % HP — obrońca.</div>';
-      } else {
-        const defenderSide=mode==="defense"?"A":"B";
-        const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,defenderSide);
-        blocks.push(pvpRenderAggregate(agg,leftItem.label,rightItem.label,mode==="defense"?"Ja bronię":"Ja atakuję"));
-      }
-
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Brak ukrytych mnożników atakujący/broniący. Po limicie 15 rund wygrywa strona z wyższym % pozostałego HP; przy identycznym % HP wygrywa obrońca. Remisy nie występują.</div></details>${sideNote}${blocks.join("")}`;
+      // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
+      // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
+      const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
