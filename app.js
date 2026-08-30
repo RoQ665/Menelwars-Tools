@@ -14998,8 +14998,10 @@ function setupAdmin() {
     return ia>ib ? a : b;
   }
 
-  function pvpOneBattle(sourceA,sourceB,params,defenderSide="B") {
+  function pvpOneBattle(sourceA,sourceB,params,defenderSide="B",initialProcMeters={}) {
     const a=pvpPrepareFighter(sourceA,"A"), b=pvpPrepareFighter(sourceB,"B");
+    a.procMeters={...a.procMeters,...(initialProcMeters.a||{})};
+    b.procMeters={...b.procMeters,...(initialProcMeters.b||{})};
     let cause="timeout_hp", rounds=15, winner=null;
 
     // Inicjatywa wyznacza pierwszy ruch; przy idealnym remisie losujemy raz
@@ -15058,9 +15060,14 @@ function setupAdmin() {
       detailA:{},detailB:{},eventTurnsA:Object.fromEntries(eventKeys.map(k=>[k,[]])),eventTurnsB:Object.fromEntries(eventKeys.map(k=>[k,[]])),
       causes:{},causesByWinner:{A:{},B:{},tie:{}}
     };
+    // Meter nie zaczyna od zera w każdej wirtualnej walce. Dzięki temu seria
+    // Monte Carlo zachowuje długoterminową szansę z buildu, zamiast sztucznie
+    // zaniżać proców przez powtarzanie "pierwszej", najsłabszej próby.
+    let carriedProcMeters={a:{},b:{}};
 
     for (let i=0;i<runs;i++) {
-      const result=pvpOneBattle(sourceA,sourceB,params,defenderSide);
+      const result=pvpOneBattle(sourceA,sourceB,params,defenderSide,carriedProcMeters);
+      carriedProcMeters={a:{...result.a.procMeters},b:{...result.b.procMeters}};
       if (result.winner==="A") agg.winsA++;
       else if (result.winner==="B") agg.winsB++;
       else agg.ties++;
@@ -15211,7 +15218,7 @@ function setupAdmin() {
     const crit=proc("crit","critOpportunities");
     const dbl=proc("double","doubleOpportunities");
     const counter=proc("counter","counterOpportunities");
-    const bleed=proc("bleed","bleedOpportunities");
+    const bleed=proc("bleedProc","bleedOpportunities");
     const stun=proc("stun","stunOpportunities");
     const evadePct=targetedAttempts?pvpPct(evades,targetedAttempts):"—";
     const items=[
@@ -15219,7 +15226,7 @@ function setupAdmin() {
       card("⚡","Podwójne uderzenie",`${dbl.pct} okazji`,`${dbl.sub}${turns.double?.length?` · ${pvpTurnBand(turns.double)}`:""}`),
       card("↩️","Kontratak",`${counter.pct} okazji`,`${counter.sub}${turns.counter?.length?` · ${pvpTurnBand(turns.counter)}`:""}`),
       card("💧","Unik",`${evadePct} ataków`,targetedAttempts?`${evades.toLocaleString("pl-PL")} / ${targetedAttempts.toLocaleString("pl-PL")} ciosów unikniętych · ${pvpAvg(evades,runs,2)}/walkę`:"brak ataków przeciwnika"),
-      card("🩸","Krwawienie",`${bleed.pct} okazji`,`${bleed.sub}${turns.bleed?.length?` · ${pvpTurnBand(turns.bleed)}`:""}`),
+      card("🩸","Proc krwawienia",`${bleed.pct} okazji`,`${bleed.sub}${turns.bleedProc?.length?` · ${pvpTurnBand(turns.bleedProc)}`:""}`),
       card("💫","Ogłuszenie",`${stun.pct} okazji`,`${stun.sub}${turns.stun?.length?` · ${pvpTurnBand(turns.stun)}`:""}`),
       card("💚","Odzyskane HP",`${Math.round(healed/Math.max(1,runs)).toLocaleString("pl-PL")} / walkę`,`lifesteal ${Math.round((utility.lifesteal||0)/Math.max(1,runs))} · regen ${Math.round((utility.regen||0)/Math.max(1,runs))}`),
       card("🎯","Trafienie / pudło",`${hitPct} / ${missPct}`,hitAttempts?`${hits.toLocaleString("pl-PL")} trafień · ${misses.toLocaleString("pl-PL")} pudeł · ${hitAttempts.toLocaleString("pl-PL")} prób`:"brak prób ataku")
