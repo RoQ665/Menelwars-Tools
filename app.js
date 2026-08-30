@@ -78,6 +78,249 @@ const MAP_POSITIONS = {
   "Ursynów":      { x: 39.6, y: 92.4 }
 };
 
+const MAP_ROUTE_DISTRICTS = [
+  "Bielany","Białołęka","Targówek","Praga","Śródmieście","Wola",
+  "Bemowo","Żoliborz","Ochota","Mokotów","Wilanów","Ursynów"
+];
+
+const MAP_ROUTE_MINUTES = [
+  [0,5,7,8,8,6,6,4,10,13,18,17],
+  [5,0,3,6,8,8,10,4,11,13,17,17],
+  [7,3,0,5,7,8,11,5,11,12,15,16],
+  [8,6,5,0,3,5,9,4,7,7,11,12],
+  [8,8,7,3,0,3,7,5,4,6,10,10],
+  [6,8,8,5,3,0,5,4,4,7,12,12],
+  [6,10,11,9,7,5,0,6,6,10,15,14],
+  [4,4,5,4,5,4,6,0,7,10,15,14],
+  [10,11,11,7,4,4,6,7,0,5,10,9],
+  [13,13,12,7,6,7,10,10,5,0,5,5],
+  [18,17,15,11,10,12,15,15,10,5,0,3],
+  [17,17,16,12,10,12,14,14,9,5,3,0]
+];
+
+const MAP_VIP_FREE_MINUTES = 5;
+let mapRouteMode = "vip";
+
+function mapRouteLexLess(a,b) {
+  if (!b) return true;
+  if (a.wait !== b.wait) return a.wait < b.wait;
+  if (a.hops !== b.hops) return a.hops < b.hops;
+  return a.nominal < b.nominal;
+}
+
+function mapRouteNormal(startIndex) {
+  const n = MAP_ROUTE_DISTRICTS.length;
+  const fullMask = (1 << n) - 1;
+  const size = 1 << n;
+  const costs = Array.from({length:size},()=>Array(n).fill(Infinity));
+  const prev = Array.from({length:size},()=>Array(n).fill(null));
+  const startMask = 1 << startIndex;
+  costs[startMask][startIndex] = 0;
+
+  for (let mask=0; mask<size; mask++) {
+    if (!(mask & startMask)) continue;
+    for (let last=0; last<n; last++) {
+      const current = costs[mask][last];
+      if (!Number.isFinite(current)) continue;
+      for (let next=0; next<n; next++) {
+        if (mask & (1 << next)) continue;
+        const nextMask = mask | (1 << next);
+        const candidate = current + MAP_ROUTE_MINUTES[last][next];
+        if (candidate < costs[nextMask][next]) {
+          costs[nextMask][next] = candidate;
+          prev[nextMask][next] = [mask,last];
+        }
+      }
+    }
+  }
+
+  let end = 0;
+  let best = Infinity;
+  for (let last=0; last<n; last++) {
+    if (costs[fullMask][last] < best) {
+      best = costs[fullMask][last];
+      end = last;
+    }
+  }
+
+  const route = [];
+  let mask = fullMask;
+  let last = end;
+  while (true) {
+    route.push(last);
+    const p = prev[mask][last];
+    if (!p) break;
+    mask = p[0];
+    last = p[1];
+  }
+  route.reverse();
+
+  return {
+    mode:"normal",
+    route,
+    wait:best,
+    nominal:best,
+    hops:Math.max(0,route.length-1)
+  };
+}
+
+function mapRouteVip(startIndex) {
+  const n = MAP_ROUTE_DISTRICTS.length;
+  const fullMask = (1 << n) - 1;
+  const startMask = 1 << startIndex;
+  const dist = new Map();
+  const prev = new Map();
+  const heap = [];
+
+  const keyOf = (mask,last) => `${mask}|${last}`;
+
+  const heapPush = node => {
+    heap.push(node);
+    let i = heap.length - 1;
+    while (i > 0) {
+      const parent = Math.floor((i-1)/2);
+      if (!mapRouteLexLess(heap[i].cost,heap[parent].cost)) break;
+      [heap[i],heap[parent]] = [heap[parent],heap[i]];
+      i = parent;
+    }
+  };
+
+  const heapPop = () => {
+    if (!heap.length) return null;
+    const top = heap[0];
+    const tail = heap.pop();
+    if (heap.length && tail) {
+      heap[0] = tail;
+      let i = 0;
+      while (true) {
+        const left = i*2+1;
+        const right = left+1;
+        let best = i;
+        if (left < heap.length && mapRouteLexLess(heap[left].cost,heap[best].cost)) best = left;
+        if (right < heap.length && mapRouteLexLess(heap[right].cost,heap[best].cost)) best = right;
+        if (best === i) break;
+        [heap[i],heap[best]] = [heap[best],heap[i]];
+        i = best;
+      }
+    }
+    return top;
+  };
+
+  const startKey = keyOf(startMask,startIndex);
+  const startCost = {wait:0,hops:0,nominal:0};
+  dist.set(startKey,startCost);
+  heapPush({mask:startMask,last:startIndex,key:startKey,cost:startCost});
+
+  let finishNode = null;
+
+  while (heap.length) {
+    const node = heapPop();
+    if (!node) break;
+    const known = dist.get(node.key);
+    if (!known || known.wait !== node.cost.wait || known.hops !== node.cost.hops || known.nominal !== node.cost.nominal) {
+      continue;
+    }
+
+    if (node.mask === fullMask) {
+      finishNode = node;
+      break;
+    }
+
+    for (let next=0; next<n; next++) {
+      if (next === node.last) continue;
+      const nominalEdge = MAP_ROUTE_MINUTES[node.last][next];
+      const waitEdge = Math.max(0,nominalEdge - MAP_VIP_FREE_MINUTES);
+      const nextMask = node.mask | (1 << next);
+      const nextKey = keyOf(nextMask,next);
+      const candidate = {
+        wait:node.cost.wait + waitEdge,
+        hops:node.cost.hops + 1,
+        nominal:node.cost.nominal + nominalEdge
+      };
+
+      if (mapRouteLexLess(candidate,dist.get(nextKey))) {
+        dist.set(nextKey,candidate);
+        prev.set(nextKey,{key:node.key,from:node.last,to:next,mask:node.mask});
+        heapPush({mask:nextMask,last:next,key:nextKey,cost:candidate});
+      }
+    }
+  }
+
+  if (!finishNode) return null;
+
+  const route = [finishNode.last];
+  let key = finishNode.key;
+  while (prev.has(key)) {
+    const step = prev.get(key);
+    route.push(step.from);
+    key = step.key;
+  }
+  route.reverse();
+
+  return {
+    mode:"vip",
+    route,
+    wait:finishNode.cost.wait,
+    nominal:finishNode.cost.nominal,
+    hops:finishNode.cost.hops
+  };
+}
+
+function mapRouteSolve(startName,mode) {
+  const startIndex = MAP_ROUTE_DISTRICTS.indexOf(startName);
+  if (startIndex < 0) return null;
+  return mode === "normal"
+    ? mapRouteNormal(startIndex)
+    : mapRouteVip(startIndex);
+}
+
+function mapRenderRouteResult() {
+  const host = el("map-route-result");
+  const startSelect = el("map-route-start");
+  if (!host || !startSelect) return;
+
+  const result = mapRouteSolve(startSelect.value,mapRouteMode);
+  if (!result) {
+    host.innerHTML = `<div class="empty">Nie udało się wyznaczyć trasy.</div>`;
+    return;
+  }
+
+  const visited = new Set();
+  const steps = result.route.map((index,routeIndex) => {
+    const district = MAP_ROUTE_DISTRICTS[index];
+    const previous = routeIndex > 0 ? result.route[routeIndex-1] : null;
+    const nominal = previous == null ? 0 : MAP_ROUTE_MINUTES[previous][index];
+    const wait = previous == null
+      ? 0
+      : result.mode === "vip"
+        ? Math.max(0,nominal-MAP_VIP_FREE_MINUTES)
+        : nominal;
+    const revisit = visited.has(index);
+    visited.add(index);
+
+    return `
+      <div class="map-route-step">
+        <span class="hop">${routeIndex+1}</span>
+        <span>
+          <b>${escapeHtml(district)}</b>
+          ${revisit ? `<span class="map-route-revisit"> · powrót przez odwiedzoną dzielnicę</span>` : ""}
+        </span>
+        <span>${routeIndex===0 ? "start" : `${nominal} min · czekasz ${wait}`}</span>
+      </div>`;
+  }).join("");
+
+  host.innerHTML = `
+    <div>
+      <strong>${result.mode === "vip" ? "💎 VIP" : "🚶 Normal"} · optymalna trasa</strong>
+      <div class="map-route-kpis">
+        <div class="map-route-kpi"><span>Realne czekanie</span><strong>${result.wait} min</strong></div>
+        <div class="map-route-kpi"><span>Przejazdy</span><strong>${result.hops}</strong></div>
+        <div class="map-route-kpi"><span>Nominalnie</span><strong>${result.nominal} min</strong></div>
+      </div>
+      <div class="map-route-steps">${steps}</div>
+    </div>`;
+}
+
   const el = id => document.getElementById(id);
 
   function key(b,y,w,p) {
@@ -829,26 +1072,59 @@ const MAP_POSITIONS = {
           recipe
         );
 
-      const result =
-        await jsonp(
+      const nonce = makeRecipeNonce();
+      let sendError = null;
+
+      criticalOperationStart(
+        "🔬 Rezerwuję recepturę…",
+        "Zapisuję rezerwację i czekam na potwierdzenie serwera."
+      );
+
+      try {
+        await timedBackendPost(
           "reserveRecipe",
           {
+            action:"reserveRecipe",
+            nonce,
             nick:cleanNick,
             baza:recipe.baza,
             drozdze:recipe.drozdze,
             woda:recipe.woda,
             program:recipe.program,
             ownerToken:
-              owner &&
-              owner.token
+              owner && owner.token
                 ? owner.token
                 : "",
             sessionToken:
-              accountNick
-                ? playerAccountSessionToken()
-                : ""
+              playerAccountSessionToken() || ""
           }
         );
+      } catch (err) {
+        // POST nie jest ponawiany. Sprawdzamy wynik pod tym samym nonce.
+        sendError = err;
+      }
+
+      let result = null;
+      for (let attempt=0; attempt<20; attempt++) {
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve,350));
+        }
+
+        try {
+          result = await jsonp("reserveRecipeResult",{nonce});
+        } catch (err) {
+          if (attempt === 19 && !sendError) sendError = err;
+          continue;
+        }
+
+        if (result && !result.pending) break;
+      }
+
+      if (!result || result.pending) {
+        throw sendError || new Error(
+          "Serwer nie potwierdził rezerwacji receptury."
+        );
+      }
 
       if (
         !result ||
@@ -891,6 +1167,8 @@ const MAP_POSITIONS = {
       );
 
       window.alert(message);
+    } finally {
+      criticalOperationFinish();
     }
   }
 
@@ -965,38 +1243,38 @@ const MAP_POSITIONS = {
       "loading"
     );
 
+    criticalOperationStart(
+      "🧪 Wysyłam wynik receptury…",
+      "Zapisuję wynik i czekam na potwierdzenie serwera."
+    );
+
     try {
-      await fetch(
-        BACKEND_URL,
-        {
-          method:"POST",
-          mode:"no-cors",
-          headers:{
-            "Content-Type":
-              "text/plain;charset=UTF-8"
-          },
-          body:
-            JSON.stringify({
-              action:
-                "submitReservedRecipe",
-              nonce,
-              ownerToken:
-                owner &&
-                owner.token
-                  ? owner.token
-                  : "",
-              sessionToken:
-                accountOwner
-                  ? playerAccountSessionToken()
-                  : "",
-              baza:recipe.baza,
-              drozdze:recipe.drozdze,
-              woda:recipe.woda,
-              program:recipe.program,
-              litry
-            })
-        }
-      );
+      let sendError = null;
+
+      try {
+        await timedBackendPost(
+          "submitReservedRecipe",
+          {
+            action:
+              "submitReservedRecipe",
+            nonce,
+            ownerToken:
+              owner &&
+              owner.token
+                ? owner.token
+                : "",
+            sessionToken:
+              playerAccountSessionToken() || "",
+            baza:recipe.baza,
+            drozdze:recipe.drozdze,
+            woda:recipe.woda,
+            program:recipe.program,
+            litry
+          }
+        );
+      } catch (err) {
+        sendError = err;
+      }
 
       let result = null;
 
@@ -1033,7 +1311,7 @@ const MAP_POSITIONS = {
         !result ||
         result.pending
       ) {
-        throw new Error(
+        throw sendError || new Error(
           "Serwer nie zwrócił wyniku zapisu."
         );
       }
@@ -1065,7 +1343,251 @@ const MAP_POSITIONS = {
       );
 
       window.alert(message);
+    } finally {
+      criticalOperationFinish();
     }
+  }
+
+
+
+  // ============================================================
+  // v21.00 — Destylarnia: eksperymentalny model danych
+  // Osobny model log-additive dla każdego programu. Nie próbuje
+  // odtwarzać ukrytych współczynników backendu gry.
+  // ============================================================
+  let distilleryModelCache = null;
+  let distilleryModelCacheSignature = "";
+
+  function distillerySolveLinearSystem(matrix, vector) {
+    const n = vector.length;
+    const a = matrix.map((row,i) => row.slice().concat([vector[i]]));
+
+    for (let col=0; col<n; col++) {
+      let pivot = col;
+      for (let row=col+1; row<n; row++) {
+        if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) pivot = row;
+      }
+      if (Math.abs(a[pivot][col]) < 1e-10) return null;
+      if (pivot !== col) [a[pivot],a[col]] = [a[col],a[pivot]];
+
+      const div = a[col][col];
+      for (let j=col; j<=n; j++) a[col][j] /= div;
+
+      for (let row=0; row<n; row++) {
+        if (row === col) continue;
+        const factor = a[row][col];
+        if (!factor) continue;
+        for (let j=col; j<=n; j++) a[row][j] -= factor * a[col][j];
+      }
+    }
+
+    return a.map(row => row[n]);
+  }
+
+  function distilleryWeightedRidge(X, y, weights, lambda=0.015) {
+    if (!X.length) return null;
+    const p = X[0].length;
+    const xtx = Array.from({length:p},() => Array(p).fill(0));
+    const xty = Array(p).fill(0);
+
+    for (let i=0; i<X.length; i++) {
+      const w = Math.max(0.0001,Number(weights[i]) || 1);
+      for (let r=0; r<p; r++) {
+        xty[r] += w * X[i][r] * y[i];
+        for (let c=0; c<p; c++) xtx[r][c] += w * X[i][r] * X[i][c];
+      }
+    }
+    for (let i=1; i<p; i++) xtx[i][i] += lambda;
+    xtx[0][0] += 1e-8;
+    return distillerySolveLinearSystem(xtx,xty);
+  }
+
+  function distilleryMedian(values) {
+    if (!values.length) return 0;
+    const sorted = values.slice().sort((a,b)=>a-b);
+    const mid = Math.floor(sorted.length/2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+  }
+
+  function distilleryFitProgram(rows, program) {
+    const data = rows.filter(row => Number(row.program) === Number(program) && Number(row.litry) > 0);
+    if (data.length < 8) return null;
+
+    const bases = [...new Set(data.map(r=>r.baza))].sort((a,b)=>String(a).localeCompare(String(b),"pl"));
+    const yeasts = [...new Set(data.map(r=>r.drozdze))].sort((a,b)=>String(a).localeCompare(String(b),"pl"));
+    const waters = [...new Set(data.map(r=>r.woda))].sort((a,b)=>String(a).localeCompare(String(b),"pl"));
+    if (!bases.length || !yeasts.length || !waters.length) return null;
+
+    const baseRef = bases[0], yeastRef = yeasts[0], waterRef = waters[0];
+    const featureNames = ["intercept"]
+      .concat(bases.slice(1).map(x=>`b:${x}`))
+      .concat(yeasts.slice(1).map(x=>`y:${x}`))
+      .concat(waters.slice(1).map(x=>`w:${x}`));
+
+    const vectorFor = row => {
+      const x = [1];
+      bases.slice(1).forEach(v=>x.push(row.baza===v ? 1 : 0));
+      yeasts.slice(1).forEach(v=>x.push(row.drozdze===v ? 1 : 0));
+      waters.slice(1).forEach(v=>x.push(row.woda===v ? 1 : 0));
+      return x;
+    };
+
+    const X = data.map(vectorFor);
+    const y = data.map(r=>Math.log(Number(r.litry)));
+    let weights = data.map(()=>1);
+    let beta = null;
+
+    for (let iteration=0; iteration<4; iteration++) {
+      beta = distilleryWeightedRidge(X,y,weights);
+      if (!beta) return null;
+      const residuals = y.map((target,i) => target - X[i].reduce((sum,v,j)=>sum+v*beta[j],0));
+      const center = distilleryMedian(residuals);
+      const mad = distilleryMedian(residuals.map(v=>Math.abs(v-center))) || 0.02;
+      const scale = Math.max(0.015,1.4826*mad);
+      const huber = 1.5*scale;
+      weights = residuals.map(r => {
+        const d = Math.abs(r-center);
+        return d <= huber ? 1 : huber/Math.max(d,1e-9);
+      });
+    }
+
+    const predictRaw = row => Math.exp(vectorFor(row).reduce((sum,v,j)=>sum+v*beta[j],0));
+    const errors = data.map(row=>Number(row.litry)-predictRaw(row));
+    const abs = errors.map(Math.abs);
+    const mae = abs.reduce((a,b)=>a+b,0)/abs.length;
+    const rmse = Math.sqrt(errors.reduce((a,b)=>a+b*b,0)/errors.length);
+
+    const counts = {
+      base:Object.fromEntries(bases.map(v=>[v,data.filter(r=>r.baza===v).length])),
+      yeast:Object.fromEntries(yeasts.map(v=>[v,data.filter(r=>r.drozdze===v).length])),
+      water:Object.fromEntries(waters.map(v=>[v,data.filter(r=>r.woda===v).length]))
+    };
+
+    return {program,dataCount:data.length,bases,yeasts,waters,baseRef,yeastRef,waterRef,featureNames,beta,mae,rmse,counts,predictRaw};
+  }
+
+  function distilleryBuildExperimentalModel(recipes) {
+    const rows = (recipes || []).filter(r=>Number.isFinite(Number(r.litry)) && Number(r.litry)>0);
+    const signature = rows
+      .map(r=>`${key(r.baza,r.drozdze,r.woda,r.program)}=${Number(r.litry).toFixed(4)}`)
+      .sort()
+      .join(";");
+
+    if (distilleryModelCache && signature === distilleryModelCacheSignature) return distilleryModelCache;
+
+    const programs = {};
+    PROGRAMS.forEach(program => {
+      programs[program] = distilleryFitProgram(rows,program);
+    });
+
+    distilleryModelCacheSignature = signature;
+    distilleryModelCache = {programs,knownCount:rows.length,createdAt:Date.now()};
+    return distilleryModelCache;
+  }
+
+  function distilleryPredict(recipe, model) {
+    const fit = model && model.programs ? model.programs[Number(recipe.program)] : null;
+    if (!fit) return null;
+    if (!fit.bases.includes(recipe.baza) || !fit.yeasts.includes(recipe.drozdze) || !fit.waters.includes(recipe.woda)) return null;
+
+    const estimate = fit.predictRaw(recipe);
+    if (!Number.isFinite(estimate) || estimate <= 0) return null;
+
+    const support = Math.min(
+      Number(fit.counts.base[recipe.baza]) || 0,
+      Number(fit.counts.yeast[recipe.drozdze]) || 0,
+      Number(fit.counts.water[recipe.woda]) || 0
+    );
+    const relError = fit.rmse / Math.max(estimate,0.01);
+    let confidence = "niska";
+    if (fit.dataCount >= 35 && support >= 8 && relError <= 0.10) confidence = "wysoka";
+    else if (fit.dataCount >= 20 && support >= 4 && relError <= 0.18) confidence = "średnia";
+
+    return {
+      estimate,
+      confidence,
+      support,
+      dataCount:fit.dataCount,
+      mae:fit.mae,
+      rmse:fit.rmse,
+      uncertainty:Math.max(fit.rmse,fit.mae*1.25,0.03)
+    };
+  }
+
+  function distilleryPredictionHtml(recipe, model, compact=false) {
+    const prediction = distilleryPredict(recipe,model);
+    if (!prediction) return compact ? "" : `<div class="distillery-estimate unavailable">🧪 Brak wystarczających danych do estymacji.</div>`;
+    return `<div class="distillery-estimate confidence-${prediction.confidence}">
+      🧪 Szacunek: <b>~${fmt(prediction.estimate)} l</b>
+      <span>· pewność ${escapeHtml(prediction.confidence)} · P${recipe.program}: ${prediction.dataCount} wyników · wsparcie min. ${prediction.support}</span>
+    </div>`;
+  }
+
+  function distilleryExperimentRecommendations(data, model) {
+    const free = (data.unknown || []).filter(r=>!recipeReservationFor(r));
+    const predicted = free
+      .map(recipe=>({recipe,prediction:distilleryPredict(recipe,model)}))
+      .filter(x=>x.prediction);
+    if (!predicted.length) return [];
+
+    const estimates = predicted.map(x=>x.prediction.estimate);
+    const min = Math.min(...estimates), max = Math.max(...estimates);
+    predicted.forEach(item => {
+      const yieldScore = max>min ? (item.prediction.estimate-min)/(max-min) : 0.5;
+      const infoScore = 1/Math.sqrt(Math.max(1,item.prediction.support));
+      const confidenceBonus = item.prediction.confidence === "niska" ? 0.12 : 0;
+      item.score = 0.62*yieldScore + 0.38*infoScore + confidenceBonus;
+    });
+    predicted.sort((a,b)=>b.score-a.score || b.prediction.estimate-a.prediction.estimate);
+
+    const selected = [];
+    const signatures = new Set();
+    for (const item of predicted) {
+      const trioSig = `${item.recipe.baza}|${item.recipe.drozdze}|${item.recipe.woda}`;
+      // Trzy rekomendacje mają badać trzy różne zestawy składników.
+      // Program nadal wpływa na model/wynik, ale nie chcemy zajmować całej
+      // listy prawie tym samym trio tylko na innych programach.
+      if (signatures.has(trioSig)) continue;
+      selected.push(item);
+      signatures.add(trioSig);
+      if (selected.length >= 3) break;
+    }
+    return selected;
+  }
+
+  function renderDistilleryExperimentalModel(data) {
+    const host = el("distillery-experiment-recommendations");
+    if (!host) return;
+    const model = distilleryBuildExperimentalModel(data.recipes);
+    const recommendations = distilleryExperimentRecommendations(data,model);
+    const fits = PROGRAMS.map(p=>model.programs[p]).filter(Boolean);
+    const meanRmse = fits.length ? fits.reduce((sum,f)=>sum+f.rmse,0)/fits.length : null;
+
+    host.innerHTML = `
+      <div class="distillery-model-head">
+        <strong>🧪 Eksperymentalny model Destylarni</strong>
+        <span>${model.knownCount} potwierdzonych wyników${meanRmse!=null ? ` · RMSE dopasowania ~${fmt(meanRmse)} l` : ""}</span>
+      </div>
+      <div class="muted">Model uczy osobne zależności składników dla każdego programu. To estymacja z danych gangu, nie ukryty wzór gry.</div>
+      ${recommendations.length ? `
+        <div class="distillery-recommendation-grid">
+          ${recommendations.map((item,index)=>`
+            <button type="button" class="distillery-recommendation" data-distillery-recommend="${escapeHtml(key(item.recipe.baza,item.recipe.drozdze,item.recipe.woda,item.recipe.program))}">
+              <b>${index===0 ? "🎯" : "🔬"} ${escapeHtml(displayName(item.recipe.baza))} · P${item.recipe.program}</b>
+              <span>${escapeHtml(displayName(item.recipe.drozdze))} · ${escapeHtml(displayName(item.recipe.woda))}</span>
+              <span>~${fmt(item.prediction.estimate)} l · pewność ${escapeHtml(item.prediction.confidence)}</span>
+              <small>${item.prediction.support <= 4 ? "Wartość informacyjna: mało danych dla co najmniej jednego składnika." : "Łączy obiecujący szacunek z wartością nowego pomiaru."}</small>
+            </button>`).join("")}
+        </div>` : `<div class="empty">Za mało danych do bezpiecznej rekomendacji.</div>`}
+    `;
+
+    host.querySelectorAll("[data-distillery-recommend]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        const recipe = (data.unknown || []).find(r=>key(r.baza,r.drozdze,r.woda,r.program)===button.dataset.distilleryRecommend);
+        if (recipe) reserveUnknownRecipe(recipe);
+      });
+    });
+    return model;
   }
 
 
@@ -1080,6 +1602,10 @@ const MAP_POSITIONS = {
       .filter(recipe => !recipeReservationFor(recipe));
 
     setupUnknownRecipeFilters();
+
+    const experimentalModel =
+      renderDistilleryExperimentalModel(data) ||
+      distilleryBuildExperimentalModel(data.recipes);
 
     const unknownBase =
       el("unknown-filter-base")?.value || "";
@@ -1151,6 +1677,8 @@ const MAP_POSITIONS = {
                       P${recipe.program}
                     </small>
                   </div>
+
+                  ${distilleryPredictionHtml(recipe,experimentalModel,true)}
 
                   ${
                     recipe.interesting
@@ -1249,6 +1777,8 @@ const MAP_POSITIONS = {
                     P${recipe.program}
                   </small>
                 </div>
+
+                ${distilleryPredictionHtml(recipe,experimentalModel,true)}
 
                 ${
                   recipe.interesting
@@ -1395,111 +1925,72 @@ const MAP_POSITIONS = {
   }
 
   function renderMap() {
+    const container = el("map-list");
+    if (!container) return;
 
-  const container =
-    el("map-list");
-
-  const markers =
-    MAP
-      .map(
-        ([district, action, icon]) => {
-
-          const position =
-            MAP_POSITIONS[district];
-
-          if (!position) {
-            return "";
-          }
-
-          const known =
-            Boolean(action);
-
+    const markers =
+      MAP
+        .map(([district,action,icon]) => {
+          const position = MAP_POSITIONS[district];
+          if (!position) return "";
+          const known = Boolean(action);
           return `
             <div
               style="
                 position:absolute;
                 left:${position.x}%;
                 top:${position.y}%;
-                transform:translate(-50%, 0);
+                transform:translate(-50%,0);
                 z-index:2;
-
                 padding:2px 5px;
                 border-radius:6px;
-
-                background:${
-                  known
-                    ? "rgba(255,248,230,.92)"
-                    : "rgba(255,238,238,.94)"
-                };
-
-                border:1px solid ${
-                  known
-                    ? "rgba(95,70,40,.55)"
-                    : "rgba(180,80,80,.65)"
-                };
-
-                box-shadow:
-                  0 1px 3px rgba(0,0,0,.25);
-
+                background:${known ? "rgba(255,248,230,.92)" : "rgba(255,238,238,.94)"};
+                border:1px solid ${known ? "rgba(95,70,40,.55)" : "rgba(180,80,80,.65)"};
+                box-shadow:0 1px 3px rgba(0,0,0,.25);
                 font-size:10px;
                 font-weight:700;
                 line-height:1.15;
                 white-space:nowrap;
-
-                color:${
-                  known
-                    ? "#3d3022"
-                    : "#9a2f2f"
-                };
-
+                color:${known ? "#3d3022" : "#9a2f2f"};
                 pointer-events:none;
-              "
-            >
-              ${icon}
-              ${escapeHtml(
-                action || "Nieodkryte"
-              )}
-            </div>
-          `;
-        }
-      )
-      .join("");
+              ">
+              ${icon} ${escapeHtml(action || "Nieodkryte")}
+            </div>`;
+        })
+        .join("");
 
-
-  container.innerHTML = `
-
-    <div
-      style="
-        max-width:420px;
-        margin:0 auto;
-      "
-    >
-
-      <div
-        style="
-          position:relative;
-          width:100%;
-        "
-      >
-
-        <img
-          src="mapa-warszawa.png"
-          alt="Mapa dzielnic"
-          style="
-            display:block;
-            width:100%;
-            height:auto;
-            border-radius:8px;
-          "
-        >
-
-        ${markers}
-
+    container.innerHTML = `
+      <div class="map-route-planner">
+        <strong>🧭 Planer przejazdu przez wszystkie dzielnice</strong>
+        <p class="muted" style="margin:5px 0 9px">
+          Normal minimalizuje sumę czasów. VIP liczy realne czekanie jako
+          <b>max(0, czas − ${MAP_VIP_FREE_MINUTES} min)</b> i może celowo wracać przez odwiedzone dzielnice.
+        </p>
+        <div class="map-route-controls">
+          <label>
+            <span>📍 Jestem tutaj</span>
+            <select id="map-route-start">
+              ${MAP_ROUTE_DISTRICTS.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("")}
+            </select>
+          </label>
+          <div class="map-mode-switch">
+            <button type="button" data-map-mode="normal">Normal</button>
+            <button type="button" data-map-mode="vip" class="active">💎 VIP</button>
+          </div>
+        </div>
+        <div id="map-route-result" class="map-route-result"></div>
       </div>
 
+      <div style="max-width:420px;margin:0 auto">
+        <div style="position:relative;width:100%">
+          <img
+            src="mapa-warszawa.png"
+            alt="Mapa dzielnic"
+            style="display:block;width:100%;height:auto;border-radius:8px">
+          ${markers}
+        </div>
 
-      <div
-        style="
+        <div style="
           margin-top:12px;
           padding:8px 10px;
           border-radius:8px;
@@ -1507,21 +1998,35 @@ const MAP_POSITIONS = {
           border:1px solid #d8c49f;
           font-size:12px;
           line-height:1.5;
-          text-align:center;
-        "
-      >
-        ⚪ Neutralny
-        &nbsp;·&nbsp;
-        🙏 Błagalny
-        &nbsp;·&nbsp;
-        🤝 Przyjacielski
-        &nbsp;·&nbsp;
-        ⚔️ Agresywny
-      </div>
+          text-align:center">
+          ⚪ Neutralny &nbsp;·&nbsp; 🙏 Błagalny &nbsp;·&nbsp;
+          🤝 Przyjacielski &nbsp;·&nbsp; ⚔️ Agresywny
+        </div>
+      </div>`;
 
-    </div>
-  `;
-}
+    const startSelect = el("map-route-start");
+    if (startSelect) {
+      const preferred =
+        localStorage.getItem("menelwars_map_start_v1") || "Wilanów";
+      if (MAP_ROUTE_DISTRICTS.includes(preferred)) startSelect.value = preferred;
+      startSelect.addEventListener("change",() => {
+        localStorage.setItem("menelwars_map_start_v1",startSelect.value);
+        mapRenderRouteResult();
+      });
+    }
+
+    container.querySelectorAll("[data-map-mode]").forEach(button => {
+      button.addEventListener("click",() => {
+        mapRouteMode = button.dataset.mapMode === "normal" ? "normal" : "vip";
+        container.querySelectorAll("[data-map-mode]").forEach(item => {
+          item.classList.toggle("active",item.dataset.mapMode === mapRouteMode);
+        });
+        mapRenderRouteResult();
+      });
+    });
+
+    mapRenderRouteResult();
+  }
 
   function renderAll() {
 
@@ -1769,34 +2274,94 @@ const MAP_POSITIONS = {
     status.textContent =
       "Wysyłanie...";
 
+    const nonce = makeRecipeNonce();
+
+    criticalOperationStart(
+      "🧪 Wysyłam recepturę…",
+      "Zapisuję zgłoszenie i czekam na potwierdzenie serwera."
+    );
+
     try {
+      let sendError = null;
 
-      // no-cors pozwala wysłać dane do Apps Script
-      // bez proszenia użytkownika o konto Google.
-      await fetch(
-        BACKEND_URL,
-        {
-          method: "POST",
-          mode: "no-cors",
-          headers: {
-            "Content-Type":
-              "text/plain;charset=UTF-8"
-          },
-          body:
-            JSON.stringify(payload)
+      try {
+        await timedBackendPost(
+          "submitRecipeBatch",
+          {
+            action:"submitRecipeBatch",
+            nonce,
+            nick,
+            sessionToken:playerAccountSessionToken() || "",
+            items:[{
+              ...payload,
+              uwagi:
+                payload.uwagi ||
+                "Ręczne zgłoszenie z MenelWars Tools."
+            }]
+          }
+        );
+      } catch (err) {
+        // Nie ponawiamy POST. Wynik jest sprawdzany po tym samym nonce.
+        sendError = err;
+      }
+
+      let result = null;
+
+      for (let attempt=0; attempt<20; attempt++) {
+        if (attempt > 0) {
+          await new Promise(resolve => setTimeout(resolve,350));
         }
-      );
 
-      status.innerHTML =
-        "✅ Zgłoszenie wysłane do weryfikacji.";
+        try {
+          result = await jsonp(
+            "recipeBatchImportResult",
+            {nonce}
+          );
+        } catch (err) {
+          if (attempt === 19 && !sendError) sendError = err;
+          continue;
+        }
+
+        if (result && !result.pending) break;
+      }
+
+      if (!result || result.pending) {
+        throw sendError || new Error(
+          "Serwer nie potwierdził zapisu receptury."
+        );
+      }
+
+      if (!result.ok) {
+        throw new Error(
+          result.error ||
+          "Nie udało się zapisać zgłoszenia."
+        );
+      }
+
+      if (Number(result.insertedCount) > 0) {
+        status.innerHTML =
+          "✅ Zgłoszenie wysłane do weryfikacji.";
+      } else if (Number(result.skippedKnown) > 0) {
+        status.innerHTML =
+          "✅ Ten sam wynik jest już potwierdzony w bazie.";
+      } else if (Number(result.skippedPending) > 0) {
+        status.innerHTML =
+          "ℹ️ Identyczne zgłoszenie już czeka na weryfikację.";
+      } else {
+        status.innerHTML =
+          "✅ Zgłoszenie zostało sprawdzone przez serwer.";
+      }
 
       el("submit-liters").value = "";
       el("submit-notes").value = "";
 
     } catch (err) {
-
       status.textContent =
-        "Nie udało się wysłać zgłoszenia. Sprawdź internet.";
+        err && err.message
+          ? err.message
+          : "Nie udało się wysłać zgłoszenia. Sprawdź internet.";
+    } finally {
+      criticalOperationFinish();
     }
   }
 
@@ -1868,7 +2433,7 @@ const MAP_POSITIONS = {
         return;
       }
 
-      if (cols.length < 5) {
+      if (cols.length !== 5) {
         parsed.push({
           line:index + 1,
           state:"invalid",
@@ -2084,21 +2649,28 @@ const MAP_POSITIONS = {
     button.disabled = true;
     status.textContent = "Wysyłanie paczki wyników...";
 
+    criticalOperationStart(
+      "📋 Wysyłam paczkę receptur…",
+      "Zapisuję wyniki i czekam na potwierdzenie serwera."
+    );
+
     try {
-      await fetch(
-        BACKEND_URL,
-        {
-          method:"POST",
-          mode:"no-cors",
-          headers:{"Content-Type":"text/plain;charset=UTF-8"},
-          body:JSON.stringify({
+      let sendError = null;
+
+      try {
+        await timedBackendPost(
+          "submitRecipeBatch",
+          {
             action:"submitRecipeBatch",
             nonce,
             nick,
+            sessionToken:playerAccountSessionToken() || "",
             items
-          })
-        }
-      );
+          }
+        );
+      } catch (err) {
+        sendError = err;
+      }
 
       let result = null;
 
@@ -2109,7 +2681,7 @@ const MAP_POSITIONS = {
       }
 
       if (!result || result.pending) {
-        throw new Error("Serwer nie zwrócił wyniku importu.");
+        throw sendError || new Error("Serwer nie zwrócił wyniku importu.");
       }
 
       if (!result.ok) {
@@ -2132,6 +2704,7 @@ const MAP_POSITIONS = {
         ? err.message
         : "Nie udało się wysłać importu.";
     } finally {
+      criticalOperationFinish();
       button.disabled = false;
     }
   }
@@ -2155,7 +2728,7 @@ const MAP_POSITIONS = {
   const moduleOpenInFlight = {
     distillery:null,
     garden:null,
-    gang:null,
+    gang:Object.create(null),
     builds:null,
     map:null,
     account:null
@@ -2199,7 +2772,7 @@ const MAP_POSITIONS = {
   let moduleAccessPolicyInFlight = null;
 
   const MODULE_ACCESS_POLICY_TTL_MS =
-    30 * 1000;
+    5 * 1000;
 
   async function fetchModuleAccessPolicy(
     options={}
@@ -2299,10 +2872,13 @@ const MAP_POSITIONS = {
   }
 
   async function ensureModuleAccess(
-    moduleName
+    moduleName,
+    options={}
   ) {
     const policy =
-      await fetchModuleAccessPolicy();
+      await fetchModuleAccessPolicy({
+        force:Boolean(options.force)
+      });
 
     if (
       !policy ||
@@ -2312,7 +2888,10 @@ const MAP_POSITIONS = {
     }
 
     const account =
-      await playerAccountStatus();
+      await playerAccountStatus({
+        force:Boolean(options.force),
+        strict:true
+      });
 
     if (account) {
       return true;
@@ -2332,7 +2911,8 @@ const MAP_POSITIONS = {
   ) {
     if (
       !(await ensureModuleAccess(
-        "distillery"
+        "distillery",
+        {force:true}
       ))
     ) {
       return;
@@ -2379,7 +2959,8 @@ const MAP_POSITIONS = {
   async function openMapModule() {
     if (
       !(await ensureModuleAccess(
-        "map"
+        "map",
+        {force:true}
       ))
     ) {
       return;
@@ -2790,7 +3371,7 @@ const MAP_POSITIONS = {
   const JSONP_TIMEOUT_MS = 20 * 1000;
   const JSONP_LATE_GRACE_MS = 60 * 1000;
 
-  function jsonp(action, params={}) {
+  function jsonpOnce(action, params={}) {
 
     const timingStartedAt =
       requestTimingNow();
@@ -2925,6 +3506,60 @@ const MAP_POSITIONS = {
       document.head.appendChild(script);
     });
   }
+
+  const JSONP_SAFE_RETRY_ACTIONS = new Set([
+    "reserveRecipeResult",
+    "reservedSubmitResult",
+    "recipeBatchImportResult",
+    "moduleAccessPolicy",
+    "playerAccountActionResult",
+    "playerAccountStatus",
+    "accountAdminPlayers",
+    "playerIdentityStatus",
+    "playerIdentityActionResult",
+    "companySalaryActionResult",
+    "gangPolls",
+    "gangGoal",
+    "gangAnnouncements",
+    "payments",
+    "gangLoginResult",
+    "adminMutationResult",
+    "adminDashboardStatus",
+    "adminGangTools",
+    "adminBuilds",
+    "adminTest",
+    "adminSubmissions",
+    "adminPaymentsStatus",
+    "adminImportPaymentsResult",
+    "buildActionResult",
+    "builds",
+    "gardenActionResult",
+    "gardenData",
+    "gangMenuStatus"
+  ]);
+
+  function jsonpShouldRetry(action) {
+    // Retry jest dozwolony WYŁĄCZNIE dla jawnie sklasyfikowanych odczytów.
+    // Nieznana/nowa akcja domyślnie nie jest ponawiana, więc przypadkowy
+    // mutujący GET nie może zostać wykonany drugi raz po zgubionej odpowiedzi.
+    return JSONP_SAFE_RETRY_ACTIONS.has(String(action || ""));
+  }
+
+  async function jsonp(action,params={},options={}) {
+    const retry =
+      options.retry === false
+        ? false
+        : jsonpShouldRetry(action);
+
+    try {
+      return await jsonpOnce(action,params);
+    } catch (err) {
+      if (!retry) throw err;
+      await new Promise(resolve => setTimeout(resolve,250));
+      return jsonpOnce(action,params);
+    }
+  }
+
 
   function formatPaymentsDateTime(value) {
 
@@ -3105,24 +3740,37 @@ const MAP_POSITIONS = {
 
   async function playerAccountPostAction(action,data={}) {
     const nonce = makeRecipeNonce();
+    let sendError = null;
 
-    await timedBackendPost(
-      action,
-      {
+    try {
+      await timedBackendPost(
         action,
-        nonce,
-        ...data
-      }
-    );
+        {
+          action,
+          nonce,
+          ...data
+        }
+      );
+    } catch (err) {
+      // Nie ponawiamy POST. Backend pamięta wynik pod tym samym nonce.
+      sendError = err;
+    }
 
     let result = null;
     for (let i=0;i<20;i++) {
-      await new Promise(resolve => setTimeout(resolve,350));
-      result = await jsonp("playerAccountActionResult",{nonce});
+      if (i > 0) await new Promise(resolve => setTimeout(resolve,350));
+      try {
+        result = await jsonp("playerAccountActionResult",{nonce});
+      } catch (err) {
+        if (i === 19 && !sendError) sendError = err;
+        continue;
+      }
       if (result && !result.pending) break;
     }
 
-    if (!result || result.pending) throw new Error("Serwer nie zwrócił wyniku operacji.");
+    if (!result || result.pending) {
+      throw sendError || new Error("Serwer nie zwrócił wyniku operacji.");
+    }
     if (!result.ok) {
       const err = new Error(result.error || "Operacja nie powiodła się.");
       err.data = result;
@@ -3147,6 +3795,7 @@ const MAP_POSITIONS = {
     }
 
     const force = Boolean(options.force);
+    const strict = Boolean(options.strict);
 
     if (
       !force &&
@@ -3187,6 +3836,10 @@ const MAP_POSITIONS = {
         return result;
 
       } catch (err) {
+        // Dla kontroli dostępu można wymusić fail-closed: jeśli świeże
+        // potwierdzenie sesji się nie udało, nie otwieramy modułu tylko na
+        // podstawie nawet poprawnego wcześniej cache.
+        if (strict) return null;
         return cachedAccountStatusToken === token
           ? cachedAccountStatus
           : null;
@@ -3444,27 +4097,19 @@ const MAP_POSITIONS = {
             "Wylogowywanie innych sesji..."
           );
 
-          try {
-          adminLoaderTexts(
-            "sessions"
+          criticalOperationStart(
+            "🚫 Wylogowuję inne sesje…",
+            "Unieważniam pozostałe sesje i czekam na potwierdzenie serwera."
           );
-            await fetch(
-              BACKEND_URL,
-              {
-                method:"POST",
-                mode:"no-cors",
-                headers:{
-                  "Content-Type":
-                    "text/plain;charset=UTF-8"
-                },
-                body:
-                  JSON.stringify({
-                    action:
-                      "playerAccountLogoutOtherSessions",
-                    sessionToken:
-                      playerAccountSessionToken()
-                  })
-              }
+
+          try {
+            adminLoaderTexts(
+              "sessions"
+            );
+
+            await playerAccountPostAction(
+              "playerAccountLogoutOtherSessions",
+              {sessionToken:playerAccountSessionToken()}
             );
 
             status.textContent =
@@ -3477,6 +4122,7 @@ const MAP_POSITIONS = {
               err.message ||
               "Nie udało się wylogować innych sesji.";
           } finally {
+            criticalOperationFinish();
             clearActionLoading(button);
           }
         }
@@ -3495,18 +4141,39 @@ const MAP_POSITIONS = {
       const password=el("account-bootstrap-password")?.value || "";
       if (!password) { status.textContent="Wpisz dotychczasowe hasło Admina."; return; }
       setActionLoading(button,status,"Nadawanie uprawnień...");
+      criticalOperationStart(
+        "🛠 Nadaję pierwszego Admina…",
+        "Zapisuję uprawnienie i potwierdzam je świeżym odczytem konta."
+      );
       try {
-        await fetch(BACKEND_URL,{
-          method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=UTF-8"},
-          body:JSON.stringify({action:"playerAccountBootstrapAdmin",legacyAdminPassword:password,sessionToken:playerAccountSessionToken()})
-        });
-        await new Promise(resolve=>setTimeout(resolve,600));
-        const refreshed=await playerAccountStatus();
-        if (!refreshed || !refreshed.admin) throw new Error("Nie udało się nadać uprawnień. Sprawdź stare hasło Admina.");
+        let sendError=null;
+        try {
+          await timedBackendPost(
+            "playerAccountBootstrapAdmin",
+            {
+              action:"playerAccountBootstrapAdmin",
+              legacyAdminPassword:password,
+              sessionToken:playerAccountSessionToken()
+            }
+          );
+        } catch(err) {
+          sendError=err;
+        }
+
+        await new Promise(resolve=>setTimeout(resolve,400));
+        const refreshed=await playerAccountStatus({force:true});
+        if (!refreshed || !refreshed.admin) {
+          throw sendError || new Error(
+            "Nie udało się nadać uprawnień. Sprawdź stare hasło Admina."
+          );
+        }
         status.textContent="✅ Konto otrzymało uprawnienia administratora.";
         await renderAccountView();
       } catch(err) { status.textContent=err.message || "Nie udało się nadać uprawnień."; }
-      finally { clearActionLoading(button); }
+      finally {
+        criticalOperationFinish();
+        clearActionLoading(button);
+      }
     });
 
     el("account-admin-open")?.addEventListener("click",()=>{
@@ -3843,24 +4510,25 @@ async function loadAccountAdminPermissions(
               );
 
               try {
-                await timedBackendPost(
-                "accountAdminSetPermission",
-                {
-                  action:
-                    "accountAdminSetPermission",
-                  sessionToken:
-                    playerAccountSessionToken(),
-                  nick:
-                    button.dataset.accountAdminToggle,
-                  enabled:
-                    button.dataset.enabled !== "1"
-                }
-              );
+                await confirmedAdminMutationPost(
+                  "accountAdminSetPermission",
+                  {
+                    action:
+                      "accountAdminSetPermission",
+                    sessionToken:
+                      playerAccountSessionToken(),
+                    nick:
+                      button.dataset.accountAdminToggle,
+                    enabled:
+                      button.dataset.enabled !== "1"
+                  },
+                  {token:playerAccountSessionToken()}
+                );
 
               accountAdminPlayersCacheAt = 0;
 
               // Bez sztucznego dodatkowego 400 ms.
-              loadAccountAdminPermissions({
+              await loadAccountAdminPermissions({
                 force:true
               });
               } finally {
@@ -3893,20 +4561,21 @@ async function loadAccountAdminPermissions(
               );
 
               try {
-                await timedBackendPost(
-                "accountAdminLogoutAll",
-                {
-                  action:
-                    "accountAdminLogoutAll",
-                  sessionToken:
-                    playerAccountSessionToken(),
-                  nick
-                }
-              );
+                await confirmedAdminMutationPost(
+                  "accountAdminLogoutAll",
+                  {
+                    action:
+                      "accountAdminLogoutAll",
+                    sessionToken:
+                      playerAccountSessionToken(),
+                    nick
+                  },
+                  {token:playerAccountSessionToken()}
+                );
 
               accountAdminPlayersCacheAt = 0;
 
-              loadAccountAdminPermissions({
+              await loadAccountAdminPermissions({
                 force:true
               });
               } finally {
@@ -4050,23 +4719,20 @@ async function loadAccountAdminPermissions(
     const nonce =
       makeRecipeNonce();
 
-    await fetch(
-      BACKEND_URL,
-      {
-        method:"POST",
-        mode:"no-cors",
-        headers:{
-          "Content-Type":
-            "text/plain;charset=UTF-8"
-        },
-        body:
-          JSON.stringify({
-            action,
-            nonce,
-            ...data
-          })
-      }
-    );
+    let sendError = null;
+
+    try {
+      await timedBackendPost(
+        action,
+        {
+          action,
+          nonce,
+          ...data
+        }
+      );
+    } catch (err) {
+      sendError = err;
+    }
 
     let result = null;
 
@@ -4075,16 +4741,22 @@ async function loadAccountAdminPermissions(
       attempt<20;
       attempt++
     ) {
-      await new Promise(
-        resolve =>
-          setTimeout(resolve,350)
-      );
-
-      result =
-        await jsonp(
-          "playerIdentityActionResult",
-          {nonce}
+      if (attempt > 0) {
+        await new Promise(
+          resolve => setTimeout(resolve,350)
         );
+      }
+
+      try {
+        result =
+          await jsonp(
+            "playerIdentityActionResult",
+            {nonce}
+          );
+      } catch (err) {
+        if (attempt === 19 && !sendError) sendError = err;
+        continue;
+      }
 
       if (
         result &&
@@ -4098,7 +4770,7 @@ async function loadAccountAdminPermissions(
       !result ||
       result.pending
     ) {
-      throw new Error(
+      throw sendError || new Error(
         "Serwer nie zwrócił wyniku operacji."
       );
     }
@@ -4131,23 +4803,20 @@ async function loadAccountAdminPermissions(
     const nonce =
       makeRecipeNonce();
 
-    await fetch(
-      BACKEND_URL,
-      {
-        method:"POST",
-        mode:"no-cors",
-        headers:{
-          "Content-Type":
-            "text/plain;charset=UTF-8"
-        },
-        body:
-          JSON.stringify({
-            action,
-            nonce,
-            ...data
-          })
-      }
-    );
+    let sendError = null;
+
+    try {
+      await timedBackendPost(
+        action,
+        {
+          action,
+          nonce,
+          ...data
+        }
+      );
+    } catch (err) {
+      sendError = err;
+    }
 
     let result = null;
 
@@ -4156,16 +4825,22 @@ async function loadAccountAdminPermissions(
       attempt<20;
       attempt++
     ) {
-      await new Promise(
-        resolve =>
-          setTimeout(resolve,350)
-      );
-
-      result =
-        await jsonp(
-          "companySalaryActionResult",
-          {nonce}
+      if (attempt > 0) {
+        await new Promise(
+          resolve => setTimeout(resolve,350)
         );
+      }
+
+      try {
+        result =
+          await jsonp(
+            "companySalaryActionResult",
+            {nonce}
+          );
+      } catch (err) {
+        if (attempt === 19 && !sendError) sendError = err;
+        continue;
+      }
 
       if (
         result &&
@@ -4179,7 +4854,7 @@ async function loadAccountAdminPermissions(
       !result ||
       result.pending
     ) {
-      throw new Error(
+      throw sendError || new Error(
         "Serwer nie zwrócił wyniku operacji."
       );
     }
@@ -5206,22 +5881,20 @@ const goal = payload && payload.goal;
     status.textContent = "Sprawdzanie hasła...";
 
     try {
+      let sendError = null;
 
-      await fetch(
-        BACKEND_URL,
-        {
-          method: "POST",
-          mode: "no-cors",
-          headers: {
-            "Content-Type": "text/plain;charset=UTF-8"
-          },
-          body: JSON.stringify({
-            action: "gangLogin",
+      try {
+        await timedBackendPost(
+          "gangLogin",
+          {
+            action:"gangLogin",
             nonce,
             password
-          })
-        }
-      );
+          }
+        );
+      } catch (err) {
+        sendError = err;
+      }
 
       let result = null;
 
@@ -5243,7 +5916,7 @@ const goal = payload && payload.goal;
       }
 
       if (!result || result.pending) {
-        throw new Error(
+        throw sendError || new Error(
           "Serwer nie zwrócił wyniku logowania. Spróbuj ponownie."
         );
       }
@@ -5288,7 +5961,7 @@ const goal = payload && payload.goal;
 let adminPaymentsSnapshot = null;
 let latestGangPayload = null;
 let latestGangPayloadAt = 0;
-const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
+const GANG_PAYLOAD_TTL_MS = 5 * 1000;
 let gangSessionValidationAt = 0;
 
 
@@ -5554,25 +6227,39 @@ function criticalOperationFinish() {
 
 async function timedBackendPost(
   action,
-  body
+  body,
+  options={}
 ) {
-  const startedAt =
-    requestTimingNow();
+  const startedAt = requestTimingNow();
+  const timeoutMs =
+    Math.max(3000,Number(options.timeoutMs) || 20000);
+
+  const controller =
+    typeof AbortController !== "undefined"
+      ? new AbortController()
+      : null;
+
+  const timer =
+    controller
+      ? setTimeout(() => controller.abort(),timeoutMs)
+      : null;
 
   try {
-    const result =
-      await fetch(
-        BACKEND_URL,
-        {
-          method:"POST",
-          mode:"no-cors",
-          headers:{
-            "Content-Type":
-              "text/plain;charset=UTF-8"
-          },
-          body:JSON.stringify(body)
-        }
-      );
+    // Krytyczny zapis POST nigdy nie jest automatycznie ponawiany.
+    // Potwierdzenie wyniku odbywa się osobnym odczytem po nonce/requestId.
+    const result = await fetch(
+      BACKEND_URL,
+      {
+        method:"POST",
+        mode:"no-cors",
+        cache:"no-store",
+        signal:controller ? controller.signal : undefined,
+        headers:{
+          "Content-Type":"text/plain;charset=UTF-8"
+        },
+        body:JSON.stringify(body)
+      }
+    );
 
     recordRequestTiming(
       action,
@@ -5591,7 +6278,170 @@ async function timedBackendPost(
       "POST"
     );
 
+    if (err && err.name === "AbortError") {
+      throw new Error("Przekroczono czas wysyłania zapisu do serwera.");
+    }
+
     throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+
+async function waitForAdminMutationResult(
+  mutationAction,
+  requestId,
+  token,
+  options={}
+) {
+  const attempts =
+    Math.max(4,Number(options.attempts) || 28);
+
+  const intervalMs =
+    Math.max(150,Number(options.intervalMs) || 400);
+
+  let lastTransportError = null;
+
+  for (let attempt=0; attempt<attempts; attempt++) {
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve,intervalMs));
+    }
+
+    let payload = null;
+
+    try {
+      payload = await jsonp(
+        "adminMutationResult",
+        {
+          token,
+          mutationAction,
+          requestId
+        }
+      );
+    } catch (err) {
+      lastTransportError = err;
+      continue;
+    }
+
+    if (!payload) {
+      continue;
+    }
+
+    if (payload.ok === false) {
+      throw new Error(
+        payload.error ||
+        "Serwer odrzucił potwierdzenie operacji administratora."
+      );
+    }
+
+    if (payload.pending) {
+      continue;
+    }
+
+    const result =
+      payload.result && typeof payload.result === "object"
+        ? payload.result
+        : null;
+
+    if (!result) {
+      throw new Error(
+        "Serwer zwrócił nieprawidłowe potwierdzenie zapisu."
+      );
+    }
+
+    if (result.ok === false) {
+      const error = new Error(
+        result.error ||
+        "Operacja nie została wykonana."
+      );
+      error.result = result;
+      throw error;
+    }
+
+    return result;
+  }
+
+  if (lastTransportError) {
+    throw new Error(
+      `Nie udało się potwierdzić zapisu: ${
+        lastTransportError && lastTransportError.message
+          ? lastTransportError.message
+          : "błąd połączenia"
+      }`
+    );
+  }
+
+  throw new Error(
+    "Serwer nie potwierdził zapisu w wymaganym czasie. Nie ponawiaj operacji automatycznie — odśwież dane i sprawdź stan."
+  );
+}
+
+
+async function confirmedAdminMutationPost(
+  action,
+  body,
+  options={}
+) {
+  const requestId =
+    String(
+      options.requestId ||
+      body.requestId ||
+      body.nonce ||
+      makeRecipeNonce()
+    ).trim();
+
+  const token =
+    String(
+      options.token ||
+      body.token ||
+      body.sessionToken ||
+      adminToken() ||
+      ""
+    );
+
+  const postBody = {
+    ...body,
+    requestId
+  };
+
+  let transportError = null;
+
+  try {
+    await timedBackendPost(
+      action,
+      postBody,
+      options
+    );
+  } catch (err) {
+    // POST mógł zostać wykonany po stronie Apps Script mimo zerwanego
+    // połączenia. Nie wysyłamy go ponownie — sprawdzamy dokładnie ten
+    // sam requestId w osobnym, bezpiecznym GET.
+    transportError = err;
+  }
+
+  try {
+    return await waitForAdminMutationResult(
+      action,
+      requestId,
+      token,
+      options
+    );
+  } catch (confirmationError) {
+    if (
+      transportError &&
+      confirmationError &&
+      /nie potwierdził|nie udało się potwierdzić/i.test(
+        String(confirmationError.message || "")
+      )
+    ) {
+      throw new Error(
+        `${transportError.message || "Błąd wysyłania zapisu."} ` +
+        "Nie udało się również potwierdzić, czy serwer wykonał operację. Odśwież dane przed ponowną próbą."
+      );
+    }
+
+    throw confirmationError;
   }
 }
 
@@ -5607,8 +6457,13 @@ const ADMIN_CRITICAL_ACTIONS = {
   adminDeleteGangPoll:"🗑 Usuwam ankietę…",
   adminSetModuleAccess:"🔐 Zmieniam dostęp do modułu…",
   adminDeleteBuild:"🗑 Usuwam publiczny build…",
+  adminClearReservation:"🧹 Zwalniam rezerwację…",
   adminClearAllReservations:"🧹 Czyszczę rezerwacje…",
-  adminRenamePlayer:"✏️ Zmieniam nick gracza…"
+  adminGenerateSalaryClaimCode:"🔑 Generuję kod aktywacyjny…",
+  adminSetCompanyIncome:"💰 Aktualizuję dochód Spółki…",
+  adminActivateCompanySalaryPlan:"💰 Aktywuję plan pensji…",
+  adminRenamePlayer:"✏️ Zmieniam nick gracza…",
+  adminRevokePlayerIdentity:"🚫 Unieważniam tożsamość gracza…"
 };
 
 async function adminPostAction(action, data={}) {
@@ -5619,34 +6474,49 @@ async function adminPostAction(action, data={}) {
     throw new Error("Brak sesji administratora.");
   }
 
+  // adminPostAction służy wyłącznie do zapisów. Każdy taki zapis dostaje
+  // blocking overlay oraz własny requestId potwierdzany przez backend.
   const criticalTitle =
-    ADMIN_CRITICAL_ACTIONS[action] || "";
+    ADMIN_CRITICAL_ACTIONS[action] ||
+    "💾 Zapisuję zmianę…";
 
-  if (criticalTitle) {
-    criticalOperationStart(
-      criticalTitle,
-      "Zapisuję zmianę. Poczekaj na potwierdzenie serwera."
-    );
-  }
+  criticalOperationStart(
+    criticalTitle,
+    "Zapisuję zmianę. Poczekaj na potwierdzenie dokładnie tej operacji."
+  );
 
   try {
-    await timedBackendPost(
+    const result = await confirmedAdminMutationPost(
       action,
       {
         action,
         token,
         ...data
-      }
+      },
+      {token}
     );
 
-    // Apps Script + no-cors: krótki bufor przed odczytem świeżego stanu.
-    await new Promise(resolve => setTimeout(resolve, 350));
-  } finally {
-    // Overlay dotyczy samego zapisu. Dalsze GET-y mogą odświeżyć widoki
-    // bez niepotrzebnego blokowania całej aplikacji.
-    if (criticalTitle) {
-      criticalOperationFinish();
+    // Dashboard jest odświeżany dopiero po potwierdzeniu requestId.
+    // Jego chwilowy błąd nie unieważnia już potwierdzonego zapisu.
+    try {
+      const dashboard = await jsonp(
+        "adminDashboardStatus",
+        {token,confirmAt:Date.now()}
+      );
+
+      if (dashboard && dashboard.ok) {
+        applyAdminDashboardStatus(dashboard);
+      }
+    } catch (err) {
+      console.warn(
+        "[MenelWars Tools] Zapis Admin potwierdzony, ale dashboard nie odświeżył się:",
+        err
+      );
     }
+
+    return result;
+  } finally {
+    criticalOperationFinish();
   }
 }
 
@@ -6683,6 +7553,28 @@ function adminSubmissionCard(item) {
        </div>`
     : "";
 
+  const distilleryModel =
+    distilleryBuildExperimentalModel(compute().recipes);
+  const anomalyPrediction =
+    distilleryPredict({
+      baza:item.baza,
+      drozdze:item.drozdze,
+      woda:item.woda,
+      program:item.program
+    },distilleryModel);
+  const anomalyDelta = anomalyPrediction
+    ? Math.abs(Number(item.litry)-anomalyPrediction.estimate)
+    : 0;
+  const anomalyThreshold = anomalyPrediction
+    ? Math.max(0.15,3*anomalyPrediction.rmse,0.20*anomalyPrediction.estimate)
+    : Infinity;
+  const anomalyInfo = anomalyPrediction && anomalyDelta > anomalyThreshold
+    ? `<div class="admin-model-anomaly">
+         🧪 <b>Nietypowy wynik względem modelu:</b> estymacja ~${formatSaldo(anomalyPrediction.estimate)} l, różnica ${formatSaldo(anomalyDelta)} l.
+         <small>To tylko ostrzeżenie jakości danych — nie odrzuca zgłoszenia automatycznie.</small>
+       </div>`
+    : "";
+
   const approveAction = item.duplicate
     ? "DUPLIKAT"
     : "ZATWIERDZONE";
@@ -6746,6 +7638,7 @@ function adminSubmissionCard(item) {
       ${notes}
       ${duplicateInfo}
       ${correctionInfo}
+      ${anomalyInfo}
 
       <div style="
         display:flex;
@@ -6887,32 +7780,16 @@ async function setAdminSubmissionStatus(
 
   try {
 
-    await fetch(
-      BACKEND_URL,
+    await confirmedAdminMutationPost(
+      "adminSetSubmissionStatus",
       {
-        method: "POST",
-        mode: "no-cors",
-
-        headers: {
-          "Content-Type":
-            "text/plain;charset=UTF-8"
-        },
-
-        body: JSON.stringify({
-          action:
-            "adminSetSubmissionStatus",
-
-          token,
-
-          row,
-
-          status:
-            newStatus,
-
-          correction:
-            Boolean(correction)
-        })
-      }
+        action:"adminSetSubmissionStatus",
+        token,
+        row,
+        status:newStatus,
+        correction:Boolean(correction)
+      },
+      {token}
     );
 
 
@@ -7327,27 +8204,14 @@ async function addAdminPlayer(event) {
 
   try {
 
-    await fetch(
-      BACKEND_URL,
+    await confirmedAdminMutationPost(
+      "adminAddPlayer",
       {
-        method: "POST",
-        mode: "no-cors",
-
-        headers: {
-          "Content-Type":
-            "text/plain;charset=UTF-8"
-        },
-
-        body:
-          JSON.stringify({
-            action:
-              "adminAddPlayer",
-
-            token,
-
-            nick
-          })
-      }
+        action:"adminAddPlayer",
+        token,
+        nick
+      },
+      {token}
     );
 
 
@@ -7451,30 +8315,15 @@ async function deleteAdminPlayer(
 
   try {
 
-    await fetch(
-      BACKEND_URL,
+    await confirmedAdminMutationPost(
+      "adminDeletePlayer",
       {
-        method: "POST",
-        mode: "no-cors",
-
-        headers: {
-          "Content-Type":
-            "text/plain;charset=UTF-8"
-        },
-
-        body:
-          JSON.stringify({
-            action:
-              "adminDeletePlayer",
-
-            token,
-
-            nick,
-
-            confirmationNick:
-              second.trim()
-          })
-      }
+        action:"adminDeletePlayer",
+        token,
+        nick,
+        confirmationNick:second.trim()
+      },
+      {token}
     );
 
 
@@ -8455,20 +9304,23 @@ async function importAdminPayments() {
   );
 
   try {
-    await fetch(
-      BACKEND_URL,
-      {
-        method:"POST",
-        mode:"no-cors",
-        headers:{"Content-Type":"text/plain;charset=UTF-8"},
-        body:JSON.stringify({
+    let sendError = null;
+
+    try {
+      await timedBackendPost(
+        "adminImportPayments",
+        {
           action:"adminImportPayments",
           token,
           nonce,
           report
-        })
-      }
-    );
+        }
+      );
+    } catch (err) {
+      // Nie powtarzamy POST. Import jest idempotentny po nonce; nawet po
+      // timeoutcie sprawdzamy wynik tego samego żądania.
+      sendError = err;
+    }
 
     let payload = null;
 
@@ -8484,7 +9336,7 @@ async function importAdminPayments() {
     }
 
     if (!payload || payload.pending) {
-      throw new Error("Serwer nie zwrócił wyniku zapisu.");
+      throw sendError || new Error("Serwer nie zwrócił wyniku zapisu.");
     }
 
     if (!payload.ok) {
@@ -8615,31 +9467,10 @@ function setupAdmin() {
             "company"
           );
 
-          criticalOperationStart(
-            "💰 Aktualizuję dochód Spółki…",
-            "Zapisuję nową wartość. Pozostałe dane odświeżą się w tle."
+          await adminPostAction(
+            "adminSetCompanyIncome",
+            {income:String(income)}
           );
-
-          const payload =
-            await jsonp(
-              "adminSetCompanyIncome",
-              {
-                token:
-                  adminToken(),
-                income:
-                  String(income)
-              }
-            );
-
-          if (!payload || !payload.ok) {
-            throw new Error(
-              payload && payload.error
-                ? payload.error
-                : "Nie udało się zapisać dochodu spółki."
-            );
-          }
-
-          criticalOperationFinish();
 
           await loadAdminPaymentsStatus();
 
@@ -8664,7 +9495,6 @@ function setupAdmin() {
           );
 
         } finally {
-          criticalOperationFinish();
           input.disabled = false;
         }
       }
@@ -9116,25 +9946,22 @@ function setupAdmin() {
           "Wylogowywanie sesji..."
         );
 
+        criticalOperationStart(
+          "🚫 Wylogowuję sesje gracza…",
+          "Unieważniam aktywne sesje i czekam na potwierdzenie serwera."
+        );
+
         try {
-          await fetch(
-            BACKEND_URL,
+          await confirmedAdminMutationPost(
+            "accountAdminLogoutAll",
             {
-              method:"POST",
-              mode:"no-cors",
-              headers:{
-                "Content-Type":
-                  "text/plain;charset=UTF-8"
-              },
-              body:
-                JSON.stringify({
-                  action:
-                    "accountAdminLogoutAll",
-                  sessionToken:
-                    playerAccountSessionToken(),
-                  nick
-                })
-            }
+              action:
+                "accountAdminLogoutAll",
+              sessionToken:
+                playerAccountSessionToken(),
+              nick
+            },
+            {token:playerAccountSessionToken()}
           );
 
           status.textContent =
@@ -9156,6 +9983,7 @@ function setupAdmin() {
             "❌ Wylogowanie nieudane"
           );
         } finally {
+          criticalOperationFinish();
           clearActionLoading(button);
         }
       }
@@ -9181,10 +10009,10 @@ function setupAdmin() {
         button.textContent = "⏳ Generowanie...";
 
         try {
-          const result = await jsonp("adminGenerateSalaryClaimCode",{
-            token:adminToken(),
-            nick
-          });
+          const result = await adminPostAction(
+            "adminGenerateSalaryClaimCode",
+            {nick}
+          );
 
           if (!result || !result.ok) {
             throw new Error(result && result.error ? result.error : "Nie udało się wygenerować kodu.");
@@ -9327,7 +10155,7 @@ function setupAdmin() {
         [["Snajper","+3% szansy na krytyka, +2% celności"],["Rozpruwacz","+7% obrażeń krytycznych"]],
         [["Drapieżnik","+1% progu egzekucji, +2% szansy na krytyka"],["Słaby Punkt","+2% kradzieży życia, +6% obrażeń krytycznych"]],
         [["Znak Łowcy","+1% progu egzekucji"],["Skrytobójstwo","+6% szansy na trafienie krytyczne"]],
-        [["Perfekcyjny Cel","+7% szansy na krytyka, +3% celności"],["Mistrz Krwawienia","+12% obrażeń krytycznych; krytyki mogą nałożyć krwawienie"]],
+        [["Perfekcyjny Cel","+7% szansy na krytyka, +3% celności"],["Mistrz Krwawienia","+12% obrażeń krytycznych; krytyki automatycznie nakładają krwawienie"]],
         [["Oko Kata","+2% progu egzekucji, +6% szansy na krytyka"],["Szkarłatne Ostrze","+4% kradzieży życia, +15% obrażeń krytycznych"]],
         [["Oko Śmierci","+10% szansy na krytyka, +3% progu egzekucji"],["Wykrwawienie","+4% kradzieży życia, +18% obrażeń krytycznych"]],
         [["Jeden Strzał","+12% szansy na krytyka, +3% progu egzekucji, +25% obrażeń krytycznych"],["Bóg Krwi","+5% kradzieży życia, +25% obrażeń krytycznych, +7% szansy na krytyka"]]
@@ -9354,6 +10182,7 @@ function setupAdmin() {
     stun:["Ogłuszenie","%"],
     bleed:["Szansa krwawienia","%"],
     bleedDamage:["Obrażenia krwawienia","%"],
+    appliesBleed:["Krwawienie na kryt",""],
     evasion:["Unik","%"],
     doubleStrike:["Podwójne uderzenie","%"],
     counter:["Kontratak","%"],
@@ -9384,6 +10213,80 @@ function setupAdmin() {
     hpRegen:20
   };
 
+  // Oficjalny frontend MenelWars pobiera `statCaps` z PvP Summary i używa
+  // ich zamiast fallbacków v3.1. Tool robi to samo, jeśli użytkownik wklei
+  // surowy JSON z gry. Klucze po lewej są dokładnie z PvPCombinedStats.
+  const BUILD_RAW_STAT_CAP_ALIASES = {
+    accuracy_percent:"accuracy",
+    crit_chance_percent:"critChance",
+    crit_damage_percent:"critDmg",
+    execute_threshold_percent:"execute",
+    lifesteal_percent:"lifesteal",
+    armor_pen_percent:"armorPen",
+    armor_penetration_percent:"armorPen",
+    stun_chance_percent:"stun",
+    evasion_percent:"evasion",
+    double_strike_percent:"doubleStrike",
+    counter_attack_percent:"counter",
+    healing_reduction_percent:"healingReduction",
+    damage_taken_reduction_percent:"damageReduction",
+    crit_resist_percent:"critResist",
+    stun_resist_percent:"stunResist",
+    bleed_resist_percent:"bleedResist",
+    hp_regen_flat:"hpRegen",
+    hp_regen_effective:"hpRegen"
+  };
+
+  function buildNormalizeDynamicStatCaps(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+    const out = {};
+    const priority = {};
+
+    Object.entries(value).forEach(([rawKey,rawValue]) => {
+      const sourceKey = String(rawKey || "");
+      const internalKey =
+        BUILD_RAW_STAT_CAP_ALIASES[sourceKey] ||
+        (Object.prototype.hasOwnProperty.call(BUILD_STAT_CAPS,sourceKey) ? sourceKey : "");
+      const number = Number(rawValue);
+
+      if (!internalKey || !Number.isFinite(number) || number < 0) return;
+
+      // Backend walki capuje sumę regeneracji jako hp_regen_effective.
+      // Jeśli odpowiedź zawiera także historyczny hp_regen_flat, efektywny
+      // limit ma pierwszeństwo niezależnie od kolejności kluczy w JSON-ie.
+      const itemPriority =
+        sourceKey === "hp_regen_effective"
+          ? 3
+          : (sourceKey === "hp_regen_flat" ? 1 : 2);
+
+      if (priority[internalKey] !== undefined && priority[internalKey] > itemPriority) {
+        return;
+      }
+
+      priority[internalKey] = itemPriority;
+      out[internalKey] = buildStatNumber(Math.min(1000000,number));
+    });
+
+    return out;
+  }
+
+  function buildStatCapsForSource(source) {
+    const raw =
+      source && source.statCaps && typeof source.statCaps === "object"
+        ? source.statCaps
+        : (
+            source &&
+            source.profile &&
+            source.profile.statCaps &&
+            typeof source.profile.statCaps === "object"
+              ? source.profile.statCaps
+              : {}
+          );
+
+    return Object.assign({},BUILD_STAT_CAPS,buildNormalizeDynamicStatCaps(raw));
+  }
+
   function buildNewStatBag() {
     return {
       attackFlat:0,
@@ -9403,6 +10306,7 @@ function setupAdmin() {
       stun:0,
       bleed:0,
       bleedDamage:0,
+      appliesBleed:0,
       evasion:0,
       doubleStrike:0,
       counter:0,
@@ -9422,9 +10326,11 @@ function setupAdmin() {
     return Math.round(n * 100) / 100;
   }
 
-  function buildCapInfo(key,value) {
+  function buildCapInfo(key,value,caps=BUILD_STAT_CAPS) {
     const raw = buildStatNumber(value);
-    const cap = BUILD_STAT_CAPS[key];
+    const cap = caps && Object.prototype.hasOwnProperty.call(caps,key)
+      ? Number(caps[key])
+      : undefined;
     const effective = Number.isFinite(cap)
       ? buildStatNumber(Math.min(cap,raw))
       : raw;
@@ -9435,8 +10341,8 @@ function setupAdmin() {
     return {raw,effective,cap:Number.isFinite(cap) ? cap : null,over};
   }
 
-  function buildCapStat(key,value) {
-    return buildCapInfo(key,value).effective;
+  function buildCapStat(key,value,caps=BUILD_STAT_CAPS) {
+    return buildCapInfo(key,value,caps).effective;
   }
 
   function buildEffectNumber(effect,pattern) {
@@ -9481,10 +10387,13 @@ function setupAdmin() {
         return;
       }
 
-      if (
-        partLower.includes("gdy hp<") ||
-        partLower.includes("krytyki mogą")
-      ) {
+      if (partLower.includes("krytyki mogą nałożyć krwawienie") || partLower.includes("krytyki automatycznie nakładają krwawienie")) {
+        // Mistrz Krwawienia: krytyk AUTOMATYCZNIE nakłada bleed.
+        // Source mapa bitwy pokazuje osobny boolean `appliesBleed`, a użytkownik
+        // potwierdził semantykę mechaniki. Nie traktujemy tego jako szansy.
+        stats.appliesBleed = 1;
+        extras.special.push("Krytyk automatycznie nakłada krwawienie");
+      } else if (partLower.includes("gdy hp<")) {
         extras.conditional.push(part);
       } else {
         unconditionalParts.push(part);
@@ -9523,7 +10432,10 @@ function setupAdmin() {
       buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*uniku\b/i);
     stats.evasion += evasionBonus;
 
-    add("counter",/([+-]?\d+(?:[.,]\d+)?)%\s*kontrataku/i);
+    let counterBonus =
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na kontratak/i) ||
+      buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*kontrataku/i);
+    stats.counter += counterBonus;
 
     let critBonus =
       buildEffectNumber(calcText,/([+-]?\d+(?:[.,]\d+)?)%\s*szansy na trafienie krytyczne/i) ||
@@ -9536,6 +10448,20 @@ function setupAdmin() {
     add("critResist",/([+-]?\d+(?:[.,]\d+)?)%\s*odporności na trafienia krytyczne/i);
     add("stunResist",/([+-]?\d+(?:[.,]\d+)?)%\s*odporności na ogłuszenie/i);
     add("bleedResist",/([+-]?\d+(?:[.,]\d+)?)%\s*odporności na krwawienie/i);
+
+    // Oficjalne opisy potrafią łączyć dwie odporności jednym procentem,
+    // np. „+10% odporności na ogłuszenie i krwawienie”. W takim zapisie
+    // ten sam bonus dotyczy obu statystyk.
+    const stunAndBleedResist =
+      buildEffectNumber(
+        calcText,
+        /([+-]?\d+(?:[.,]\d+)?)%\s*odporności na ogłuszenie i krwawienie/i
+      );
+    if (stunAndBleedResist) {
+      // stun został już wykryty przez krótszy wzorzec powyżej; dokładamy
+      // tylko brakującą odporność na krwawienie.
+      stats.bleedResist += stunAndBleedResist;
+    }
     add("maxHpPct",/([+-]?\d+(?:[.,]\d+)?)%\s*maksymalnego hp/i);
 
     const allResist =
@@ -9572,7 +10498,7 @@ function setupAdmin() {
     // Zachowujemy nietypowe, nieprzeliczalne opisy jako efekty specjalne.
     if (
       lower.includes("krwawienie") &&
-      !/odporności na krwawienie/i.test(calcText) &&
+      !/odporności na (?:[^,;]*\s+i\s+)?krwawienie/i.test(calcText) &&
       !/otrzymywanych obrażeń/i.test(calcText)
     ) {
       if (!/^\+?\d+(?:[.,]\d+)?%\s*kradzieży życia/i.test(calcText)) {
@@ -9588,7 +10514,9 @@ function setupAdmin() {
     "max hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
     "maks hp":{key:"maxHpFlat",label:"Maks. HP",unit:"flat"},
     "max hp %":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
+    "max hp%":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
     "maks hp %":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
+    "maks hp%":{key:"maxHpPct",label:"Maks. HP (%)",unit:"pct"},
 
     // Atak / obrona — auto rozróżnia flat i procent po znaku % wartości.
     "atak":{key:"attackAuto",label:"Atak",unit:"auto"},
@@ -9619,6 +10547,8 @@ function setupAdmin() {
     "redukcja obrazen":{key:"damageReduction",label:"Redukcja obrażeń",unit:"pct"},
     "odpornosc na kryta":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
     "odpornosc na kryt":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
+    "odp na kryt":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
+    "odp na kryta":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
     "odp na kryt szansa":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
     "odp na kryta szansa":{key:"critResist",label:"Odporność na kryt",unit:"pct"},
     "odpornosc na ogluszenie":{key:"stunResist",label:"Odporność na ogłuszenie",unit:"pct"},
@@ -9643,7 +10573,268 @@ function setupAdmin() {
       .trim();
   }
 
+
+  // Surowe klucze pvp_bonuses potwierdzone w source mapie gry.
+  // Jeśli użytkownik wklei JSON z pvp_bonuses, ten blok jest źródłem
+  // prawdy i ma pierwszeństwo przed parserem opisowych etykiet.
+  const BUILD_RAW_PVP_ALIASES = {
+    crit_chance_percent:["critChance",true,"Szansa na kryt"],
+    crit_damage_percent:["critDmg",true,"Obrażenia krytyczne"],
+    armor_pen_percent:["armorPen",true,"Przebicie pancerza"],
+    armor_penetration_percent:["armorPen",true,"Przebicie pancerza"],
+    hp_percent:["maxHpPct",true,"Maks. HP"],
+    max_hp_percent:["maxHpPct",true,"Maks. HP"],
+    hp_flat:["maxHpFlat",false,"Maks. HP"],
+    max_hp_flat:["maxHpFlat",false,"Maks. HP"],
+    double_strike_percent:["doubleStrike",true,"Podwójne uderzenie"],
+    first_strike_percent:["firstStrike",true,"Pierwszy cios"],
+    execute_threshold_percent:["execute",true,"Próg egzekucji"],
+    stun_chance_percent:["stun",true,"Szansa ogłuszenia"],
+    bleed_chance_percent:["bleed",true,"Szansa krwawienia"],
+    bleed_damage_percent:["bleedDamage",true,"Obrażenia krwawienia"],
+    applies_bleed:["appliesBleed",false,"Krwawienie na kryt"],
+    evasion_percent:["evasion",true,"Unik"],
+    accuracy_percent:["accuracy",true,"Celność"],
+    crit_resist_percent:["critResist",true,"Odporność na kryt"],
+    counter_attack_percent:["counter",true,"Kontratak"],
+    damage_taken_reduction_percent:["damageReduction",true,"Redukcja obrażeń"],
+    stun_resist_percent:["stunResist",true,"Odporność na ogłuszenie"],
+    bleed_resist_percent:["bleedResist",true,"Odporność na krwawienie"],
+    lifesteal_percent:["lifesteal",true,"Kradzież życia"],
+    hp_regen_flat:["hpRegen",false,"Regeneracja HP / turę"],
+    hp_regen_percent:["hpRegenPct",true,"Regeneracja HP"],
+    healing_reduction_percent:["healingReduction",true,"Redukcja leczenia wroga"],
+    attack_percent:["attackPct",true,"Atak"],
+    defense_percent:["defensePct",true,"Obrona"],
+    attack_flat:["attackFlat",false,"Atak"],
+    defense_flat:["defenseFlat",false,"Obrona"],
+    initiative:["initiative",false,"Inicjatywa"]
+  };
+
+  function buildFindRawPvpObject(value) {
+    if (!value || typeof value !== "object") return null;
+    if (value.pvp_bonuses && typeof value.pvp_bonuses === "object") return value.pvp_bonuses;
+    const keys = Object.keys(value);
+    if (keys.some(k=>BUILD_RAW_PVP_ALIASES[k])) return value;
+
+    const nonBonusContainers = new Set([
+      "statCaps","stat_caps",
+      "combinedStats","combined_stats",
+      "baseStats","base_stats",
+      "skillBonuses","skill_bonuses",
+      "setPvpBonuses","set_pvp_bonuses",
+      "miscPvpBonuses","misc_pvp_bonuses",
+      "gangUpgradeBonuses","gang_upgrade_bonuses"
+    ]);
+
+    for (const [childKey,child] of Object.entries(value)) {
+      if (nonBonusContainers.has(childKey)) continue;
+      if (child && typeof child === "object") {
+        const found = buildFindRawPvpObject(child);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function buildFindRawStatCapsObject(value) {
+    if (!value || typeof value !== "object") return null;
+
+    // Nie próbujemy zgadywać po samych nazwach statystyk: pvp_bonuses i
+    // statCaps używają częściowo tych samych kluczy. Dynamiczne limity
+    // uznajemy za wiarygodne wyłącznie, gdy JSON nazywa je wprost.
+    if (value.statCaps && typeof value.statCaps === "object") {
+      return value.statCaps;
+    }
+
+    if (value.stat_caps && typeof value.stat_caps === "object") {
+      return value.stat_caps;
+    }
+
+    for (const child of Object.values(value)) {
+      if (child && typeof child === "object") {
+        const found = buildFindRawStatCapsObject(child);
+        if (found) return found;
+      }
+    }
+
+    return null;
+  }
+
+  function buildFindExplicitPvpBonusesObject(value) {
+    if (!value || typeof value !== "object") return null;
+
+    if (value.pvp_bonuses && typeof value.pvp_bonuses === "object") {
+      return value.pvp_bonuses;
+    }
+
+    for (const child of Object.values(value)) {
+      if (child && typeof child === "object") {
+        const found = buildFindExplicitPvpBonusesObject(child);
+        if (found) return found;
+      }
+    }
+
+    return null;
+  }
+
+  function buildCollectPvpSummaryBonusGroups(value,groups=[],seen=new Set()) {
+    if (!value || typeof value !== "object" || seen.has(value)) return groups;
+    seen.add(value);
+
+    const add = (keys,source,kind="equipment") => {
+      for (const key of keys) {
+        const candidate = value[key];
+        if (candidate && typeof candidate === "object" && !Array.isArray(candidate)) {
+          groups.push({source,kind,bonuses:candidate});
+          break;
+        }
+      }
+    };
+
+    add(["setPvpBonuses","set_pvp_bonuses"],"Set (raw)");
+    add(["miscPvpBonuses","misc_pvp_bonuses"],"Akcesoria / misc (raw)");
+    add(["gangUpgradeBonuses","gang_upgrade_bonuses"],"Gang (raw)","gang");
+
+    for (const child of Object.values(value)) {
+      if (child && typeof child === "object") {
+        buildCollectPvpSummaryBonusGroups(child,groups,seen);
+      }
+    }
+
+    return groups;
+  }
+
+  function buildPushRawEquipmentEntries(bonuses,source,entries,unknown) {
+    Object.entries(bonuses || {}).forEach(([rawKey,rawValue])=>{
+      const def = BUILD_RAW_PVP_ALIASES[String(rawKey)];
+      const number = Number(rawValue);
+      if (!def) {
+        if (Number.isFinite(number) && number !== 0) unknown.push(`${source}: ${rawKey}`);
+        return;
+      }
+      if (!Number.isFinite(number) || number === 0) return;
+      entries.push({
+        source,
+        name:def[2],
+        key:def[0],
+        value:buildStatNumber(number),
+        percent:Boolean(def[1]),
+        rawKey:String(rawKey)
+      });
+    });
+  }
+
+  function buildPushRawGangEntries(bonuses,source,entries,unknown) {
+    const aliases = {
+      cellarAttack:["attackFlat",false,"Atak","Gang — Piwnica"],
+      cellar_attack:["attackFlat",false,"Atak","Gang — Piwnica"],
+      sewerDefense:["defenseFlat",false,"Obrona","Gang — Bagno"],
+      sewer_defense:["defenseFlat",false,"Obrona","Gang — Bagno"],
+      gymHp:["maxHpFlat",false,"Maks. HP","Gang — Siłownia"],
+      gym_hp:["maxHpFlat",false,"Maks. HP","Gang — Siłownia"],
+      shootingRangeAccuracy:["accuracy",true,"Celność","Gang — Strzelnica"],
+      shooting_range_accuracy:["accuracy",true,"Celność","Gang — Strzelnica"]
+    };
+
+    Object.entries(bonuses || {}).forEach(([rawKey,rawValue])=>{
+      const def = aliases[String(rawKey)];
+      const number = Number(rawValue);
+      if (!def) {
+        if (Number.isFinite(number) && number !== 0) unknown.push(`${source}: ${rawKey}`);
+        return;
+      }
+      if (!Number.isFinite(number) || number === 0) return;
+      entries.push({
+        source:def[3],
+        name:def[2],
+        key:def[0],
+        value:buildStatNumber(number),
+        percent:Boolean(def[1]),
+        rawKey:String(rawKey)
+      });
+    });
+  }
+
+  function buildParseRawPvpBonuses(text) {
+    const raw = String(text || "").trim();
+    if (!raw || !raw.includes("{")) return null;
+    const candidates = [raw];
+    const pvpMatch = raw.match(/["']?pvp_bonuses["']?\s*:\s*(\{[^{}]*\})/s);
+    // Najpierw próbujemy cały JSON PvP Summary, bo tylko tam mogą być
+    // równolegle setPvpBonuses, miscPvpBonuses, gangUpgradeBonuses i statCaps.
+    // Wycięty pvp_bonuses jest fallbackiem dla niepełnych wklejek.
+    if (pvpMatch) candidates.push(pvpMatch[1]);
+
+    for (const candidate of candidates) {
+      try {
+        const parsed = JSON.parse(candidate.replace(/'([^']*)'\s*:/g,'"$1":'));
+        const rawStatCaps = buildFindRawStatCapsObject(parsed);
+        const statCaps = buildNormalizeDynamicStatCaps(rawStatCaps || {});
+        const entries = [];
+        const unknown = [];
+
+        // Jeśli w danych występuje jawne pvp_bonuses, traktujemy je jako
+        // autorytatywny, już zagregowany zestaw i nie dokładamy równolegle
+        // set/misc/gang, aby nie policzyć tych samych bonusów podwójnie.
+        const explicit = buildFindExplicitPvpBonusesObject(parsed);
+        if (explicit) {
+          buildPushRawEquipmentEntries(
+            explicit,
+            "pvp_bonuses (raw)",
+            entries,
+            unknown
+          );
+        } else {
+          const groups = buildCollectPvpSummaryBonusGroups(parsed);
+
+          if (groups.length) {
+            groups.forEach(group=>{
+              if (group.kind === "gang") {
+                buildPushRawGangEntries(group.bonuses,group.source,entries,unknown);
+              } else {
+                buildPushRawEquipmentEntries(group.bonuses,group.source,entries,unknown);
+              }
+            });
+          } else {
+            // Fallback dla wklejonego pojedynczego obiektu bonusów bez nazwy.
+            const bonuses = buildFindRawPvpObject(parsed);
+            if (bonuses) {
+              buildPushRawEquipmentEntries(
+                bonuses,
+                "pvp_bonuses (raw)",
+                entries,
+                unknown
+              );
+            }
+          }
+        }
+
+        if (!entries.length && !Object.keys(statCaps).length && !unknown.length) continue;
+
+        return {
+          entries,
+          unknown:[...new Set(unknown)],
+          rawAuthoritative:true,
+          statCaps
+        };
+      } catch (err) {}
+    }
+    return null;
+  }
+
   function buildParseBonusText(text) {
+    const rawParsed = buildParseRawPvpBonuses(text);
+    if (
+      rawParsed &&
+      (
+        rawParsed.entries.length ||
+        Object.keys(rawParsed.statCaps || {}).length
+      )
+    ) {
+      return rawParsed;
+    }
+
     const entries = [];
     const unknown = [];
 
@@ -9858,6 +11049,7 @@ function setupAdmin() {
         /^wymagane przedmioty\s*:/i.test(line) ||
         /^bonusy za komplet\s*:/i.test(line) ||
         /^bonus za ulepszenie/i.test(line) ||
+        /^(set|akcesoria|gang)\s*:?$/i.test(line) ||
         /^t\d+\s*/i.test(line) ||
         /^image$/i.test(line)
       ) {
@@ -9932,7 +11124,8 @@ function setupAdmin() {
 
     return {
       entries,
-      unknown
+      unknown,
+      statCaps:{}
     };
   }
 
@@ -9966,17 +11159,38 @@ function setupAdmin() {
     if (!host) return;
 
     const entries = Array.isArray(buildState.bonuses) ? buildState.bonuses : [];
-    if (!entries.length) {
-      host.innerHTML = `<div class="muted">Brak wczytanych bonusów dodatkowych.</div>`;
+    const statCaps = buildNormalizeDynamicStatCaps(buildState.statCaps || {});
+    const capEntries = Object.entries(statCaps);
+
+    if (!entries.length && !capEntries.length) {
+      host.innerHTML = `<div class="muted">Brak wczytanych bonusów dodatkowych i dynamicznych limitów PvP.</div>`;
       return;
     }
 
-    host.innerHTML = entries.map(entry => `
+    const bonusesHtml = entries.map(entry => `
       <div class="build-bonus-row">
         <span><b>${escapeHtml(entry.source)}</b> · ${escapeHtml(entry.name)}</span>
-        <strong>+${escapeHtml(buildFormatPlainNumber(entry.value))}${entry.percent ? "%" : ""}</strong>
+        <strong>${entry.key === "appliesBleed" ? (Number(entry.value) > 0 ? "tak" : "nie") : `+${escapeHtml(buildFormatPlainNumber(entry.value))}${entry.percent ? "%" : ""}`}</strong>
       </div>
     `).join("");
+
+    const capsHtml = capEntries.length
+      ? `
+        <div class="build-bonus-cap-note">
+          <b>🎯 Dynamiczne limity z PvP Summary:</b>
+          ${
+            capEntries
+              .map(([key,value]) => {
+                const meta = BUILD_STAT_META[key] || [key,""];
+                return `${escapeHtml(meta[0])} ${escapeHtml(buildFormatPlainNumber(value))}${escapeHtml(meta[1] || "")}`;
+              })
+              .join(" · ")
+          }
+        </div>
+      `
+      : "";
+
+    host.innerHTML = bonusesHtml + capsHtml;
   }
 
   function buildFormatPlainNumber(value) {
@@ -9993,15 +11207,23 @@ function setupAdmin() {
     const parsed = buildParseBonusText(text);
 
     buildState.bonuses = parsed.entries;
+    buildState.statCaps = buildNormalizeDynamicStatCaps(parsed.statCaps || {});
     buildState.bonusText = text;
+    if (!buildState.profile || typeof buildState.profile !== "object") buildState.profile = buildEmptyState().profile;
+    buildState.profile.bonusesConfirmed = Boolean(el("build-bonus-confirmed")?.checked);
 
-    if (!parsed.entries.length) {
+    const capCount = Object.keys(buildState.statCaps).length;
+
+    if (!parsed.entries.length && !capCount) {
       status.textContent = parsed.unknown.length
         ? "❌ Nie rozpoznałem żadnego bonusu z wklejonego tekstu."
         : "Wklej bonusy z gry.";
     } else {
+      const parts = [];
+      if (parsed.entries.length) parts.push(`${parsed.entries.length} bonusów`);
+      if (capCount) parts.push(`${capCount} dynamicznych limitów PvP`);
       status.textContent =
-        `✅ Wczytano ${parsed.entries.length} bonusów.` +
+        `✅ Wczytano ${parts.join(" i ")}.` +
         (parsed.unknown.length ? ` ⚠️ Pominięto ${parsed.unknown.length} nierozpoznanych wierszy.` : "");
     }
 
@@ -10011,7 +11233,11 @@ function setupAdmin() {
 
   function buildClearBonuses() {
     buildState.bonuses = [];
+    buildState.statCaps = {};
     buildState.bonusText = "";
+    if (!buildState.profile || typeof buildState.profile !== "object") buildState.profile = buildEmptyState().profile;
+    buildState.profile.bonusesConfirmed = false;
+    if (el("build-bonus-confirmed")) el("build-bonus-confirmed").checked = false;
     if (el("build-bonus-text")) el("build-bonus-text").value = "";
     if (el("build-bonus-status")) el("build-bonus-status").textContent = "Bonusy dodatkowe zostały wyczyszczone.";
     buildRenderBonusPreview();
@@ -10041,12 +11267,46 @@ function setupAdmin() {
         : fallback;
     };
 
+    const cleanCharacterLevel = (value,fallback=1) => {
+      const number = Number(value);
+      return Number.isInteger(number) && number >= 1
+        ? Math.min(100000,number)
+        : fallback;
+    };
+
+    const supplied =
+      profile.provided && typeof profile.provided === "object"
+        ? profile.provided
+        : null;
+    const has = keyName =>
+      supplied
+        ? Boolean(supplied[keyName])
+        : Object.prototype.hasOwnProperty.call(profile,keyName);
+
+    const validCharacterLevel =
+      Number.isInteger(Number(profile.characterLevel)) &&
+      Number(profile.characterLevel) >= 1;
+    const validPositive = keyName =>
+      Number.isFinite(Number(profile[keyName])) && Number(profile[keyName]) >= 1;
+    const validNonNegative = keyName =>
+      Number.isFinite(Number(profile[keyName])) && Number(profile[keyName]) >= 0;
+
     return {
+      characterLevel:cleanCharacterLevel(profile.characterLevel,1),
       attack:cleanPositive(profile.attack,1),
       defense:cleanPositive(profile.defense,1),
       baseHp:cleanPositive(profile.baseHp,100),
       petHp:cleanNonNegative(profile.petHp,0),
-      eqHp:cleanNonNegative(profile.eqHp,0)
+      eqHp:cleanNonNegative(profile.eqHp,0),
+      provided:{
+        characterLevel:has("characterLevel") && validCharacterLevel,
+        attack:has("attack") && validPositive("attack"),
+        defense:has("defense") && validPositive("defense"),
+        baseHp:has("baseHp") && validPositive("baseHp"),
+        petHp:has("petHp") && validNonNegative("petHp"),
+        eqHp:has("eqHp") && validNonNegative("eqHp")
+      },
+      bonusesConfirmed:Boolean(profile.bonusesConfirmed)
     };
   }
 
@@ -10070,6 +11330,11 @@ function setupAdmin() {
         Math.ceil(usedAttributePoints / 2)
       );
 
+    const characterLevel =
+      profile.provided && profile.provided.characterLevel
+        ? Math.max(1,Math.floor(Number(profile.characterLevel) || 1))
+        : requiredLevel;
+
     const stats = buildNewStatBag();
     const extras = {
       conditional:[],
@@ -10085,7 +11350,7 @@ function setupAdmin() {
     stats.defensePct = END * 0.65;
 
     stats.levelHp =
-      requiredLevel * 5;
+      characterLevel * 5;
 
     stats.maxHpFlat =
       profile.baseHp +
@@ -10142,6 +11407,10 @@ function setupAdmin() {
 
     buildApplyImportedBonuses(stats,source);
 
+    if (Number(stats.appliesBleed) > 0) {
+      extras.special.push("Krytyk automatycznie nakłada krwawienie");
+    }
+
     // Perki typu "+3% regeneracji HP" regenerują procent AKTUALNEGO
     // maksymalnego HP na turę. Najpierw wyliczamy końcowe HP po bonusie %,
     // a dopiero potem zamieniamy procent regeneracji na wartość / turę.
@@ -10160,8 +11429,10 @@ function setupAdmin() {
 
     const rawStats = {};
     const capInfo = {};
+    const effectiveStatCaps = buildStatCapsForSource(source || {});
+
     Object.keys(stats).forEach(key => {
-      const info = buildCapInfo(key,stats[key]);
+      const info = buildCapInfo(key,stats[key],effectiveStatCaps);
       rawStats[key] = info.raw;
       capInfo[key] = info;
       stats[key] = info.effective;
@@ -10193,7 +11464,9 @@ function setupAdmin() {
       rawStats,
       capInfo,
       extras,
-      requiredLevel
+      requiredLevel,
+      characterLevel,
+      characterLevelProvided:Boolean(profile.provided && profile.provided.characterLevel)
     };
   }
 
@@ -10455,7 +11728,7 @@ function setupAdmin() {
                     <span class="build-stat-name">
                       HP za poziom
                       <small>
-                        ${escapeHtml(String(calculated.requiredLevel))} × 5 HP
+                        ${escapeHtml(String(calculated.characterLevel))} × 5 HP${calculated.characterLevelProvided ? "" : " · poziom nieuzupełniony (tymczasowo minimum buildu)"}
                       </small>
                     </span>
                     <span class="build-stat-base">—</span>
@@ -10463,7 +11736,7 @@ function setupAdmin() {
                       ${escapeHtml(
                         sourceValue(
                           "maxHpFlat",
-                          calculated.requiredLevel * 5
+                          calculated.characterLevel * 5
                         )
                       )}
                     </span>
@@ -10473,7 +11746,7 @@ function setupAdmin() {
                         ${escapeHtml(
                           sourceValue(
                             "maxHpFlat",
-                            calculated.requiredLevel * 5
+                            calculated.characterLevel * 5
                           )
                         )}
                       </strong>
@@ -10668,13 +11941,17 @@ function setupAdmin() {
       name:"",
       description:"",
       profile:{
+        characterLevel:1,
         attack:1,
         defense:1,
         baseHp:100,
         petHp:0,
-        eqHp:0
+        eqHp:0,
+        provided:{characterLevel:false,attack:false,defense:false,baseHp:false,petHp:false,eqHp:false},
+        bonusesConfirmed:false
       },
       bonuses:[],
+      statCaps:{},
       bonusText:""
     };
   }
@@ -10703,6 +11980,99 @@ function setupAdmin() {
       Math.floor((Number(buildState.attributes[attrKey]) || 0) / 5)
     );
   }
+
+
+  function buildOfficialStringFrom(source) {
+    const attrs = source && source.attributes ? source.attributes : {};
+    const perks = source && source.perks ? source.perks : {};
+    const values = BUILD_ATTR_ORDER.map(attrKey=>Math.max(0,Math.min(50,Math.trunc(Number(attrs[attrKey])||0))));
+    const skillSegments = BUILD_ATTR_ORDER.map((attrKey,index)=>{
+      const tierCount = Math.min(10,Math.floor(values[index]/5));
+      const selected = perks[attrKey] || {};
+      let out = "";
+      for (let tier=1; tier<=tierCount; tier++) {
+        const choice = selected[tier];
+        out += choice === "A" || choice === "B" ? choice : "-";
+      }
+      return out;
+    });
+    return `${values.join("/")}:${skillSegments.join("/")}`;
+  }
+
+  function buildParseOfficialString(raw) {
+    const text = String(raw || "").trim();
+    if (!text) throw new Error("Wklej build z MenelWars.");
+    const colon = text.indexOf(":");
+    const attrPart = colon >= 0 ? text.slice(0,colon) : text;
+    const skillPart = colon >= 0 ? text.slice(colon+1) : null;
+    const attrParts = attrPart.split("/");
+    if (attrParts.length !== 5) throw new Error("Część atrybutów musi mieć dokładnie 5 wartości STR/END/AGI/VIT/PRC.");
+
+    const values = attrParts.map((value,index)=>{
+      if (!/^\d+$/.test(String(value).trim())) throw new Error(`Atrybut ${index+1} nie jest liczbą całkowitą.`);
+      const number = Number(value);
+      if (!Number.isInteger(number) || number < 0 || number > 50) throw new Error(`Atrybut ${index+1} musi być w zakresie 0–50.`);
+      return number;
+    });
+
+    let skillSegments = ["","","","",""];
+    if (skillPart !== null) {
+      skillSegments = skillPart.split("/");
+      if (skillSegments.length !== 5) throw new Error("Po dwukropku musi być dokładnie 5 segmentów perków rozdzielonych znakiem /.");
+    }
+
+    const perks = {};
+    BUILD_ATTR_ORDER.forEach((attrKey,index)=>{
+      perks[attrKey] = {};
+      const segment = String(skillSegments[index] || "").toUpperCase();
+      const available = Math.min(10,Math.floor(values[index]/5));
+      if (!/^[AB-]*$/.test(segment)) throw new Error(`Perki ${BUILD_ATTRS[attrKey].name}: dozwolone są tylko A, B i -.`);
+      if (segment.length > available) throw new Error(`Perki ${BUILD_ATTRS[attrKey].name}: segment ma ${segment.length} wyborów, ale atrybut ${values[index]} odblokowuje tylko ${available}.`);
+      [...segment].forEach((choice,tierIndex)=>{
+        if (choice === "A" || choice === "B") perks[attrKey][tierIndex+1] = choice;
+      });
+    });
+
+    const attributes = {};
+    BUILD_ATTR_ORDER.forEach((attrKey,index)=>{ attributes[attrKey] = values[index]; });
+    return {attributes,perks,official:buildOfficialStringFrom({attributes,perks})};
+  }
+
+  function buildImportOfficialString() {
+    const status = el("build-game-string-status");
+    try {
+      const parsed = buildParseOfficialString(el("build-game-string")?.value || "");
+      buildState.attributes = parsed.attributes;
+      buildState.perks = parsed.perks;
+      buildActiveAttr = "";
+      if (el("build-game-string")) el("build-game-string").value = buildOfficialStringFrom(buildState);
+      if (status) status.textContent = `✅ Import poprawny. Rozdano ${buildPointsUsed()} pkt · wymagany poziom ${buildRequiredLevel()}.`;
+      renderBuildEditor();
+      if (el("build-skill-editor")) el("build-skill-editor").hidden = true;
+    } catch (err) {
+      if (status) status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się zaimportować buildu.");
+    }
+  }
+
+  async function buildCopyOfficialString() {
+    const status = el("build-game-string-status");
+    const value = buildOfficialStringFrom(buildState);
+    if (el("build-game-string")) el("build-game-string").value = value;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const input = el("build-game-string");
+        input?.focus();
+        input?.select();
+        if (!document.execCommand("copy")) throw new Error("Schowek niedostępny");
+      }
+      if (status) status.textContent = "✅ Skopiowano oficjalny format buildu.";
+    } catch (err) {
+      if (status) status.textContent = "⚠️ Nie mogłem użyć schowka — gotowy ciąg jest w polu powyżej.";
+    }
+  }
+
 
   function buildSelectedSkillCount(attrKey) {
     const perks = buildState.perks[attrKey] || {};
@@ -10906,31 +12276,53 @@ function setupAdmin() {
   }
 
   function buildReadProfileInputs() {
+    const rawValue = id => String(el(id)?.value ?? "").trim();
     const readPositive = (id,fallback) => {
-      const value = Number(el(id)?.value);
+      const value = Number(rawValue(id));
       return Number.isFinite(value) && value >= 1
         ? buildStatNumber(value)
         : fallback;
     };
+    const readNonNegative = (id,fallback=0) => {
+      const value = Number(rawValue(id));
+      return Number.isFinite(value) && value >= 0 && rawValue(id) !== ""
+        ? buildStatNumber(value)
+        : fallback;
+    };
 
-    const petHpValue =
-      Number(el("build-profile-pet-hp")?.value);
-
-    const eqHpValue =
-      Number(el("build-profile-eq-hp")?.value);
+    const levelRaw = rawValue("build-profile-level");
+    const levelNumber = Number(levelRaw);
+    const characterLevel =
+      Number.isInteger(levelNumber) && levelNumber >= 1
+        ? Math.min(100000,levelNumber)
+        : 1;
+    const validPositiveInput = id => {
+      const raw = rawValue(id);
+      const value = Number(raw);
+      return raw !== "" && Number.isFinite(value) && value >= 1;
+    };
+    const validNonNegativeInput = id => {
+      const raw = rawValue(id);
+      const value = Number(raw);
+      return raw !== "" && Number.isFinite(value) && value >= 0;
+    };
 
     buildState.profile = {
+      characterLevel,
       attack:readPositive("build-profile-attack",1),
       defense:readPositive("build-profile-defense",1),
       baseHp:readPositive("build-profile-hp",100),
-      petHp:
-        Number.isFinite(petHpValue) && petHpValue >= 0
-          ? buildStatNumber(petHpValue)
-          : 0,
-      eqHp:
-        Number.isFinite(eqHpValue) && eqHpValue >= 0
-          ? buildStatNumber(eqHpValue)
-          : 0
+      petHp:readNonNegative("build-profile-pet-hp",0),
+      eqHp:readNonNegative("build-profile-eq-hp",0),
+      provided:{
+        characterLevel:levelRaw !== "" && Number.isInteger(levelNumber) && levelNumber >= 1,
+        attack:validPositiveInput("build-profile-attack"),
+        defense:validPositiveInput("build-profile-defense"),
+        baseHp:validPositiveInput("build-profile-hp"),
+        petHp:validNonNegativeInput("build-profile-pet-hp"),
+        eqHp:validNonNegativeInput("build-profile-eq-hp")
+      },
+      bonusesConfirmed:Boolean(el("build-bonus-confirmed")?.checked)
     };
 
     return buildState.profile;
@@ -10938,25 +12330,20 @@ function setupAdmin() {
 
   function buildWriteProfileInputs(profile) {
     const clean = buildProfileStats({profile});
+    const provided = clean.provided || {};
+    const setValue = (id,keyName,value) => {
+      const input = el(id);
+      if (input) input.value = provided[keyName] ? value : "";
+    };
 
-    if (el("build-profile-attack")) {
-      el("build-profile-attack").value = clean.attack;
-    }
-
-    if (el("build-profile-defense")) {
-      el("build-profile-defense").value = clean.defense;
-    }
-
-    if (el("build-profile-hp")) {
-      el("build-profile-hp").value = clean.baseHp;
-    }
-
-    if (el("build-profile-pet-hp")) {
-      el("build-profile-pet-hp").value = clean.petHp;
-    }
-
-    if (el("build-profile-eq-hp")) {
-      el("build-profile-eq-hp").value = clean.eqHp;
+    setValue("build-profile-level","characterLevel",clean.characterLevel);
+    setValue("build-profile-attack","attack",clean.attack);
+    setValue("build-profile-defense","defense",clean.defense);
+    setValue("build-profile-hp","baseHp",clean.baseHp);
+    setValue("build-profile-pet-hp","petHp",clean.petHp);
+    setValue("build-profile-eq-hp","eqHp",clean.eqHp);
+    if (el("build-bonus-confirmed")) {
+      el("build-bonus-confirmed").checked = Boolean(clean.bonusesConfirmed);
     }
   }
 
@@ -10984,26 +12371,40 @@ function setupAdmin() {
       attributes:buildState.attributes,
       perks:buildState.perks,
       profile:Object.assign({},buildState.profile),
-      bonuses:Array.isArray(buildState.bonuses) ? buildState.bonuses : []
+      bonuses:Array.isArray(buildState.bonuses) ? buildState.bonuses : [],
+      statCaps:buildNormalizeDynamicStatCaps(buildState.statCaps || {})
     };
   }
 
   async function buildPostAction(payload) {
     if (!backendConfigured()) throw new Error("Backend nie jest skonfigurowany.");
 
-    await timedBackendPost(
-      payload.action || "buildAction",
-      payload
-    );
+    let sendError = null;
+
+    try {
+      await timedBackendPost(
+        payload.action || "buildAction",
+        payload
+      );
+    } catch (err) {
+      sendError = err;
+    }
 
     let result = null;
     for (let attempt=0; attempt<20; attempt++) {
       if (attempt) await new Promise(resolve=>setTimeout(resolve,350));
-      result = await jsonp("buildActionResult",{nonce:payload.nonce});
+      try {
+        result = await jsonp("buildActionResult",{nonce:payload.nonce});
+      } catch (err) {
+        if (attempt === 19 && !sendError) sendError = err;
+        continue;
+      }
       if (result && !result.pending) break;
     }
 
-    if (!result || result.pending) throw new Error("Serwer nie zwrócił wyniku operacji.");
+    if (!result || result.pending) {
+      throw sendError || new Error("Serwer nie zwrócił wyniku operacji.");
+    }
     if (!result.ok) throw new Error(result.error || "Nie udało się zapisać buildu.");
     return result;
   }
@@ -11041,6 +12442,11 @@ function setupAdmin() {
     button.disabled = true;
     status.textContent = isPublic ? "Udostępniam build..." : "Zapisuję build prywatnie...";
 
+    criticalOperationStart(
+      isPublic ? "🌐 Udostępniam build…" : "💾 Zapisuję build…",
+      "Zapisuję build i czekam na jednoznaczne potwierdzenie serwera."
+    );
+
     try {
       const result = await buildPostAction(payload);
 
@@ -11073,6 +12479,7 @@ function setupAdmin() {
       status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się zapisać buildu.");
     } finally {
       button.disabled = false;
+      criticalOperationFinish();
     }
   }
 
@@ -11089,6 +12496,11 @@ function setupAdmin() {
       perks:Object.assign(buildEmptyState().perks,item && item.perks || {}),
       profile:buildProfileStats(item || {}),
       bonuses:Array.isArray(item && item.bonuses) ? item.bonuses : [],
+      statCaps:buildNormalizeDynamicStatCaps(
+        item && item.statCaps
+          ? item.statCaps
+          : (item && item.profile && item.profile.statCaps ? item.profile.statCaps : {})
+      ),
       updatedAt:String(item && item.updatedAt || "")
     };
   }
@@ -11366,6 +12778,7 @@ function setupAdmin() {
         });
       });
     }
+    pvpPopulateSelectors();
   }
 
   function showBuildViewer(item) {
@@ -11484,6 +12897,10 @@ function setupAdmin() {
         id:item.id
       };
       status.textContent = "Usuwanie...";
+      criticalOperationStart(
+        "🗑 Usuwam build…",
+        "Usuwam zapisany build i czekam na potwierdzenie serwera."
+      );
       try {
         await buildPostAction(payload);
         status.textContent = "✅ Build został usunięty.";
@@ -11492,6 +12909,8 @@ function setupAdmin() {
         await fetchBuildLists(true);
       } catch(err) {
         status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się usunąć buildu.");
+      } finally {
+        criticalOperationFinish();
       }
     });
   }
@@ -11513,19 +12932,19 @@ function setupAdmin() {
         includeBonuses
       )
         ? buildProfileStats(item || {})
-        : {
-            attack:1,
-            defense:1,
-            baseHp:100,
-            petHp:0,
-            eqHp:0
-          };
+        : Object.assign({},buildEmptyState().profile,{
+            provided:Object.assign({},buildEmptyState().profile.provided)
+          });
 
     fresh.bonuses =
       includeBonuses &&
       Array.isArray(item.bonuses)
         ? item.bonuses.map(entry=>Object.assign({},entry))
         : [];
+    fresh.statCaps =
+      (keepId || includeBonuses)
+        ? buildNormalizeDynamicStatCaps(item.statCaps || {})
+        : {};
     fresh.bonusText = "";
 
     BUILD_ATTR_ORDER.forEach(attrKey=>{
@@ -11552,7 +12971,7 @@ function setupAdmin() {
       : (
           includeBonuses
             ? "📦 Skopiowano build razem z itemami. Zapis utworzy nowy build."
-            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój Atak, Obronę, Bazowe HP, HP z pancerza peta, HP ze zwykłego EQ (bez bonusu seta) i wklej własne bonusy."
+            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój faktyczny poziom postaci, Atak, Obronę, Bazowe HP, HP z pancerza peta, HP ze zwykłego EQ (bez bonusu seta) i wklej własne bonusy."
         );
     renderBuildEditor();
     el("build-skill-editor").hidden = true;
@@ -11579,12 +12998,9 @@ function setupAdmin() {
   // ============================================================
 
   const GARDEN_LOCAL_KEY = "menelwars_garden_plots_v1";
-  let gardenData = {active:[],results:[],plants:["Cebula"]};
+  let gardenData = {active:[],results:[],phases:[],plants:["Cebula"]};
   let gardenSelectedPlot = 1;
-  let gardenRefreshTimer = null;
-  let gardenClockTimer = null;
   let gardenLiveRefreshInFlight = null;
-  let gardenLiveRefreshBound = false;
 
   function gardenLoadLocalPlots() {
     try {
@@ -11639,7 +13055,7 @@ function setupAdmin() {
 
   function gardenManualConfig(kind) {
     return {
-      sun:{range:"garden-sun",input:"garden-sun-input",min:0,max:100,step:1,fallback:50},
+      sun:{range:"garden-sun",input:"garden-sun-input",min:0,max:100,step:1,fallback:60},
       water:{range:"garden-water",input:"garden-water-input",min:0,max:100,step:1,fallback:50},
       ph:{range:"garden-ph",input:"garden-ph-input",min:0,max:14,step:0.1,fallback:7}
     }[kind] || null;
@@ -11808,12 +13224,491 @@ function setupAdmin() {
     return null;
   }
 
+
+  // ============================================================
+  // v21.00 — Ogród: append-only obserwacje atlasFrame/READY
+  // ============================================================
+  function gardenEventsFor(experimentId) {
+    return (gardenData.phases || [])
+      .filter(event=>String(event.experimentId)===String(experimentId))
+      .slice()
+      .sort((a,b)=>(Number(a.observedAt)||0)-(Number(b.observedAt)||0) || String(a.eventId||"").localeCompare(String(b.eventId||"")));
+  }
+
+  function gardenPhaseSummary(experiment) {
+    if (!experiment || !experiment.id) {
+      return {events:[],analysisEvents:[],frames:[],lastFrame:null,ready:null};
+    }
+
+    // Historia pozostaje append-only. Korekta nie usuwa starego wiersza z OgrodFazy,
+    // ale w analizie wykluczamy raport wskazany przez CorrectionOfEventID. Dzięki temu
+    // błędne 7 skorygowane później na 6 nie wygląda jak biologiczne cofnięcie 7→6.
+    const events=gardenEventsFor(experiment.id);
+    const correctedIds=new Set(
+      events
+        .map(event=>String(event.correctionOfEventId||"").trim())
+        .filter(Boolean)
+    );
+    const analysisEvents=events.filter(
+      event=>!correctedIds.has(String(event.eventId||"").trim())
+    );
+
+    const frames=analysisEvents.filter(
+      event=>event.eventType==="FRAME" && Number.isInteger(Number(event.atlasFrame))
+    );
+    const readyEvents=analysisEvents.filter(event=>event.eventType==="READY");
+    const ready=readyEvents.length?readyEvents[0]:null;
+    const lastFrame=frames.length?frames[frames.length-1]:null;
+    let entryLower=Number(experiment.startedAt)||0;
+    let entryUpper=lastFrame?Number(lastFrame.observedAt)||0:0;
+
+    if (lastFrame) {
+      let firstIndex=frames.length-1;
+      while (firstIndex>0 && Number(frames[firstIndex-1].atlasFrame)===Number(lastFrame.atlasFrame)) firstIndex--;
+      const firstCurrent=frames[firstIndex];
+      entryUpper=Number(firstCurrent.observedAt)||entryUpper;
+      const allBefore=analysisEvents.filter(
+        event=>(Number(event.observedAt)||0)<entryUpper && event.eventType==="FRAME"
+      );
+      if (allBefore.length) entryLower=Number(allBefore[allBefore.length-1].observedAt)||entryLower;
+    }
+
+    return {events,analysisEvents,frames,lastFrame,ready,entryLower,entryUpper};
+  }
+
+  function gardenFrameSpriteHtml(frame,className="garden-phase-sprite") {
+    const number=Number(frame);
+    if (!Number.isInteger(number) || number<0 || number>9) return "";
+    return `<span class="${className}" style="--garden-frame:${number}" aria-label="Etap ${number}"></span>`;
+  }
+
+  async function gardenPostAction(action,payload) {
+    const nonce=makeRecipeNonce();
+    let sendError=null;
+    try {
+      await timedBackendPost(action,Object.assign({},payload,{action,nonce}));
+    } catch (err) {
+      // Brak odpowiedzi POST nie oznacza, że Apps Script nie wykonał zapisu.
+      // Nie ponawiamy mutacji; pytamy o ten sam nonce.
+      sendError=err;
+    }
+    let result=null;
+    for (let attempt=0;attempt<24;attempt++) {
+      if (attempt) await new Promise(resolve=>setTimeout(resolve,350));
+      try {
+        result=await jsonp("gardenActionResult",{nonce});
+      } catch (err) {
+        if (attempt===23 && !sendError) sendError=err;
+        continue;
+      }
+      if (result && !result.pending) break;
+    }
+    if (!result || result.pending) {
+      throw sendError || new Error("Serwer nie potwierdził zapisu Ogrodu.");
+    }
+    return result;
+  }
+
+  async function gardenRecordPhase(atlasFrame,correction=false) {
+    const own=gardenOwnExperimentForPlot(gardenSelectedPlot);
+    if (!own) return;
+    const status=el("garden-action-status");
+    criticalOperationStart("🌿 Zapisuję etap…","Dopisuję obserwację do historii faz. Poprzednie raporty nie są nadpisywane.");
+    try {
+      let result=await gardenPostAction("gardenPhase",{
+        id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
+        eventType:"FRAME",atlasFrame:Number(atlasFrame),correction:correction?"1":"0",observedAtMs:Date.now()
+      });
+      if (result && result.correctionRequired && !correction) {
+        criticalOperationFinish();
+        const accepted=window.confirm(`${result.error||"Wybrano wcześniejszy etap."}\n\nZapisać to jako korektę poprzedniego raportu? Historia pozostanie zachowana.`);
+        if (!accepted) return;
+        criticalOperationStart("🌿 Zapisuję korektę…","Dopisuję oznaczoną korektę do append-only historii faz.");
+        result=await gardenPostAction("gardenPhase",{
+          id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
+          eventType:"FRAME",atlasFrame:Number(atlasFrame),correction:"1",observedAtMs:Date.now()
+        });
+      }
+      if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać etapu.");
+      if (status) status.textContent=result.correction?`✅ Zapisano korektę: etap ${atlasFrame}.`:`✅ Zapisano obserwację: etap ${atlasFrame}.`;
+      await gardenFetchData({force:true});
+    } catch(err) {
+      if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd zapisu etapu."}`;
+    } finally { criticalOperationFinish(); }
+  }
+
+  async function gardenRecordReady() {
+    const own=gardenOwnExperimentForPlot(gardenSelectedPlot);
+    if (!own) return;
+    const status=el("garden-action-status");
+    if (!window.confirm("Potwierdzić timestamp: gra pokazuje „Gotowe do zbioru”? READY jest zapisywane niezależnie od klatki 9 i od późniejszego zbioru.")) return;
+    criticalOperationStart("✅ Zapisuję READY…","Zapisuję moment, w którym gra pokazała gotowość do zbioru.");
+    try {
+      const result=await gardenPostAction("gardenPhase",{
+        id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
+        eventType:"READY",observedAtMs:Date.now()
+      });
+      if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać READY.");
+      if (status) status.textContent="✅ Zapisano READY. Zbiór możesz zakończyć osobnym przyciskiem, gdy faktycznie zbierzesz roślinę.";
+      await gardenFetchData({force:true});
+    } catch(err) {
+      if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd zapisu READY."}`;
+    } finally { criticalOperationFinish(); }
+  }
+
+  function gardenRenderPhaseTools(own) {
+    const tools=el("garden-phase-tools"), grid=el("garden-phase-grid"), last=el("garden-phase-last"), readyButton=el("garden-ready");
+    if (!tools) return;
+    tools.hidden=!own;
+    if (!own) { if (el("garden-phase-picker")) el("garden-phase-picker").hidden=true; return; }
+    const summary=gardenPhaseSummary(own);
+    if (last) last.textContent=summary.lastFrame?`etap ${summary.lastFrame.atlasFrame}`:"brak raportu";
+    if (grid) {
+      grid.innerHTML=Array.from({length:10},(_,frame)=>`<button type="button" class="garden-phase-option ${summary.lastFrame&&Number(summary.lastFrame.atlasFrame)===frame?"selected":""}" data-garden-frame="${frame}">${gardenFrameSpriteHtml(frame)}<b>${frame}</b></button>`).join("");
+      grid.querySelectorAll("[data-garden-frame]").forEach(button=>button.addEventListener("click",()=>gardenRecordPhase(Number(button.dataset.gardenFrame))));
+    }
+    if (readyButton) {
+      readyButton.textContent=summary.ready?"✅ READY zapisane — potwierdź ponownie":"✅ Gra pokazuje: Gotowe do zbioru";
+      readyButton.classList.toggle("garden-ready-recorded",Boolean(summary.ready));
+    }
+  }
+
+  function gardenObservedDuration(item) {
+    const summary=gardenPhaseSummary(item);
+    if (summary.ready && Number(summary.ready.observedAt)>Number(item.startedAt)) {
+      return {duration:Number(summary.ready.observedAt)-Number(item.startedAt),source:"READY"};
+    }
+    if (Number(item.durationMs)>0) return {duration:Number(item.durationMs),source:"HARVEST"};
+    return null;
+  }
+
+  function gardenObservationForModel(item) {
+    const observed=gardenObservedDuration(item);
+    if (!observed || !Number.isFinite(observed.duration) || observed.duration<=0) return null;
+
+    // MANUAL ma mniejszą wiarygodność czasu startu. HARVEST bywa mocno
+    // spóźniony, więc dostaje mniejszą wagę niż osobno zgłoszone READY.
+    // Obie wartości nadal są górnym ograniczeniem rzeczywistego momentu
+    // dojrzenia, a nie „prawdą co do sekundy”.
+    const startWeight=String(item.startSource||"LIVE").toUpperCase()==="MANUAL" ? 0.65 : 1;
+    const endWeight=observed.source==="READY" ? 1 : 0.78;
+    return {
+      duration:observed.duration,
+      source:observed.source,
+      weight:startWeight*endWeight
+    };
+  }
+
+  function gardenBestCompletedCenter(plant) {
+    const rows=(gardenData.results||[])
+      .filter(item=>item.plant===plant)
+      .map(item=>({item,obs:gardenObservationForModel(item)}))
+      .filter(x=>x.obs&&x.obs.duration>0);
+
+    rows.sort((a,b)=>
+      a.obs.duration/Math.max(0.1,a.obs.weight) -
+      b.obs.duration/Math.max(0.1,b.obs.weight)
+    );
+    return rows[0]||null;
+  }
+
+  function gardenRaceCenter(plant) {
+    const grouped=new Map();
+    (gardenData.active||[])
+      .filter(item=>item.plant===plant)
+      .forEach(item=>{
+        const summary=gardenPhaseSummary(item);
+        if (!summary.lastFrame || !summary.entryUpper) return;
+        const frame=Number(summary.lastFrame.atlasFrame);
+        if (!Number.isInteger(frame)) return;
+        if (!grouped.has(frame)) grouped.set(frame,[]);
+        grouped.get(frame).push({
+          item,
+          summary,
+          upper:Math.max(0,Number(summary.entryUpper)-Number(item.startedAt||0)),
+          weight:String(item.startSource||"LIVE").toUpperCase()==="MANUAL"?0.65:1
+        });
+      });
+
+    // Do wyznaczania centrum używamy tylko grup, w których naprawdę można
+    // porównać co najmniej dwie rośliny na TYM SAMYM frame. Nie porównujemy
+    // frame 7 z frame 6 i nie zamieniamy numeru klatki na procent.
+    const comparable=[...grouped.entries()]
+      .filter(([,rows])=>rows.length>=2)
+      .sort((a,b)=>b[1].length-a[1].length || b[0]-a[0]);
+    if (!comparable.length) return null;
+
+    const [frame,rows]=comparable[0];
+    rows.sort((a,b)=>
+      a.upper/Math.max(0.1,a.weight) -
+      b.upper/Math.max(0.1,b.weight)
+    );
+    return {item:rows[0].item,frame,count:rows.length,source:"FRAME"};
+  }
+
+  function gardenCandidateIsActive(candidate) {
+    const wanted=gardenComboKey(candidate);
+    return (gardenData.active||[]).some(item=>gardenComboKey(item)===wanted);
+  }
+
+  function gardenHalton(index,base) {
+    let f=1,result=0,i=Math.max(1,index);
+    while(i>0){f/=base;result+=f*(i%base);i=Math.floor(i/base);} return result;
+  }
+
+  function gardenResearchDistance(a,b) {
+    if (!a || !b) return Infinity;
+    const ds=(Number(a.sun)-Number(b.sun))/25;
+    const dw=(Number(a.water)-Number(b.water))/25;
+    const dp=(Number(a.ph)-Number(b.ph))/2;
+    return Math.sqrt(ds*ds+dw*dw+dp*dp);
+  }
+
+  function gardenNearestResearchDistance(candidate) {
+    const rows=[]
+      .concat(gardenData.active||[])
+      .concat(gardenData.results||[])
+      .filter(item=>item&&item.plant===candidate.plant);
+    if (!rows.length) return Infinity;
+    return Math.min(...rows.map(item=>gardenResearchDistance(candidate,item)));
+  }
+
+  function gardenKernelPrediction(candidate) {
+    const rows=(gardenData.results||[])
+      .filter(item=>item&&item.plant===candidate.plant)
+      .map(item=>({item,obs:gardenObservationForModel(item)}))
+      .filter(row=>row.obs);
+    if (rows.length<3) return null;
+
+    const bandwidth=0.9;
+    const weighted=[];
+    rows.forEach(row=>{
+      const distance=gardenResearchDistance(candidate,row.item);
+      const kernel=Math.exp(-0.5*(distance/bandwidth)*(distance/bandwidth));
+      const weight=kernel*row.obs.weight;
+      if (weight>0.015) weighted.push({
+        duration:row.obs.duration,
+        weight,
+        distance,
+        source:row.obs.source
+      });
+    });
+    if (weighted.length<3) return null;
+
+    const sw=weighted.reduce((sum,row)=>sum+row.weight,0);
+    const sw2=weighted.reduce((sum,row)=>sum+row.weight*row.weight,0);
+    const effectiveN=sw2>0 ? (sw*sw)/sw2 : 0;
+    if (sw<=0 || effectiveN<2.2) return null;
+
+    const predictedMs=weighted.reduce((sum,row)=>sum+row.weight*row.duration,0)/sw;
+    const variance=weighted.reduce((sum,row)=>sum+row.weight*Math.pow(row.duration-predictedMs,2),0)/sw;
+    const nearest=Math.min(...weighted.map(row=>row.distance));
+    const uncertaintyMs=Math.sqrt(Math.max(0,variance)) + predictedMs*(0.06/Math.sqrt(Math.max(1,effectiveN))) + predictedMs*Math.min(0.25,nearest*0.08);
+    const readySupport=weighted.filter(row=>row.source==="READY").length;
+
+    let confidence="niska";
+    if (effectiveN>=6 && nearest<=0.55 && uncertaintyMs/predictedMs<=0.18) confidence="wysoka";
+    else if (effectiveN>=3.5 && nearest<=0.9 && uncertaintyMs/predictedMs<=0.30) confidence="średnia";
+
+    return {
+      predictedMs,
+      uncertaintyMs,
+      confidence,
+      effectiveN,
+      support:weighted.length,
+      readySupport,
+      nearest
+    };
+  }
+
+  function gardenCandidatePool(mode,center,plant,n) {
+    const pool=[];
+    const push=(sun,water,ph)=>{
+      const candidate={
+        plant,
+        sun:gardenClampValue(sun,0,100,1,60),
+        water:gardenClampValue(water,0,100,1,50),
+        ph:gardenClampValue(ph,0,14,0.1,7)
+      };
+      const keyValue=gardenComboKey(candidate);
+      if (!pool.some(item=>gardenComboKey(item)===keyValue)) pool.push(candidate);
+    };
+
+    if (mode==="Zawężanie") {
+      const offsets=[
+        [4,0,0],[-4,0,0],[0,4,0],[0,-4,0],[0,0,0.2],[0,0,-0.2],
+        [8,0,0],[-8,0,0],[0,8,0],[0,-8,0],[0,0,0.4],[0,0,-0.4],
+        [6,-5,0.2],[-6,5,-0.2],[5,5,-0.3],[-5,-5,0.3],
+        [10,-8,0],[-10,8,0],[8,0,0.4],[-8,0,-0.4]
+      ];
+      offsets.forEach(offset=>push(
+        Number(center.sun)+offset[0],
+        Number(center.water)+offset[1],
+        Number(center.ph)+offset[2]
+      ));
+    } else {
+      for (let k=0;k<64;k++) {
+        const i=n+1+k;
+        push(
+          Math.round(gardenHalton(i,2)*100),
+          Math.round(gardenHalton(i,3)*100),
+          Number((gardenHalton(i,5)*14).toFixed(1))
+        );
+      }
+    }
+    return pool;
+  }
+
+  function gardenChooseModelCandidate(pool) {
+    const candidates=pool
+      .filter(candidate=>!gardenCandidateIsActive(candidate))
+      .map(candidate=>({
+        candidate,
+        prediction:gardenKernelPrediction(candidate),
+        novelty:gardenNearestResearchDistance(candidate)
+      }));
+    if (!candidates.length) return null;
+
+    const predicted=candidates.filter(item=>item.prediction);
+    if (!predicted.length) {
+      return candidates.sort((a,b)=>b.novelty-a.novelty)[0];
+    }
+
+    const times=predicted.map(item=>item.prediction.predictedMs);
+    const uncertainties=predicted.map(item=>item.prediction.uncertaintyMs);
+    const minTime=Math.min(...times),maxTime=Math.max(...times);
+    const minUnc=Math.min(...uncertainties),maxUnc=Math.max(...uncertainties);
+
+    predicted.forEach(item=>{
+      const quality=maxTime>minTime
+        ? (maxTime-item.prediction.predictedMs)/(maxTime-minTime)
+        : 0.5;
+      const uncertainty=maxUnc>minUnc
+        ? (item.prediction.uncertaintyMs-minUnc)/(maxUnc-minUnc)
+        : 0.5;
+      const novelty=Math.min(1,item.novelty/1.4);
+      const nearDuplicatePenalty=item.novelty<0.22 ? 0.55 : item.novelty<0.38 ? 0.20 : 0;
+      item.score=0.52*quality+0.30*uncertainty+0.18*novelty-nearDuplicatePenalty;
+    });
+    predicted.sort((a,b)=>b.score-a.score || b.novelty-a.novelty);
+    return predicted[0];
+  }
+
+  function gardenExperimentalRecommendation(combo) {
+    const plant=combo.plant||"Cebula";
+    const completed=(gardenData.results||[]).filter(x=>x.plant===plant);
+    const active=(gardenData.active||[]).filter(x=>x.plant===plant);
+    const n=completed.length+active.length;
+    const best=gardenBestCompletedCenter(plant);
+    const race=gardenRaceCenter(plant);
+    const center=best
+      ? best.item
+      : race
+        ? race.item
+        : {plant,sun:60,water:50,ph:7};
+
+    // 1/7 ≈ 14.3% daje kontrolowaną replikację w środku uzgodnionego pasma
+    // 10–20%. Pozostałe rekomendacje przeplatają eksplorację i zawężanie.
+    const mode=n>0 && n%7===0
+      ? "Kontrola / replikacja"
+      : (completed.length>=3 && n%2===0 ? "Zawężanie" : "Eksploracja");
+
+    if (mode==="Kontrola / replikacja") {
+      const candidate={plant,sun:Number(center.sun),water:Number(center.water),ph:Number(center.ph)};
+      const prediction=gardenKernelPrediction(candidate);
+      const reason=best
+        ? "Celowo powtarzamy obecnie najlepszy wariant z READY/HARVEST, żeby sprawdzić powtarzalność."
+        : race
+          ? `Celowo replikujemy lidera porównania na tym samym etapie ${race.frame}; frame nie jest procentem postępu.`
+          : "Powtarzamy punkt kontrolny 60/50/7; to punkt startowy, nie uznane optimum.";
+      return {mode,candidate,reason,best,race,count:n,prediction,replication:true};
+    }
+
+    const pool=gardenCandidatePool(mode,center,plant,n);
+    const chosen=gardenChooseModelCandidate(pool) || {candidate:pool[0]||{plant,sun:60,water:50,ph:7},prediction:null,novelty:Infinity};
+    let reason="";
+    if (mode==="Zawężanie") {
+      reason=chosen.prediction
+        ? "Badamy sąsiedztwo aktualnego lidera, równoważąc przewidywany czas, niepewność modelu i karę za prawie-duplikaty."
+        : "Badamy bliskie sąsiedztwo aktualnego lidera małym krokiem; danych jest jeszcze za mało na stabilną predykcję 3D.";
+    } else {
+      reason=chosen.prediction
+        ? "Wybieramy informacyjny punkt 3D: model łączy obiecujący obszar z wysoką niepewnością i odległością od trwających prób."
+        : "Wybieramy szeroko odległy punkt Haltona, żeby zdobyć nową informację zamiast kopiować bieżące próby.";
+    }
+    return {mode,candidate:chosen.candidate,reason,best,race,count:n,prediction:chosen.prediction||null,replication:false};
+  }
+
+  function gardenRenderRecommendation(own) {
+    const host=el("garden-recommendation");
+    if (!host) return;
+    if (own) {host.hidden=true;host.innerHTML="";return;}
+    const rec=gardenExperimentalRecommendation(gardenCurrentControls());
+    const c=rec.candidate;
+    host.hidden=false;
+    const prediction=rec.prediction;
+    const modelLine=prediction
+      ? `<div class="garden-model-prediction">🧪 Lokalny model 3D: przewidywany górny czas ~<b>${escapeHtml(gardenFormatDuration(prediction.predictedMs))}</b> · pewność ${escapeHtml(prediction.confidence)} · efektywne wsparcie ${Number(prediction.effectiveN).toLocaleString("pl-PL",{maximumFractionDigits:1})} · READY w sąsiedztwie ${prediction.readySupport}</div>`
+      : `<div class="garden-model-prediction muted">🧪 Model 3D: za mało porównywalnych zakończonych danych — rekomendacja opiera się głównie na eksploracji / rankingu.</div>`;
+    host.innerHTML=`<strong>🔬 Polecany eksperyment — 🧪 Eksperymentalne</strong><div class="garden-recommendation-values">☀️ ${c.sun} · 💧 ${c.water} · pH ${Number(c.ph).toFixed(1)}</div><div><b>${escapeHtml(rec.mode)}</b> · ${escapeHtml(rec.reason)}</div>${modelLine}<div class="muted">READY/HARVEST są traktowane jako górne ograniczenia czasu, MANUAL ma wagę 0,65. Frame porównujemy wyłącznie z tym samym frame — nigdy jako procent. Punkt 60/50/7 jest tylko kontrolą/startem, nie założonym optimum.</div><button type="button" class="secondary-btn" data-garden-use-recommendation>Ustaw te wartości</button>`;
+    host.querySelector("[data-garden-use-recommendation]")?.addEventListener("click",()=>{
+      if (el("garden-sun")) el("garden-sun").value=String(c.sun);
+      if (el("garden-water")) el("garden-water").value=String(c.water);
+      if (el("garden-ph")) el("garden-ph").value=Number(c.ph).toFixed(1);
+      gardenSyncAllManualInputs(); gardenRenderComboStatus();
+    });
+  }
+
+  function gardenRenderRace() {
+    const host=el("garden-race");
+    if (!host) return;
+    const rows=(gardenData.active||[]).map(item=>{
+      const summary=gardenPhaseSummary(item);
+      const age=Math.max(0,Date.now()-Number(item.startedAt||0));
+      const upper=summary.lastFrame&&summary.entryUpper?Math.max(0,summary.entryUpper-Number(item.startedAt||0)):null;
+      const lower=summary.lastFrame&&summary.entryLower?Math.max(0,summary.entryLower-Number(item.startedAt||0)):null;
+      return {item,summary,age,upper,lower};
+    });
+    if (!rows.length) {host.innerHTML='<div class="empty">Brak aktywnych badań.</div>';return;}
+
+    const bestByFrame=new Map();
+    const countByFrame=new Map();
+    rows.forEach(row=>{
+      if (!row.summary.lastFrame || row.upper==null) return;
+      const f=Number(row.summary.lastFrame.atlasFrame);
+      countByFrame.set(f,(countByFrame.get(f)||0)+1);
+      const current=bestByFrame.get(f);
+      if (!current || row.upper<current.upper) bestByFrame.set(f,row);
+    });
+
+    rows.sort((a,b)=>{
+      const af=a.summary.lastFrame?Number(a.summary.lastFrame.atlasFrame):-1;
+      const bf=b.summary.lastFrame?Number(b.summary.lastFrame.atlasFrame):-1;
+      return bf-af || (a.upper??Infinity)-(b.upper??Infinity) || a.age-b.age;
+    });
+
+    host.innerHTML=`<div class="garden-race-list">${rows.map(row=>{
+      const item=row.item, summary=row.summary;
+      const frame=summary.lastFrame?Number(summary.lastFrame.atlasFrame):null;
+      const comparable=frame!=null && (countByFrame.get(frame)||0)>=2;
+      const leader=comparable && bestByFrame.get(frame)===row;
+      const best=comparable?bestByFrame.get(frame):null;
+      let label="mało danych";
+      if (leader) label="lider tego etapu";
+      else if (best && row.upper!=null && row.upper<=best.upper*1.15) label="obiecujące";
+      const interval=frame==null?"brak raportu etapu":`wejście w etap ${frame}: ${gardenFormatDuration(row.lower||0)}–${gardenFormatDuration(row.upper||0)}`;
+      return `<div class="garden-race-row ${leader?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.nick)} · ☀️${item.sun} 💧${item.water} pH${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>wiek ${escapeHtml(gardenFormatDuration(row.age))}</span><span>${escapeHtml(interval)}</span><span>${escapeHtml(String(item.startSource||"LIVE"))}</span><span>${summary.ready?"✅ READY":"READY: nie"}</span></div></div><span class="garden-race-label">${escapeHtml(label)}</span></div>`;
+    }).join("")}</div>`;
+  }
+
+
   function gardenRenderPlots() {
     const host = el("garden-plots");
     if (!host) return;
 
     host.innerHTML = [1,2,3,4].map(plot => {
       const active = gardenOwnExperimentForPlot(plot);
+      const summary = active ? gardenPhaseSummary(active) : null;
       const growingFor = active
         ? gardenFormatDuration(Date.now()-Number(active.startedAt || 0))
         : "";
@@ -11825,14 +13720,21 @@ function setupAdmin() {
            </span>
            <span class="garden-plot-time">⏱️ ${escapeHtml(growingFor)}</span>`
         : "";
+      const frame = summary && summary.lastFrame ? Number(summary.lastFrame.atlasFrame) : null;
+      const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite") : "";
+      const frameBadge = frame !== null ? `<span class="garden-plot-frame-badge">etap ${frame}</span>` : "";
+      const readyBadge = summary && summary.ready ? `<span class="garden-plot-ready-badge">✅ READY</span>` : "";
+
       return `
         <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">
           <span class="garden-plot-visual">
-            <span class="garden-plant-art" aria-hidden="true">🌱</span>
+            ${sprite}
+            ${frameBadge}
+            ${readyBadge}
             ${stats}
           </span>
           <span class="garden-plot-name">Grządka ${plot}</span>
-          <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · rośnie` : "Pusta"}</span>
+          <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${summary&&summary.ready?"gotowe do zbioru":frame===null?"etap niepotwierdzony":"rośnie"}` : "Pusta"}</span>
         </button>`;
     }).join("");
 
@@ -11858,11 +13760,10 @@ function setupAdmin() {
   }
 
   function gardenDirectionForDimension(combo,dimension) {
-    const rows = (gardenData.results || []).filter(item =>
-      item &&
-      item.plant === combo.plant &&
-      Number(item.durationMs) > 0
-    );
+    const rows = (gardenData.results || [])
+      .filter(item => item && item.plant === combo.plant)
+      .map(item => ({item,obs:gardenObservationForModel(item)}))
+      .filter(row => row.obs);
 
     // Przy kilku pierwszych pomiarach nie udajemy, że znamy optimum.
     if (rows.length < 5) {
@@ -11874,9 +13775,10 @@ function setupAdmin() {
     const range = ranges[dimension];
     const weighted = [];
 
-    rows.forEach(item => {
+    rows.forEach(row => {
+      const item=row.item;
       const x = Number(item[dimension]);
-      const y = Number(item.durationMs);
+      const y = Number(row.obs.duration);
       if (!Number.isFinite(x) || !Number.isFinite(y) || y <= 0) return;
 
       // Porównania najbardziej podobne w pozostałych dwóch parametrach
@@ -11889,7 +13791,7 @@ function setupAdmin() {
       });
 
       const targetDiff = Math.abs(x-Number(combo[dimension]))/range;
-      const sourceWeight = String(item.startSource || "LIVE").toUpperCase() === "MANUAL" ? 0.65 : 1;
+      const sourceWeight = Number(row.obs.weight) || 0.5;
       const weight = Math.exp(-10*otherDistanceSq) * Math.exp(-1.5*targetDiff) * sourceWeight;
       if (weight > 0.015) weighted.push({x:x/range,y,w:weight});
     });
@@ -11956,7 +13858,7 @@ function setupAdmin() {
       ["ph","🧪 pH"]
     ];
     const completed = (gardenData.results || []).filter(item =>
-      item && item.plant === combo.plant && Number(item.durationMs) > 0
+      item && item.plant === combo.plant && Boolean(gardenObservationForModel(item))
     ).length;
 
     const rows = configs.map(([key,label]) => {
@@ -11995,7 +13897,14 @@ function setupAdmin() {
       const manualHint = String(result.startSource || "").toUpperCase() === "MANUAL"
         ? ` <small class="garden-manual-hint">🟡 start wpisany ręcznie</small>`
         : "";
-      lines.push(`<div class="garden-known">✅ Uzyskany czas: ${escapeHtml(gardenFormatDuration(result.durationMs))}${manualHint}</div>`);
+      const observed = gardenObservedDuration(result);
+      const observedDuration = observed && Number(observed.duration) > 0
+        ? Number(observed.duration)
+        : Number(result.durationMs) || 0;
+      const observedLabel = observed && observed.source === "READY"
+        ? "Czas wg READY"
+        : "Czas do zbioru (HARVEST)";
+      lines.push(`<div class="garden-known">✅ ${observedLabel}: ${escapeHtml(gardenFormatDuration(observedDuration))}${manualHint}</div>`);
     } else {
       lines.push(`<div>🔬 Brak zapisanego wyniku dla tych ustawień.</div>`);
     }
@@ -12023,7 +13932,10 @@ function setupAdmin() {
 
     const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
     el("garden-editor-title").textContent = `Grządka ${gardenSelectedPlot}`;
-    el("garden-editor-mode").textContent = own ? "rośnie" : "pusta";
+    const ownPhaseSummary = own ? gardenPhaseSummary(own) : null;
+    el("garden-editor-mode").textContent = own
+      ? (ownPhaseSummary && ownPhaseSummary.ready ? "gotowe do zbioru" : "rośnie")
+      : "pusta";
 
     const controls = [
       el("garden-plant"),el("garden-sun"),el("garden-water"),el("garden-ph"),
@@ -12055,6 +13967,10 @@ function setupAdmin() {
     } else {
       gardenRenderComboStatus();
     }
+
+    gardenRenderPhaseTools(own);
+    gardenRenderRecommendation(own);
+    gardenRenderRace();
   }
 
   function gardenUpdateClock() {
@@ -12062,7 +13978,14 @@ function setupAdmin() {
     if (!box || box.hidden) return;
     const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
     if (!own) return;
-    box.textContent = `⏱️ Rośnie już: ${gardenFormatDuration(Date.now()-Number(own.startedAt || 0))}`;
+    const summary = gardenPhaseSummary(own);
+    if (summary.ready && Number(summary.ready.observedAt) > Number(own.startedAt || 0)) {
+      box.textContent =
+        `✅ READY od ${gardenFormatDuration(Date.now()-Number(summary.ready.observedAt))} · ` +
+        `od startu ${gardenFormatDuration(Date.now()-Number(own.startedAt || 0))}`;
+    } else {
+      box.textContent = `⏱️ Rośnie już: ${gardenFormatDuration(Date.now()-Number(own.startedAt || 0))}`;
+    }
   }
 
   async function gardenFetchData(options={}) {
@@ -12079,7 +14002,8 @@ function setupAdmin() {
     gardenData = {
       plants:Array.isArray(payload.plants) ? payload.plants : ["Cebula"],
       active:Array.isArray(payload.active) ? payload.active : [],
-      results:Array.isArray(payload.results) ? payload.results : []
+      results:Array.isArray(payload.results) ? payload.results : [],
+      phases:Array.isArray(payload.phases) ? payload.phases : []
     };
     gardenDataLoaded = true;
     gardenRenderPlots();
@@ -12121,7 +14045,7 @@ function setupAdmin() {
     button.disabled = true;
     if (status) status.textContent = "⏳ Sprawdzam i rozpoczynam uprawę…";
 
-    const request = async forceDuplicate => jsonp("gardenStart",{
+    const request = async forceDuplicate => gardenPostAction("gardenStart",{
       ...combo,
       plot:gardenSelectedPlot,
       nick,
@@ -12209,7 +14133,7 @@ function setupAdmin() {
     );
 
     try {
-      const result = await jsonp("gardenFinish",{
+      const result = await gardenPostAction("gardenFinish",{
         id:own.id,
         ownerToken:own.ownerToken || "",
         sessionToken:playerAccountSessionToken() || ""
@@ -12241,7 +14165,7 @@ function setupAdmin() {
     );
 
     try {
-      const result = await jsonp("gardenCancel",{
+      const result = await gardenPostAction("gardenCancel",{
         id:own.id,
         ownerToken:own.ownerToken || "",
         sessionToken:playerAccountSessionToken() || ""
@@ -12342,39 +14266,18 @@ function setupAdmin() {
     el("garden-start")?.addEventListener("click",gardenStartCultivation);
     el("garden-finish")?.addEventListener("click",gardenFinishCultivation);
     el("garden-cancel")?.addEventListener("click",gardenCancelCultivation);
+    el("garden-open-phase-picker")?.addEventListener("click",()=>{
+      const picker=el("garden-phase-picker");
+      if (picker) picker.hidden=!picker.hidden;
+    });
+    el("garden-ready")?.addEventListener("click",gardenRecordReady);
     gardenRenderPlots();
     gardenRenderEditor();
 
-    if (!gardenClockTimer) {
-      gardenClockTimer = setInterval(()=>{
-        gardenUpdateClock();
-        if (activeToolModule === "garden") {
-          // Czas wzrostu jest widoczny także bezpośrednio na czterech grządkach.
-          gardenRenderPlots();
-          if (!gardenOwnExperimentForPlot(gardenSelectedPlot)) {
-            gardenRenderComboStatus();
-          }
-        }
-      },30000);
-    }
-
-    // Gdy użytkownik wraca do karty / okna, natychmiast sprawdzamy,
-    // czy ktoś rozpoczął albo zakończył badanie tej kombinacji.
-    if (!gardenLiveRefreshBound) {
-      gardenLiveRefreshBound = true;
-      document.addEventListener("visibilitychange",()=>{
-        if (document.visibilityState === "visible" && activeToolModule === "garden") {
-          gardenLiveRefresh();
-        }
-      });
-      window.addEventListener("focus",()=>{
-        if (activeToolModule === "garden") gardenLiveRefresh();
-      });
-    }
   }
 
   async function openGardenModule() {
-    if (!(await ensureModuleAccess("garden"))) return;
+    if (!(await ensureModuleAccess("garden",{force:true}))) return;
 
     showModuleLoading("garden","🌱 Ładowanie Ogrodu…","Pobieram aktywne uprawy, rezerwacje i zapisane wyniki.");
     if (!moduleOpenInFlight.garden) {
@@ -12391,19 +14294,13 @@ function setupAdmin() {
     gardenRenderPlots();
     gardenRenderEditor();
 
-    if (gardenRefreshTimer) clearInterval(gardenRefreshTimer);
-    // Ogród działa jako wspólna tablica badań, więc podczas otwartej zakładki
-    // sprawdzamy zmiany często. Dzięki temu nowa rezerwacja innego gracza
-    // pojawi się bez ręcznego odświeżania strony.
-    gardenRefreshTimer = setInterval(()=>{
-      gardenLiveRefresh();
-    },5000);
   }
 
   async function openBuildModule() {
     if (
       !(await ensureModuleAccess(
-        "builds"
+        "builds",
+        {force:true}
       ))
     ) {
       return;
@@ -12444,15 +14341,591 @@ function setupAdmin() {
     renderBuildLists();
   }
 
+
+  // ============================================================
+  // v21.00 — PvP Lab / Monte Carlo (jawnie eksperymentalny)
+  // Znane reguły są odtwarzane wprost, a brakujące elementy silnika
+  // pozostają parametrami użytkownika. Nie jest to klon backendu gry.
+  // ============================================================
+  const PVP_ESCALATION = [3,7,10,13,16,20,23,26,29,33,36,39,42,46,49];
+  let pvpGeneratedPresetsCache = null;
+
+  function buildSimulationReadiness(source) {
+    const missing = [];
+    if (!source || typeof source !== "object") return {ok:false,missing:["build"]};
+
+    const profile = buildProfileStats(source);
+    const level =
+      profile.provided && profile.provided.characterLevel
+        ? Number(profile.characterLevel)
+        : NaN;
+    if (!Number.isInteger(level) || level < 1) missing.push("faktyczny poziom postaci");
+
+    const attrs = source.attributes || {};
+    BUILD_ATTR_ORDER.forEach(attrKey=>{
+      const value = Number(attrs[attrKey]);
+      if (!Number.isInteger(value) || value < 0 || value > 50) {
+        missing.push(`atrybut ${BUILD_ATTRS[attrKey].name}`);
+      }
+    });
+
+    const usedAttributePoints = BUILD_ATTR_ORDER.reduce(
+      (sum,attrKey) => sum + (Number.isFinite(Number(attrs[attrKey])) ? Number(attrs[attrKey]) : 0),
+      0
+    );
+    if (Number.isFinite(level) && level >= 1 && usedAttributePoints > level * 2) {
+      missing.push(
+        `poziom zbyt niski dla ${Math.round(usedAttributePoints)} pkt atrybutów (min. ${Math.ceil(usedAttributePoints/2)})`
+      );
+    }
+
+    BUILD_ATTR_ORDER.forEach(attrKey=>{
+      const value = Math.max(0,Math.min(50,Number(attrs[attrKey])||0));
+      const tiers = Math.min(10,Math.floor(value/5));
+      const perks = source.perks && source.perks[attrKey] ? source.perks[attrKey] : {};
+      for (let tier=1; tier<=tiers; tier++) {
+        if (perks[tier] !== "A" && perks[tier] !== "B") {
+          missing.push(`${BUILD_ATTRS[attrKey].name}: wybór perka T${tier}`);
+        }
+      }
+    });
+
+    const profileLabels = {
+      attack:"Atak z profilu",
+      defense:"Obrona z profilu",
+      baseHp:"bazowe HP",
+      petHp:"HP z pancerza peta",
+      eqHp:"HP ze zwykłego EQ"
+    };
+    Object.keys(profileLabels).forEach(keyName=>{
+      if (!profile.provided || !profile.provided[keyName]) missing.push(profileLabels[keyName]);
+    });
+    if (!profile.bonusesConfirmed) missing.push("potwierdzenie pełnych bonusów PvP itemów/setu/akcesoriów/gangu");
+
+    try {
+      const calculated = buildCalculateStats(source);
+      const primary = buildFinalPrimaryStats(calculated);
+      if (![primary.attack,primary.defense,primary.hp].every(v=>Number.isFinite(v) && v>0)) {
+        missing.push("obliczalne Atak / Obrona / HP");
+      }
+    } catch (err) {
+      missing.push("obliczalne statystyki końcowe");
+    }
+
+    return {ok:missing.length===0,missing:[...new Set(missing)]};
+  }
+
+  function pvpPresetAllocate(level,weights) {
+    const target = Math.min(250,2*level);
+    const cap = Math.min(50,level);
+    const values = weights.map(()=>0);
+    let left = target;
+    while (left>0) {
+      let best = -1, bestScore = -Infinity;
+      weights.forEach((weight,index)=>{
+        if (values[index] >= cap) return;
+        const desired = target * weight / weights.reduce((a,b)=>a+b,0);
+        const score = desired - values[index] + weight*0.001;
+        if (score > bestScore) { bestScore=score; best=index; }
+      });
+      if (best<0) break;
+      values[best]++;
+      left--;
+    }
+    return values;
+  }
+
+  function pvpPresetBonus(source,name,key,value,percent=true) {
+    return {source:`Preset · ${source}`,name,key,value,percent};
+  }
+
+  function pvpGeneratedPresets() {
+    if (pvpGeneratedPresetsCache) return pvpGeneratedPresetsCache;
+    const archetypes = [
+      {
+        id:"glass",name:"Glass Cannon",weights:[5,1,1,1,4],choices:"AB",
+        description:"Przeciwnik treningowy / wygenerowany. Testuje przeżycie burstu, krytyków, first strike i Execute.",
+        bonuses:[["Atak","attackPct",18],["Kryt","critChance",14],["Crit dmg","critDmg",28],["Pierwszy cios","firstStrike",8],["Egzekucja","execute",7]]
+      },
+      {
+        id:"tank",name:"Tank",weights:[1,5,1,5,1],choices:"BA",
+        description:"Przeciwnik treningowy / wygenerowany. Testuje sustain, przebicie, Execute i odporności.",
+        bonuses:[["Obrona","defensePct",28],["Maks. HP","maxHpPct",24],["Redukcja obrażeń","damageReduction",12],["Odp. kryt","critResist",14],["Regeneracja","hpRegen",7,false],["Odp. krwawienie","bleedResist",10]]
+      },
+      {
+        id:"dodge",name:"Dodge / Counter",weights:[1,2,5,2,2],choices:"ABBA",
+        description:"Przeciwnik treningowy / wygenerowany. Testuje Celność, Unik, Kontratak i Double Strike.",
+        bonuses:[["Unik","evasion",14],["Kontratak","counter",17],["Podwójne","doubleStrike",11],["Celność","accuracy",8]]
+      },
+      {
+        id:"bleed",name:"Bleed",weights:[4,1,3,2,3],choices:"AABB",
+        description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na krwawienie i tempo zabicia pod DoT.",
+        bonuses:[["Krwawienie","bleed",20],["Obrażenia krwawienia","bleedDamage",55],["Atak","attackPct",10],["Kradzież życia","lifesteal",7]]
+      },
+      {
+        id:"control",name:"Control / Stun",weights:[2,2,2,2,5],choices:"BABA",
+        description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na ogłuszenie, Celność i presję Execute.",
+        bonuses:[["Ogłuszenie","stun",16],["Celność","accuracy",12],["Redukcja leczenia","healingReduction",14],["Odp. ogłuszenie","stunResist",12],["Egzekucja","execute",6]]
+      },
+      {
+        id:"sustain",name:"Sustain / Wampir",weights:[2,3,1,5,2],choices:"BBAA",
+        description:"Przeciwnik treningowy / wygenerowany. Testuje długą walkę, lifesteal, regen i Healing Reduction.",
+        bonuses:[["Maks. HP","maxHpPct",18],["Kradzież życia","lifesteal",13],["Regeneracja","hpRegen",8,false],["Redukcja obrażeń","damageReduction",8],["Redukcja leczenia","healingReduction",8]]
+      }
+    ];
+
+    const out = [];
+    [40,50,60].forEach(level=>{
+      archetypes.forEach((arch,archIndex)=>{
+        const values = pvpPresetAllocate(level,arch.weights);
+        const attributes = {};
+        const perks = {};
+        BUILD_ATTR_ORDER.forEach((attrKey,index)=>{
+          attributes[attrKey] = values[index];
+          perks[attrKey] = {};
+          const tiers = Math.min(10,Math.floor(values[index]/5));
+          for (let tier=1;tier<=tiers;tier++) {
+            perks[attrKey][tier] = arch.choices[(tier+index+archIndex)%arch.choices.length];
+          }
+        });
+        const profile = {
+          characterLevel:level,
+          attack:Math.round(175+level*3.8),
+          defense:Math.round(215+level*4.6),
+          baseHp:105,
+          petHp:Math.round(level*4),
+          eqHp:Math.round(level*3),
+          provided:{characterLevel:true,attack:true,defense:true,baseHp:true,petHp:true,eqHp:true},
+          bonusesConfirmed:true
+        };
+        const bonuses = arch.bonuses.map(def=>pvpPresetBonus(arch.name,def[0],def[1],def[2],def.length<4?true:def[3]));
+        out.push({
+          id:`preset-${level}-${arch.id}`,
+          name:`Lvl ${level} · ${arch.name}`,
+          authorNick:"MenelWars Tools · przeciwnik treningowy",
+          ownerNick:"",
+          public:false,
+          level,
+          attributes,perks,profile,bonuses,
+          description:`${arch.description} Jawny stat block; bez ukrytych mnożników trudności.`
+        });
+      });
+    });
+    pvpGeneratedPresetsCache = out;
+    return out;
+  }
+
+  function pvpSimulationSources() {
+    const current = Object.assign({},buildState,{id:"current",name:"Aktualny edytor",level:buildRequiredLevel(),profile:buildProfileStats(buildState)});
+    const all = [{key:"current",label:"✏️ Aktualny edytor",source:current,group:"current"}];
+    buildMyItems.forEach(item=>all.push({key:`mine:${item.id}`,label:`🔒 ${item.name}`,source:item,group:"mine"}));
+    buildPublicItems.forEach(item=>all.push({key:`public:${item.id}`,label:`🌍 ${item.name} · ${item.authorNick||"Anonim"}`,source:item,group:"public"}));
+    pvpGeneratedPresets().forEach(item=>all.push({key:`preset:${item.id}`,label:`🤖 ${item.name} · treningowy`,source:item,group:"preset"}));
+    return all;
+  }
+
+  function pvpPopulateSelectors() {
+    const left = el("pvp-sim-left"), right = el("pvp-sim-right");
+    if (!left || !right) return;
+    const sources = pvpSimulationSources();
+    const render = select => {
+      const old = select.value;
+      select.innerHTML = sources.map(item=>`<option value="${escapeHtml(item.key)}">${escapeHtml(item.label)}</option>`).join("");
+      if (sources.some(x=>x.key===old)) select.value=old;
+    };
+    render(left); render(right);
+    if (!left.value) left.value = sources.some(x=>x.key==="current") ? "current" : sources[0]?.key || "";
+    if (!right.value || right.value===left.value) {
+      const preferred = sources.find(x=>x.group==="public") || sources.find(x=>x.group==="preset");
+      if (preferred) right.value=preferred.key;
+    }
+    pvpUpdateReadiness();
+  }
+
+  function pvpResolveSource(key) {
+    return pvpSimulationSources().find(item=>item.key===key) || null;
+  }
+
+  function pvpUpdateReadiness() {
+    const host = el("pvp-sim-readiness");
+    if (!host) return;
+    const leftItem=pvpResolveSource(el("pvp-sim-left")?.value||"");
+    const rightItem=pvpResolveSource(el("pvp-sim-right")?.value||"");
+    if (!leftItem || !rightItem) { host.textContent="Wybierz dwa buildy."; return; }
+    const leftReady=buildSimulationReadiness(leftItem.source);
+    const rightReady=buildSimulationReadiness(rightItem.source);
+    if (leftReady.ok && rightReady.ok) {
+      host.textContent="✅ Oba buildy mają komplet danych wymaganych do symulacji.";
+      return;
+    }
+    const parts=[];
+    if (!leftReady.ok) parts.push(`${leftItem.label}: ${leftReady.missing.join(", ")}`);
+    if (!rightReady.ok) parts.push(`${rightItem.label}: ${rightReady.missing.join(", ")}`);
+    host.textContent="⚠️ Brakuje: "+parts.join(" · ");
+  }
+
+  function pvpClamp(value,min,max) { return Math.max(min,Math.min(max,value)); }
+  function pvpChance(percent) { return Math.random()*100 < pvpClamp(percent,0,100); }
+
+  function pvpConditionalEffects(calculated,hpPct) {
+    const out={attackPct:0,damageReduction:0,regenFlat:0};
+    (calculated.extras?.conditional || []).forEach(text=>{
+      const threshold=String(text).match(/HP\s*<\s*(\d+(?:[.,]\d+)?)%/i);
+      if (!threshold || hpPct >= Number(threshold[1].replace(",","."))) return;
+      const attack=String(text).match(/\+\s*(\d+(?:[.,]\d+)?)%\s*ataku/i);
+      if (attack) out.attackPct += Number(attack[1].replace(",","."));
+      const reduction=String(text).match(/-\s*(\d+(?:[.,]\d+)?)%\s*otrzymywanych obrażeń/i);
+      if (reduction) out.damageReduction += Number(reduction[1].replace(",","."));
+      const regen=String(text).match(/\+\s*(\d+(?:[.,]\d+)?)(?!\s*%)\s*regeneracji hp/i);
+      if (regen) out.regenFlat += Number(regen[1].replace(",","."));
+    });
+    return out;
+  }
+
+  function pvpPrepareFighter(source,label) {
+    const calculated=buildCalculateStats(source);
+    const primary=buildFinalPrimaryStats(calculated);
+    return {
+      source,label,calculated,stats:calculated.stats,primary,
+      maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
+      bleeding:null,stunned:false,firstAttack:true,
+      metrics:{damage:0,crit:0,double:0,counter:0,bleed:0,stun:0,execute:0,evade:0,miss:0,lifesteal:0,regen:0}
+    };
+  }
+
+  function pvpHeal(fighter,amount,enemy,metricKey) {
+    const reduction=pvpClamp(Number(enemy.stats.healingReduction)||0,0,100);
+    const heal=Math.max(0,Math.round(Number(amount||0)*(1-reduction/100)));
+    const actual=Math.max(0,Math.min(heal,fighter.maxHp-fighter.hp));
+    fighter.hp += actual;
+    if (actual && metricKey) fighter.metrics[metricKey]+=actual;
+    return actual;
+  }
+
+  function pvpDamageFormula(attacker,defender,round,params,isCrit,isFirst) {
+    const hpPct=100*attacker.hp/attacker.maxHp;
+    const condA=pvpConditionalEffects(attacker.calculated,hpPct);
+    const condD=pvpConditionalEffects(defender.calculated,100*defender.hp/defender.maxHp);
+    const dynamicPct=(attacker.calculated.extras?.dynamic||[])
+      .filter(x=>x.type==="attackPctPerTurn")
+      .reduce((sum,x)=>sum+(Number(x.amount)||0)*round,0);
+    const attack=attacker.primary.attack*(1+(condA.attackPct+dynamicPct)/100);
+    const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
+    const defenseFactor=params.defenseK/(effectiveDefense+params.defenseK);
+    const damageReduction=pvpClamp((Number(defender.stats.damageReduction)||0)+condD.damageReduction,0,90);
+    // Source mapa gry podaje drugą funkcję Evasion: pasywną redukcję obrażeń
+    // równą evasion / 3.5. Backendowa kolejność względem zwykłego DR nie jest
+    // dostępna, więc w modelu eksperymentalnym stosujemy ją jako osobny
+    // mnożnik po standardowym Damage Reduction, bez mieszania z capem 60%.
+    const evasionPassiveReduction=pvpClamp((Number(defender.stats.evasion)||0)/3.5,0,100);
+    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(14,round-1))]||0)/100;
+    let damage=attack*defenseFactor*(1-damageReduction/100)*(1-evasionPassiveReduction/100)*escalation;
+    if (isCrit) damage*=1+(Number(attacker.stats.critDmg)||0)/100;
+    if (isFirst) damage*=1+(Number(attacker.stats.firstStrike)||0)/100;
+    return Math.max(1,Math.round(damage));
+  }
+
+  function pvpApplyBleedTick(victim,round) {
+    if (!victim.bleeding) return {damage:0,killed:false};
+    const source=victim.bleeding;
+    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(14,round-1))]||0)/100;
+    const damage=Math.max(1,Math.round(victim.maxHp*0.02*(1+(Number(source.stats.bleedDamage)||0)/100)*escalation));
+    victim.hp=Math.max(0,victim.hp-damage);
+    source.metrics.damage+=damage;
+    return {damage,killed:victim.hp<=0};
+  }
+
+  function pvpStrike(attacker,defender,round,params,options={}) {
+    if (attacker.hp<=0 || defender.hp<=0) return {killed:false,cause:""};
+    const allowExecute=options.allowExecute!==false;
+    const allowCounter=options.allowCounter!==false;
+    const isFirst=Boolean(attacker.firstAttack && options.consumeFirst!==false);
+    if (options.consumeFirst!==false) attacker.firstAttack=false;
+
+    if (allowExecute && 100*defender.hp/defender.maxHp < (Number(attacker.stats.execute)||0)) {
+      defender.hp=0; attacker.metrics.execute++;
+      return {killed:true,cause:"execute"};
+    }
+
+    const finalHit=pvpClamp((Number(attacker.stats.accuracy)||0)-(Number(defender.stats.evasion)||0),5,99);
+    if (!pvpChance(finalHit)) {
+      defender.metrics.evade++;
+      if (allowCounter && pvpChance(Number(defender.stats.counter)||0)) {
+        defender.metrics.counter++;
+        const counterResult=pvpStrike(defender,attacker,round,params,{allowExecute:false,allowCounter:false,consumeFirst:false,damageMultiplier:params.counterMult});
+        if (counterResult.killed) return {killed:true,cause:"counter"};
+      }
+      return {killed:false,cause:"evade"};
+    }
+
+    const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-(Number(defender.stats.critResist)||0));
+    const crit=pvpChance(critChance);
+    if (crit) attacker.metrics.crit++;
+    let damage=pvpDamageFormula(attacker,defender,round,params,crit,isFirst);
+    if (Number.isFinite(options.damageMultiplier)) damage=Math.max(1,Math.round(damage*options.damageMultiplier));
+    const actual=Math.min(defender.hp,damage);
+    defender.hp-=actual;
+    attacker.metrics.damage+=actual;
+
+    if (actual>0 && Number(attacker.stats.lifesteal)>0) {
+      pvpHeal(attacker,actual*(Number(attacker.stats.lifesteal)||0)/100,defender,"lifesteal");
+    }
+    if (defender.hp<=0) return {killed:true,cause:options.damageMultiplier!=null?"counter":"damage"};
+
+    // Mistrz Krwawienia / applies_bleed: krytyk automatycznie nakłada bleed.
+    // To nie jest dodatkowy rzut szansy i nie odejmujemy Bleed Resist od
+    // automatycznego proc-a. Gdy nie ma auto-bleed, działa zwykła szansa
+    // bleedChance - bleedResist.
+    const autoBleed = crit && Number(attacker.stats.appliesBleed) > 0;
+    const bleedChance=Math.max(0,(Number(attacker.stats.bleed)||0)-(Number(defender.stats.bleedResist)||0));
+    if (autoBleed || pvpChance(bleedChance)) {
+      if (!defender.bleeding) attacker.metrics.bleed++;
+      defender.bleeding=attacker;
+    }
+    const stunChance=Math.max(0,(Number(attacker.stats.stun)||0)-(Number(defender.stats.stunResist)||0));
+    if (pvpChance(stunChance)) { defender.stunned=true; attacker.metrics.stun++; }
+    return {killed:false,cause:crit?"crit":"hit"};
+  }
+
+  function pvpActivity(actor,enemy,round,params) {
+    const bleedTick=pvpApplyBleedTick(actor,round);
+    if (bleedTick.killed) return {winner:enemy,cause:"bleed"};
+
+    const cond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
+    pvpHeal(actor,(Number(actor.stats.hpRegen)||0)+cond.regenFlat,enemy,"regen");
+
+    if (actor.stunned) { actor.stunned=false; return null; }
+    const main=pvpStrike(actor,enemy,round,params,{allowExecute:true,allowCounter:true,consumeFirst:true});
+    if (enemy.hp<=0) return {winner:actor,cause:main.cause||"damage"};
+    // Kontratak jest rozstrzygany wewnątrz pvpStrike(). Jeśli zabił aktywnego
+    // gracza, nie wolno pozwolić mu wykonać double strike ani przejść do
+    // kolejnych tur z HP=0.
+    if (actor.hp<=0) return {winner:enemy,cause:main.cause||"counter"};
+
+    if (pvpChance(Number(actor.stats.doubleStrike)||0)) {
+      actor.metrics.double++;
+      const second=pvpStrike(actor,enemy,round,params,{allowExecute:false,allowCounter:true,consumeFirst:false});
+      if (enemy.hp<=0) return {winner:actor,cause:second.cause||"double"};
+      if (actor.hp<=0) return {winner:enemy,cause:second.cause||"counter"};
+    }
+    return null;
+  }
+
+  function pvpPickFirst(a,b,params) {
+    const ia=Number(a.stats.initiative)||0, ib=Number(b.stats.initiative)||0;
+    if (Math.abs(ia-ib)<1e-9) return Math.random()<0.5 ? a : b;
+    const higher=ia>ib?a:b, lower=ia>ib?b:a;
+    return Math.random()<params.firstMoverHigher ? higher : lower;
+  }
+
+  function pvpOneBattle(sourceA,sourceB,params) {
+    const a=pvpPrepareFighter(sourceA,"A"), b=pvpPrepareFighter(sourceB,"B");
+    let cause="timeout", rounds=15, winner=null;
+
+    // firstMover jest zdarzeniem startu walki. Losujemy go raz na walkę,
+    // a nie ponownie w każdej turze. Algorytm wyboru pozostaje jawnie
+    // eksperymentalny, bo backend gry nie występuje w source mapie.
+    const first=pvpPickFirst(a,b,params);
+    const second=first===a?b:a;
+
+    for (let round=1;round<=15;round++) {
+      const r1=pvpActivity(first,second,round,params);
+      if (r1) { winner=r1.winner;cause=r1.cause;rounds=round;break; }
+      const r2=pvpActivity(second,first,round,params);
+      if (r2) { winner=r2.winner;cause=r2.cause;rounds=round;break; }
+    }
+    if (!winner) {
+      const pa=a.hp/a.maxHp, pb=b.hp/b.maxHp;
+      if (Math.abs(pa-pb)>1e-9) winner=pa>pb?a:b;
+      else cause="tie";
+    }
+    return {winner:winner===a?"A":winner===b?"B":"tie",cause,rounds,a,b,timeout:cause==="timeout"||cause==="tie"};
+  }
+
+  function pvpHpBucketIndex(percent) {
+    const value=pvpClamp(Number(percent)||0,0,100);
+    if (value<=0) return 0;
+    if (value<=25) return 1;
+    if (value<=50) return 2;
+    if (value<=75) return 3;
+    return 4;
+  }
+
+  function pvpAddCause(target,cause) {
+    const key=String(cause||"inne");
+    target[key]=(target[key]||0)+1;
+  }
+
+  async function pvpMonteCarlo(sourceA,sourceB,runs,params) {
+    const eventKeys=["crit","double","counter","bleed","stun","execute"];
+    const emptyEvents=()=>Object.fromEntries(eventKeys.map(key=>[key,0]));
+    const agg={
+      runs,winsA:0,winsB:0,ties:0,timeouts:0,rounds:[],
+      endHpA:0,endHpB:0,damageA:0,damageB:0,
+      hpBucketsA:[0,0,0,0,0],hpBucketsB:[0,0,0,0,0],
+      eventsA:emptyEvents(),eventsB:emptyEvents(),
+      eventFightsA:emptyEvents(),eventFightsB:emptyEvents(),
+      causes:{},causesByWinner:{A:{},B:{},tie:{}}
+    };
+
+    for (let i=0;i<runs;i++) {
+      const result=pvpOneBattle(sourceA,sourceB,params);
+      if (result.winner==="A") agg.winsA++;
+      else if (result.winner==="B") agg.winsB++;
+      else agg.ties++;
+      if (result.timeout) agg.timeouts++;
+      agg.rounds.push(result.rounds);
+
+      const hpA=100*result.a.hp/result.a.maxHp;
+      const hpB=100*result.b.hp/result.b.maxHp;
+      agg.endHpA+=hpA;
+      agg.endHpB+=hpB;
+      agg.hpBucketsA[pvpHpBucketIndex(hpA)]++;
+      agg.hpBucketsB[pvpHpBucketIndex(hpB)]++;
+      agg.damageA+=result.a.metrics.damage;
+      agg.damageB+=result.b.metrics.damage;
+
+      eventKeys.forEach(key=>{
+        const countA=Number(result.a.metrics[key])||0;
+        const countB=Number(result.b.metrics[key])||0;
+        agg.eventsA[key]+=countA;
+        agg.eventsB[key]+=countB;
+        if (countA>0) agg.eventFightsA[key]++;
+        if (countB>0) agg.eventFightsB[key]++;
+      });
+
+      pvpAddCause(agg.causes,result.cause);
+      pvpAddCause(agg.causesByWinner[result.winner]||agg.causesByWinner.tie,result.cause);
+      if (i && i%500===0) await new Promise(resolve=>setTimeout(resolve,0));
+    }
+
+    agg.rounds.sort((a,b)=>a-b);
+    agg.avgRounds=agg.rounds.reduce((a,b)=>a+b,0)/runs;
+    const mid=Math.floor(agg.rounds.length/2);
+    agg.medianRounds=agg.rounds.length%2
+      ? (agg.rounds[mid]||0)
+      : ((agg.rounds[mid-1]||0)+(agg.rounds[mid]||0))/2;
+    return agg;
+  }
+
+  function pvpPct(n,d) { return d ? (100*n/d).toLocaleString("pl-PL",{maximumFractionDigits:1})+"%" : "0%"; }
+
+  function pvpMetricLine(events,eventFights,runs) {
+    const item=(key,label)=>`${label} ${pvpPct(eventFights[key],runs)} walk (${Number(events[key]/runs).toLocaleString("pl-PL",{maximumFractionDigits:2})}/walkę)`;
+    return [
+      item("crit","kryt"),
+      item("double","double"),
+      item("counter","counter"),
+      item("bleed","bleed"),
+      item("stun","stun"),
+      item("execute","execute")
+    ].join(" · ");
+  }
+
+  function pvpHpDistributionLine(buckets,runs) {
+    const labels=["0%","1–25%","26–50%","51–75%","76–100%"];
+    return labels.map((label,index)=>`${label}: ${pvpPct(buckets[index]||0,runs)}`).join(" · ");
+  }
+
+  function pvpCauseLine(causes,total) {
+    return Object.entries(causes||{})
+      .sort((a,b)=>b[1]-a[1])
+      .map(([key,value])=>`${escapeHtml(key)} ${pvpPct(value,total)}`)
+      .join(" · ") || "—";
+  }
+
+  function pvpRenderAggregate(agg,leftLabel,rightLabel,title) {
+    return `<section class="pvp-sim-result-card">
+      <h4>${escapeHtml(title)}</h4>
+      <div class="pvp-sim-score"><b>${escapeHtml(leftLabel)}: ${pvpPct(agg.winsA,agg.runs)}</b><span>${escapeHtml(rightLabel)}: ${pvpPct(agg.winsB,agg.runs)}</span><span>remis ${pvpPct(agg.ties,agg.runs)}</span></div>
+      <div class="pvp-sim-kpis"><span>Śr. rund: <b>${agg.avgRounds.toLocaleString("pl-PL",{maximumFractionDigits:1})}</b></span><span>Mediana: <b>${agg.medianRounds.toLocaleString("pl-PL",{maximumFractionDigits:1})}</b></span><span>Timeout: <b>${pvpPct(agg.timeouts,agg.runs)}</b></span></div>
+      <div class="muted">Końcowe HP średnio: ${escapeHtml(leftLabel)} ${(agg.endHpA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}% · ${escapeHtml(rightLabel)} ${(agg.endHpB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:1})}%</div>
+      <div class="pvp-hp-distribution"><b>Rozkład końcowego HP — ${escapeHtml(leftLabel)}:</b> ${pvpHpDistributionLine(agg.hpBucketsA,agg.runs)}<br><b>${escapeHtml(rightLabel)}:</b> ${pvpHpDistributionLine(agg.hpBucketsB,agg.runs)}</div>
+      <div class="muted">Śr. zadane obrażenia: ${(agg.damageA/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})} / ${(agg.damageB/agg.runs).toLocaleString("pl-PL",{maximumFractionDigits:0})}</div>
+      <div class="pvp-sim-procs"><b>${escapeHtml(leftLabel)}</b>: ${pvpMetricLine(agg.eventsA,agg.eventFightsA,agg.runs)}<br><b>${escapeHtml(rightLabel)}</b>: ${pvpMetricLine(agg.eventsB,agg.eventFightsB,agg.runs)}</div>
+      <div class="muted"><b>Przyczyny wygranych ${escapeHtml(leftLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.A,Math.max(1,agg.winsA))}<br><b>Przyczyny wygranych ${escapeHtml(rightLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.B,Math.max(1,agg.winsB))}<br><b>Remisy/timeouty:</b> ${pvpCauseLine(agg.causesByWinner.tie,Math.max(1,agg.ties))}</div>
+    </section>`;
+  }
+
+  async function pvpRunSimulation() {
+    const button=el("pvp-sim-run"), host=el("pvp-sim-results"), readinessHost=el("pvp-sim-readiness");
+    const leftItem=pvpResolveSource(el("pvp-sim-left")?.value||"");
+    const rightItem=pvpResolveSource(el("pvp-sim-right")?.value||"");
+    if (!leftItem || !rightItem) return;
+    const lready=buildSimulationReadiness(leftItem.source), rready=buildSimulationReadiness(rightItem.source);
+    if (!lready.ok || !rready.ok) { pvpUpdateReadiness(); return; }
+    const params={
+      defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||500,50,5000),
+      counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2),
+      firstMoverHigher:pvpClamp(Number(el("pvp-sim-first-mover")?.value)||0.60,0.5,1)
+    };
+    const runs=[1000,5000,10000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):5000;
+    const mode=String(el("pvp-sim-mode")?.value||"both");
+    button.disabled=true; if (readinessHost) readinessHost.textContent=`⏳ Symuluję ${runs.toLocaleString("pl-PL")} walk...`;
+    try {
+      const blocks=[];
+      let sideNote="";
+
+      // Z dostępnych danych nie wynika osobny mnożnik atakujący/obrońca ani
+      // deterministyczny first mover zależny od strony. Nie generujemy więc
+      // dwóch niezależnych próbek, które różniłyby się wyłącznie szumem Monte
+      // Carlo i mogłyby sugerować nieistniejącą przewagę strony.
+      if (mode==="both") {
+        const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params);
+        blocks.push(pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Oba warianty — brak potwierdzonej różnicy stron"));
+        sideNote='<div class="pvp-side-note">ℹ️ W obecnym modelu „atakuję” i „bronię” mają te same reguły. Jeśli logi/source pokażą mechanikę zależną od strony, warianty zostaną rozdzielone.</div>';
+      } else {
+        const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params);
+        blocks.push(pvpRenderAggregate(agg,leftItem.label,rightItem.label,mode==="defense"?"Ja bronię":"Ja atakuję"));
+      }
+
+      host.innerHTML=`<div class="pvp-sim-assumptions">🧪 Założenia nieznanego silnika: hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Brak ukrytych mnożników atakujący/broniący.</div>${sideNote}${blocks.join("")}`;
+      if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
+    } catch (err) {
+      if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
+    } finally { button.disabled=false; }
+  }
+
+  function pvpAnalyzeLog() {
+    const text=String(el("pvp-log-text")?.value||"");
+    const host=el("pvp-log-results");
+    if (!host) return;
+    if (!text.trim()) { host.innerHTML='<div class="empty">Wklej log walki.</div>'; return; }
+    const patterns={
+      krytyk:/\b(kryt|critical|crit)\w*/gi,
+      double:/podw[oó]jn\w*\s+uderz|double\s+strike/gi,
+      counter:/kontratak|counter/gi,
+      bleed:/krwaw|bleed/gi,
+      stun:/og[łl]usz|stun/gi,
+      execute:/egzekuc|execute/gi,
+      evade:/unik|evad/gi
+    };
+    const counts={}; Object.entries(patterns).forEach(([k,re])=>{counts[k]=(text.match(re)||[]).length;});
+    const turns=(text.match(/\b(?:tura|turn)\s*#?\s*\d+/gi)||[]).map(x=>Number((x.match(/\d+/)||[0])[0])).filter(Boolean);
+    const damage=(text.match(/\b\d+(?:[.,]\d+)?\s*(?:obra[żz]e[nń]|damage)/gi)||[]).map(x=>Number((x.match(/\d+(?:[.,]\d+)?/)||[0])[0].replace(",","."))).filter(Number.isFinite);
+    host.innerHTML=`<div class="pvp-log-summary"><b>Rozpoznane wzmianki:</b> ${Object.entries(counts).map(([k,v])=>`${escapeHtml(k)}: ${v}`).join(" · ")}<br>${turns.length?`Najwyższy numer tury: ${Math.max(...turns)}. `:""}${damage.length?`Rozpoznane wartości obrażeń: ${damage.length}, średnia ${Math.round(damage.reduce((a,b)=>a+b,0)/damage.length)}.`:"Brak jednoznacznych wartości obrażeń."}<div class="muted">Analizator liczy tylko to, co faktycznie występuje w tekście; nie uzupełnia brakujących eventów.</div></div>`;
+  }
+
+  function setupPvpLab() {
+    pvpPopulateSelectors();
+    ["pvp-sim-left","pvp-sim-right"].forEach(id=>el(id)?.addEventListener("change",pvpUpdateReadiness));
+    el("pvp-sim-run")?.addEventListener("click",pvpRunSimulation);
+    el("pvp-log-analyze")?.addEventListener("click",pvpAnalyzeLog);
+  }
+
+
   function setupBuildCreator() {
     if (!el("build-attributes")) return;
 
     el("build-new")?.addEventListener("click",newBuild);
+    el("build-game-import")?.addEventListener("click",buildImportOfficialString);
+    el("build-game-copy")?.addEventListener("click",buildCopyOfficialString);
     setupBuildPublicFilters();
     el("build-bonus-import")?.addEventListener("click",buildImportBonuses);
     el("build-bonus-clear")?.addEventListener("click",buildClearBonuses);
 
     [
+      "build-profile-level",
       "build-profile-attack",
       "build-profile-defense",
       "build-profile-hp",
@@ -12465,10 +14938,16 @@ function setupAdmin() {
       });
     });
 
+    el("build-bonus-confirmed")?.addEventListener("change",()=>{
+      buildReadProfileInputs();
+      renderBuildStats();
+    });
+
     buildWriteProfileInputs(buildState.profile);
 
     el("build-save-private")?.addEventListener("click",()=>saveBuild(false));
     el("build-share-public")?.addEventListener("click",()=>saveBuild(true));
+    setupPvpLab();
 
     renderBuildEditor();
   }
@@ -12516,21 +14995,29 @@ function setupAdmin() {
     }
 
     document.querySelectorAll("[data-gang-menu-target]").forEach(button=>{
-    button.addEventListener("click",async ()=>{
-      if (button.disabled) {
-        return;
-      }
+      // showToolView() jest wywoływane bardzo często. Bez strażnika każde
+      // wejście do dowolnego widoku dokładało kolejny handler do tych samych
+      // przycisków menu Gangu, więc po dłuższej sesji jedno kliknięcie mogło
+      // uruchamiać tę samą nawigację wielokrotnie.
+      if (button.dataset.gangMenuBound === "1") return;
+      button.dataset.gangMenuBound = "1";
 
-      if (!playerAccountSessionToken()) {
-        await openGangLanding();
-        return;
-      }
+      button.addEventListener("click",async ()=>{
+        if (button.disabled) {
+          return;
+        }
 
-      await openGangModule(
-        button.dataset.gangMenuTarget
-      );
+        if (!playerAccountSessionToken()) {
+          await openGangLanding();
+          return;
+        }
+
+        await openGangModule(
+          button.dataset.gangMenuTarget,
+          {forceRefresh:true}
+        );
+      });
     });
-  });
 
   document.querySelectorAll("[data-subtab]").forEach(button=>{
       button.classList.toggle("active",button.dataset.subtab===viewId);
@@ -12991,15 +15478,17 @@ function setupAdmin() {
       requests.push(loadGangAnnouncements());
     }
 
-    if (!moduleOpenInFlight.gang) {
-      moduleOpenInFlight.gang =
+    const gangLoadKey = isPaymentsOrCompany ? "payments-company" : target;
+
+    if (!moduleOpenInFlight.gang[gangLoadKey]) {
+      moduleOpenInFlight.gang[gangLoadKey] =
         Promise.allSettled(requests);
     }
 
     try {
-      await moduleOpenInFlight.gang;
+      await moduleOpenInFlight.gang[gangLoadKey];
     } finally {
-      moduleOpenInFlight.gang = null;
+      moduleOpenInFlight.gang[gangLoadKey] = null;
     }
 
     if (!playerAccountSessionToken()) {
@@ -13081,11 +15570,11 @@ function setupAdmin() {
       const group=button.dataset.group;
 
       if (group === "gang") {
-        await openGangModule(viewId);
+        await openGangModule(viewId,{forceRefresh:true});
         return;
       }
 
-      await openDistilleryModule(viewId);
+      await openDistilleryModule(viewId,{forceRefresh:true});
     });
   });
 
@@ -13146,8 +15635,22 @@ preloadApplicationData();
 fetchModuleAccessPolicy().catch(()=>{});
 
 
-  const ADMIN_ACCOUNT_BADGE_REFRESH_MS =
-    60 * 1000;
+  // ============================================================
+  // v21.00 — JEDEN WSPÓLNY TICKER + JEDEN REFRESH PO POWROCIE
+  // ============================================================
+
+  const APP_TICK_MS = 5 * 1000;
+  const DISTILLERY_LIVE_REFRESH_MS = 20 * 1000;
+  const ADMIN_ACCOUNT_BADGE_REFRESH_MS = 60 * 1000;
+
+  const appRefreshAt = {
+    garden:0,
+    distillery:0,
+    account:0
+  };
+
+  let activeModuleReturnRefreshAt = 0;
+  let activeModuleReturnRefreshInFlight = null;
 
   async function refreshAdminBadgeOnAccount() {
     if (
@@ -13169,16 +15672,6 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
   }
 
-  setInterval(
-    refreshAdminBadgeOnAccount,
-    ADMIN_ACCOUNT_BADGE_REFRESH_MS
-  );
-
-  // Destylarnia: aktualne rezerwacje również wtedy,
-  // gdy użytkownik już ma moduł otwarty.
-  const DISTILLERY_LIVE_REFRESH_MS =
-    20 * 1000;
-
   async function refreshActiveDistilleryInBackground() {
     if (
       activeToolModule !== "distillery" ||
@@ -13191,9 +15684,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
 
     try {
-      await fetchApprovedRecipes({
-        force:true
-      });
+      await fetchApprovedRecipes({force:true});
     } catch (err) {
       console.warn(
         "[MenelWars Tools] Odświeżanie Destylarni w tle:",
@@ -13202,29 +15693,147 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
   }
 
-  setInterval(
-    refreshActiveDistilleryInBackground,
-    DISTILLERY_LIVE_REFRESH_MS
-  );
+  function currentVisibleViewId() {
+    const view = Array.from(document.querySelectorAll(".view"))
+      .find(item => !item.hidden);
+    return view ? view.id : "";
+  }
 
-  document.addEventListener(
-    "visibilitychange",
-    () => {
-      if (
-        document.visibilityState === "visible" &&
-        activeToolModule === "distillery"
-      ) {
-        refreshActiveDistilleryInBackground();
-      }
+  async function refreshActiveGangView() {
+    if (activeToolModule !== "gang" || !playerAccountSessionToken()) return;
 
-      if (
-        document.visibilityState === "visible" &&
-        activeToolModule === "account"
-      ) {
-        refreshAdminBadgeOnAccount();
-      }
+    const viewId = currentVisibleViewId();
+
+    if (viewId === "payments-view" || viewId === "company-view") {
+      await loadPayments({background:true,force:true});
+      return;
     }
-  );
+
+    if (viewId === "polls-view") {
+      await loadGangPolls({force:true});
+      return;
+    }
+
+    if (viewId === "goals-view") {
+      await loadGangGoal();
+      return;
+    }
+
+    if (viewId === "announcements-view") {
+      await loadGangAnnouncements();
+      return;
+    }
+
+    if (viewId === "gang-menu-view") {
+      await loadGangMenuStatus();
+    }
+  }
+
+  async function refreshActiveModuleOnReturn() {
+    if (document.visibilityState !== "visible") return;
+
+    const now = Date.now();
+    if (now - activeModuleReturnRefreshAt < 750) {
+      return activeModuleReturnRefreshInFlight;
+    }
+    activeModuleReturnRefreshAt = now;
+
+    if (activeModuleReturnRefreshInFlight) {
+      return activeModuleReturnRefreshInFlight;
+    }
+
+    activeModuleReturnRefreshInFlight = (async () => {
+      try {
+        await fetchModuleAccessPolicy({force:true});
+
+        if (activeToolModule === "garden") {
+          appRefreshAt.garden = Date.now();
+          await gardenLiveRefresh();
+          gardenUpdateClock();
+          gardenRenderPlots();
+          return;
+        }
+
+        if (activeToolModule === "distillery") {
+          appRefreshAt.distillery = Date.now();
+          await refreshActiveDistilleryInBackground();
+          return;
+        }
+
+        if (activeToolModule === "builds") {
+          await fetchBuildLists(true);
+          renderBuildLists();
+          return;
+        }
+
+        if (activeToolModule === "gang") {
+          await refreshActiveGangView();
+          return;
+        }
+
+        if (activeToolModule === "account") {
+          appRefreshAt.account = Date.now();
+          await renderAccountView({force:true});
+          await refreshAdminBadgeOnAccount();
+        }
+      } catch (err) {
+        console.warn("[MenelWars Tools] Odświeżenie po powrocie:",err);
+      } finally {
+        activeModuleReturnRefreshInFlight = null;
+      }
+    })();
+
+    return activeModuleReturnRefreshInFlight;
+  }
+
+  async function globalApplicationTick() {
+    if (document.visibilityState !== "visible") return;
+
+    const now = Date.now();
+
+    if (activeToolModule === "garden") {
+      gardenUpdateClock();
+      gardenRenderPlots();
+      if (!gardenOwnExperimentForPlot(gardenSelectedPlot)) {
+        gardenRenderComboStatus();
+      }
+
+      if (now - appRefreshAt.garden >= APP_TICK_MS) {
+        appRefreshAt.garden = now;
+        await gardenLiveRefresh();
+      }
+      return;
+    }
+
+    if (
+      activeToolModule === "distillery" &&
+      now - appRefreshAt.distillery >= DISTILLERY_LIVE_REFRESH_MS
+    ) {
+      appRefreshAt.distillery = now;
+      await refreshActiveDistilleryInBackground();
+      return;
+    }
+
+    if (
+      activeToolModule === "account" &&
+      now - appRefreshAt.account >= ADMIN_ACCOUNT_BADGE_REFRESH_MS
+    ) {
+      appRefreshAt.account = now;
+      await refreshAdminBadgeOnAccount();
+    }
+  }
+
+  setInterval(globalApplicationTick,APP_TICK_MS);
+
+  document.addEventListener("visibilitychange",()=>{
+    if (document.visibilityState === "visible") {
+      refreshActiveModuleOnReturn();
+    }
+  });
+
+  window.addEventListener("focus",()=>{
+    refreshActiveModuleOnReturn();
+  });
 
 
   // ============================================================
@@ -13335,11 +15944,69 @@ fetchModuleAccessPolicy().catch(()=>{});
   onlineState();
 
 
+  // ============================================================
+  // v21.00 — PWA: widoczna informacja o nowej wersji
+  // ============================================================
+
+  let pwaReloadingForUpdate = false;
+
+  function showPwaUpdateBanner(registration) {
+    if (!registration || !registration.waiting) return;
+    if (document.querySelector(".pwa-update-banner")) return;
+
+    const banner = document.createElement("div");
+    banner.className = "pwa-update-banner";
+    banner.setAttribute("role","status");
+    banner.innerHTML = `
+      <span>🆕 Dostępna jest nowa wersja MenelWars Tools.</span>
+      <button type="button" class="primary-btn">Odśwież</button>
+    `;
+
+    banner.querySelector("button")?.addEventListener("click",()=>{
+      const waiting = registration.waiting;
+      if (!waiting) {
+        location.reload();
+        return;
+      }
+      waiting.postMessage({type:"SKIP_WAITING"});
+    });
+
+    document.body.appendChild(banner);
+  }
+
   if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("controllerchange",()=>{
+      if (pwaReloadingForUpdate) return;
+      pwaReloadingForUpdate = true;
+      location.reload();
+    });
 
     navigator.serviceWorker
       .register("./sw.js")
-      .catch(console.error);
+      .then(registration => {
+        registration.update().catch(()=>{});
+
+        if (registration.waiting) {
+          showPwaUpdateBanner(registration);
+        }
+
+        registration.addEventListener("updatefound",()=>{
+          const worker = registration.installing;
+          if (!worker) return;
+
+          worker.addEventListener("statechange",()=>{
+            if (
+              worker.state === "installed" &&
+              navigator.serviceWorker.controller
+            ) {
+              showPwaUpdateBanner(registration);
+            }
+          });
+        });
+      })
+      .catch(error => {
+        console.warn("[MenelWars Tools] Service Worker:",error);
+      });
   }
 
 })();

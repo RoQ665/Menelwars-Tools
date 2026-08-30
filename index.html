@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=20.98">
+  <link rel="stylesheet" href="styles.css?v=21.00">
   <title>MenelWars Tools</title>
 
   <style>
@@ -808,6 +808,11 @@
   </section>
 
   <section id="unknown-view" class="view" hidden>
+    <div id="distillery-experiment-recommendations" class="distillery-model-box">
+      <strong>🧪 Eksperymentalny model Destylarni</strong>
+      <div class="muted">Model ładuje się razem z aktualnymi zatwierdzonymi receptami.</div>
+    </div>
+
     <details class="content-accordion research-accordion" open>
       <summary>
         <span>🧪 W trakcie badania</span>
@@ -1074,11 +1079,11 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             <div class="garden-slider-head">
               <span>☀️ Nasłonecznienie</span>
               <label class="garden-number-wrap" aria-label="Nasłonecznienie procent">
-                <input id="garden-sun-input" type="text" value="50" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
+                <input id="garden-sun-input" type="text" value="60" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
                 <span>%</span>
               </label>
             </div>
-            <input id="garden-sun" type="range" min="0" max="100" step="1" value="50" aria-label="Nasłonecznienie">
+            <input id="garden-sun" type="range" min="0" max="100" step="1" value="60" aria-label="Nasłonecznienie">
           </div>
 
           <div class="garden-slider-row">
@@ -1127,13 +1132,53 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
           <div id="garden-active-time" class="garden-active-time" hidden></div>
 
+          <div id="garden-recommendation" class="garden-recommendation" hidden></div>
+
+          <div id="garden-phase-tools" class="garden-phase-tools" hidden>
+            <div class="garden-phase-head">
+              <div>
+                <strong>🌿 Etap z gry</strong>
+                <div class="muted">Wybierz dokładną klatkę 0–9. To nie jest procent postępu.</div>
+              </div>
+              <span id="garden-phase-last" class="chip">brak raportu</span>
+            </div>
+
+            <button id="garden-open-phase-picker" type="button" class="secondary-btn">
+              🌿 Ustaw / potwierdź aktualny etap
+            </button>
+
+            <div id="garden-phase-picker" class="garden-phase-picker" hidden>
+              <div id="garden-phase-grid" class="garden-phase-grid" aria-label="Klatki wzrostu cebuli"></div>
+              <div class="muted garden-phase-note">
+                Powtórne potwierdzenie tej samej klatki również zapisujemy — zawęża ono czas przejścia do następnego etapu.
+              </div>
+            </div>
+
+            <button id="garden-ready" type="button" class="primary-btn garden-ready-btn">
+              ✅ Gra pokazuje: Gotowe do zbioru
+            </button>
+          </div>
+
           <div class="garden-actions">
             <button id="garden-start" type="button" class="primary-btn" disabled>🌱 Zacznij uprawę</button>
-            <button id="garden-finish" type="button" class="primary-btn" hidden>🧺 Wyrosła — zbierz</button>
+            <button id="garden-finish" type="button" class="primary-btn" hidden>🧺 Zebrane w grze — zakończ pomiar</button>
             <button id="garden-cancel" type="button" class="danger-soft" hidden>🗑️ Anuluj uprawę</button>
           </div>
           <div id="garden-action-status" class="submit-status"></div>
         </div>
+
+        <details id="garden-race-section" class="content-accordion garden-race-section" open>
+          <summary>
+            <span>🏁 Aktualny wyścig</span>
+            <span class="accordion-chevron">⌄</span>
+          </summary>
+          <div class="content-accordion-body">
+            <div class="muted garden-race-explainer">
+              Porównujemy wiek roślin potrzebny do osiągnięcia tej samej klatki atlasu. Klatka 7 nie oznacza 70%.
+            </div>
+            <div id="garden-race"></div>
+          </div>
+        </details>
       </div>
     </div>
   </section>
@@ -1155,6 +1200,25 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
         </div>
 
         <div id="build-editor">
+          <details class="content-accordion build-string-tools" open>
+            <summary>
+              <span>🔁 Oficjalny format buildu MenelWars</span>
+              <span class="accordion-chevron">⌄</span>
+            </summary>
+            <div class="content-accordion-body">
+              <p class="muted">
+                Format gry: <b>STR/END/AGI/VIT/PRC</b>, a po dwukropku pięć slash-separated ciągów wyborów A/B/-.
+              </p>
+              <input id="build-game-string" type="text" spellcheck="false"
+                placeholder="np. 0/50/0/50/0:/ABBABABAAA//AAAAAABAAA/">
+              <div class="build-bonus-actions">
+                <button id="build-game-import" type="button" class="secondary-btn">📥 Importuj build z MenelWars</button>
+                <button id="build-game-copy" type="button" class="secondary-btn">📋 Kopiuj build do MenelWars</button>
+              </div>
+              <div id="build-game-string-status" class="submit-status"></div>
+            </div>
+          </details>
+
           <div class="build-editor-head">
             <div class="build-points-grid">
               <div><span>Rozdano</span><strong id="build-points-used">0</strong></div>
@@ -1175,34 +1239,40 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
             <div class="build-profile-stats-grid">
               <label>
+                <span>🎚️ Faktyczny poziom postaci</span>
+                <input id="build-profile-level" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 50">
+                <small>To Twój aktualny poziom w grze, nie minimalny poziom wymagany przez rozkład atrybutów.</small>
+              </label>
+
+              <label>
                 <span>⚔️ Atak z profilu</span>
-                <input id="build-profile-attack" type="number" min="1" step="1" value="1" inputmode="numeric">
+                <input id="build-profile-attack" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 364">
               </label>
 
               <label>
                 <span>🛡️ Obrona z profilu</span>
-                <input id="build-profile-defense" type="number" min="1" step="1" value="1" inputmode="numeric">
+                <input id="build-profile-defense" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 449">
               </label>
 
               <label>
                 <span>❤️ Bazowe HP</span>
-                <input id="build-profile-hp" type="number" min="1" step="1" value="100" inputmode="numeric">
+                <input id="build-profile-hp" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 105">
               </label>
 
               <label>
                 <span>🐾 HP z pancerza peta</span>
-                <input id="build-profile-pet-hp" type="number" min="0" step="1" value="0" inputmode="numeric" placeholder="0">
+                <input id="build-profile-pet-hp" type="number" min="0" step="1" inputmode="numeric" placeholder="np. 200">
               </label>
 
               <label>
                 <span>❤️ HP ze zwykłego EQ</span>
-                <input id="build-profile-eq-hp" type="number" min="0" step="1" value="0" inputmode="numeric" placeholder="np. 150">
+                <input id="build-profile-eq-hp" type="number" min="0" step="1" inputmode="numeric" placeholder="np. 150">
                 <small>Bez bonusu za komplet/set — ten jest pobierany z importu.</small>
               </label>
             </div>
 
             <div class="build-profile-stats-note">
-              Atak i Obrona zawierają już zwykłe bonusy postaci. HP z pancerza peta i HP ze zwykłego EQ wpisz osobno. W polu EQ nie dodawaj bonusu za komplet/set — jest on pobierany z importu.
+              Faktyczny poziom postaci jest używany do HP za poziom i do symulatora. „Wymagany poziom” buildu pozostaje osobno minimalnym poziomem wynikającym z wydanych punktów atrybutów. Atak i Obrona zawierają już zwykłe bonusy postaci. HP z pancerza peta i HP ze zwykłego EQ wpisz osobno. W polu EQ nie dodawaj bonusu za komplet/set — jest on pobierany z importu.
             </div>
           </div>
 
@@ -1212,12 +1282,16 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
               <span class="accordion-chevron">⌄</span>
             </summary>
             <div class="content-accordion-body">
-              <p class="muted build-bonus-help">Wklej cały blok zaczynający się od „Powyższe atrybuty zostały powiększone...”. Rozpoznam bonusy z Setu, Akcesoriów i Gangu.</p>
+              <p class="muted build-bonus-help">Wklej cały blok zaczynający się od „Powyższe atrybuty zostały powiększone...”. Rozpoznam bonusy z Setu, Akcesoriów i Gangu. Możesz też wkleić surowy JSON PvP Summary — wtedy Tool odczyta również dynamiczne <code>statCaps</code> zwrócone przez grę.</p>
               <textarea id="build-bonus-text" rows="7" placeholder="Wklej tutaj bonusy skopiowane z gry..."></textarea>
               <div class="build-bonus-actions">
                 <button id="build-bonus-import" type="button" class="secondary-btn">📋 Wczytaj bonusy</button>
                 <button id="build-bonus-clear" type="button" class="secondary-btn">🧹 Wyczyść bonusy</button>
               </div>
+              <label class="build-sim-confirm">
+                <input id="build-bonus-confirmed" type="checkbox">
+                <span>Potwierdzam, że wkleiłem pełne bonusy PvP itemów / setu / akcesoriów / gangu dla tego buildu.</span>
+              </label>
               <div id="build-bonus-status" class="submit-status"></div>
               <div id="build-bonus-preview" class="build-bonus-preview"></div>
             </div>
@@ -1349,6 +1423,66 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
         </details>
 
         <div id="build-viewer" class="build-viewer" hidden></div>
+
+        <details id="pvp-simulator-section" class="content-accordion pvp-simulator-section">
+          <summary>
+            <span>🥊 Symulator walk — 🧪 Eksperymentalny</span>
+            <span class="accordion-chevron">⌄</span>
+          </summary>
+          <div class="content-accordion-body">
+            <div class="submit-info server-warning pvp-sim-warning">
+              To nie jest kopia backendowego silnika MenelWars. Source mapa nie zawiera dokładnego wzoru zwykłych obrażeń, reguły pierwszego ruchu ani części kolejności proców. Znane mechaniki są odtworzone, a nieznane parametry są jawne i konfigurowalne.
+            </div>
+
+            <div class="pvp-sim-grid">
+              <label>
+                <span>Twój build</span>
+                <select id="pvp-sim-left"></select>
+              </label>
+              <label>
+                <span>Przeciwnik</span>
+                <select id="pvp-sim-right"></select>
+              </label>
+              <label>
+                <span>Scenariusz</span>
+                <select id="pvp-sim-mode">
+                  <option value="attack">Ja atakuję</option>
+                  <option value="defense">Ja bronię</option>
+                  <option value="both" selected>Sprawdź oba kierunki</option>
+                </select>
+              </label>
+              <label>
+                <span>Monte Carlo</span>
+                <select id="pvp-sim-runs">
+                  <option value="1000">1 000 walk</option>
+                  <option value="5000" selected>5 000 walk</option>
+                  <option value="10000">10 000 walk</option>
+                </select>
+              </label>
+            </div>
+
+            <details class="build-filter-details pvp-sim-advanced">
+              <summary>⚙️ Parametry nieznanych elementów silnika</summary>
+              <div class="pvp-sim-grid">
+                <label><span>DEF K</span><input id="pvp-sim-defense-k" type="number" min="50" max="5000" step="10" value="500"></label>
+                <label><span>Counter multiplier</span><input id="pvp-sim-counter-mult" type="number" min="0" max="2" step="0.05" value="1"></label>
+                <label><span>Pierwszy ruch przy wyższej inicjatywie</span><input id="pvp-sim-first-mover" type="number" min="0.5" max="1" step="0.01" value="0.60"></label>
+              </div>
+            </details>
+
+            <button id="pvp-sim-run" type="button" class="primary-btn">🥊 Symuluj walkę</button>
+            <div id="pvp-sim-readiness" class="submit-status"></div>
+            <div id="pvp-sim-results" class="pvp-sim-results"></div>
+
+            <details class="build-filter-details pvp-log-analyzer">
+              <summary>🧾 Analizator logu walki</summary>
+              <p class="muted">Wklej tekstowy log. Analizator policzy rozpoznane eventy bez udawania, że zna nieobecne w logu wartości.</p>
+              <textarea id="pvp-log-text" rows="7" spellcheck="false" placeholder="Wklej log walki..."></textarea>
+              <button id="pvp-log-analyze" type="button" class="secondary-btn">🔎 Analizuj log</button>
+              <div id="pvp-log-results"></div>
+            </details>
+          </div>
+        </details>
       </div>
     </div>
   </section>
@@ -1366,7 +1500,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <div class="panel-body" id="progress-body"></div>
     </div>
   </section>
-</section>
 
 <section id="admin-view" class="view" hidden>
 
@@ -1905,7 +2038,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <footer>MenelWars Tools · autor: RoQ</footer>
 
-<script src="data.js"></script>
-<script src="app.js?v=20.98"></script>
+<script src="data.js?v=21.00"></script>
+<script src="app.js?v=21.00"></script>
 </body>
 </html>

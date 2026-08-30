@@ -1472,6 +1472,15 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .build-bonus-row strong {
   white-space: nowrap;
 }
+.build-bonus-cap-note {
+  border: 1px solid rgba(154,101,0,.35);
+  border-radius: 7px;
+  padding: 7px 8px;
+  font-size: 10px;
+  line-height: 1.45;
+  background: rgba(255,244,205,.62);
+  color: #6f5420;
+}
 .build-stat-row strong {
   display: inline-flex;
   align-items: baseline;
@@ -2938,3 +2947,485 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     top:auto!important;
   }
 }
+
+
+/* ============================================================
+   v21.00 — OGRÓD: oryginalny atlas faz, READY, wyścig, eksperymenty
+   ============================================================ */
+.garden-phase-tools,
+.garden-recommendation,
+.garden-race-section{
+  margin-top:12px;
+}
+
+.garden-phase-tools{
+  padding:11px;
+  border:1px solid #cfbea2;
+  border-radius:11px;
+  background:#fffaf0;
+  display:grid;
+  gap:9px;
+}
+
+.garden-phase-tools[hidden],
+.garden-recommendation[hidden]{
+  display:none!important;
+}
+
+.garden-phase-head{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  align-items:flex-start;
+}
+
+.garden-phase-picker{
+  padding:9px;
+  border:1px solid #ddcfb7;
+  border-radius:10px;
+  background:#f7eddd;
+}
+
+.garden-phase-picker[hidden]{display:none!important}
+
+.garden-phase-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:7px;
+}
+
+.garden-phase-option{
+  position:relative;
+  min-height:88px;
+  border:1px solid #c9b897;
+  border-radius:9px;
+  background:#6a5136 url("empty-soil.png?v=21.00") center/cover no-repeat;
+  padding:3px;
+  cursor:pointer;
+  overflow:hidden;
+}
+
+.garden-phase-option:hover{filter:brightness(1.04)}
+.garden-phase-option.selected{outline:3px solid #8f6b2f;outline-offset:1px}
+
+.garden-phase-sprite,
+.garden-plot-sprite{
+  display:block;
+  width:100%;
+  aspect-ratio:1/1;
+  background-image:url("onion-growth-atlas.png?v=21.00");
+  background-repeat:no-repeat;
+  background-size:1000% 100%;
+  background-position:calc(var(--garden-frame,0) * 11.111111%) 50%;
+}
+
+.garden-phase-option b{
+  position:absolute;
+  right:5px;
+  bottom:4px;
+  min-width:20px;
+  padding:2px 5px;
+  border-radius:999px;
+  background:rgba(255,250,240,.9);
+  color:#433320;
+  font-size:11px;
+}
+
+.garden-phase-note{margin-top:7px;line-height:1.35}
+.garden-ready-btn{width:100%}
+
+.garden-recommendation{
+  padding:10px 11px;
+  border:1px solid #d6b96e;
+  border-radius:10px;
+  background:#fff6d8;
+  line-height:1.4;
+}
+
+.garden-recommendation strong{display:block;margin-bottom:3px}
+.garden-recommendation .garden-recommendation-values{
+  font-weight:900;
+  font-size:15px;
+  margin:4px 0;
+}
+
+.garden-race-explainer{margin-bottom:9px}
+
+.garden-race-list{display:grid;gap:7px}
+.garden-race-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  padding:9px;
+  border:1px solid #ded0ba;
+  border-radius:9px;
+  background:#fffdf8;
+}
+.garden-race-row.leader{border-color:#c29b4b;background:#fff7dd}
+.garden-race-main{min-width:0}
+.garden-race-main strong{display:block}
+.garden-race-meta{
+  display:flex;
+  gap:7px;
+  flex-wrap:wrap;
+  margin-top:4px;
+  font-size:11px;
+  color:#756650;
+}
+.garden-race-label{
+  align-self:start;
+  border-radius:999px;
+  padding:4px 7px;
+  background:#eee3d2;
+  font-size:10px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.garden-race-row.leader .garden-race-label{background:#ead08b}
+
+.garden-plot-visual{
+  background-image:url("empty-soil.png?v=21.00");
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+}
+.garden-plot-sprite{
+  position:absolute;
+  inset:4px;
+  width:auto;
+  height:auto;
+  aspect-ratio:auto;
+}
+.garden-plot-frame-badge{
+  position:absolute;
+  right:5px;
+  top:5px;
+  z-index:3;
+  padding:2px 5px;
+  border-radius:999px;
+  font-size:9px;
+  font-weight:900;
+  background:rgba(255,250,240,.9);
+  color:#443321;
+}
+.garden-plot-ready-badge{
+  position:absolute;
+  left:5px;
+  top:5px;
+  z-index:3;
+  padding:2px 5px;
+  border-radius:999px;
+  font-size:9px;
+  font-weight:900;
+  background:#eef8df;
+  color:#426126;
+}
+
+/* ============================================================
+   v21.00 — Destylarnia: model predykcyjny / aktywne badania
+   ============================================================ */
+.distillery-model-box{
+  margin-bottom:10px;
+  padding:11px;
+  border:1px solid #d7b768;
+  border-radius:11px;
+  background:#fff6dc;
+  line-height:1.4;
+}
+.distillery-model-box>strong{display:block;margin-bottom:4px}
+.distillery-model-recs{display:grid;gap:7px;margin-top:8px}
+.distillery-model-rec{
+  padding:8px 9px;
+  border:1px solid #e0cb96;
+  border-radius:8px;
+  background:#fffdf5;
+}
+.distillery-model-rec-head{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  align-items:center;
+}
+.distillery-estimate{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  margin-top:5px;
+  padding:3px 6px;
+  border-radius:999px;
+  background:#f3ead7;
+  font-size:10px;
+  font-weight:800;
+  color:#6c5533;
+}
+.distillery-estimate.low{opacity:.7}
+.distillery-anomaly{
+  margin-top:7px;
+  padding:7px 8px;
+  border:1px solid #ddb277;
+  border-radius:7px;
+  background:#fff1d9;
+  color:#7a4b13;
+  font-size:11px;
+  line-height:1.35;
+}
+
+/* ============================================================
+   v21.00 — Build import/export + symulator PvP
+   ============================================================ */
+.build-string-tools input,
+.pvp-sim-grid input,
+.pvp-sim-grid select,
+.pvp-log-analyzer textarea,
+.pvp-sim-grid select,
+#pvp-sim-left,
+#pvp-sim-right{
+  width:100%;
+  box-sizing:border-box;
+  border:1px solid #ccb797;
+  border-radius:8px;
+  background:#fffdf8;
+  color:#332a20;
+  padding:9px 10px;
+  font:inherit;
+}
+
+.build-string-tools input{margin-bottom:8px}
+
+.build-sim-confirm{
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+  margin-top:9px;
+  padding:8px;
+  border:1px solid #dacbad;
+  border-radius:8px;
+  background:#fffaf0;
+  font-size:11px;
+  line-height:1.35;
+}
+.build-sim-confirm input{margin-top:2px;flex:none}
+
+.pvp-simulator-section{margin-top:14px}
+.pvp-sim-warning{margin-bottom:10px}
+.pvp-sim-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  margin-bottom:9px;
+}
+.pvp-sim-grid label{display:grid;gap:4px}
+.pvp-sim-grid label>span{font-size:11px;font-weight:800;color:#685640}
+.pvp-sim-advanced{margin:9px 0}
+.pvp-sim-results{margin-top:10px}
+.pvp-sim-summary-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:7px;
+  margin-bottom:9px;
+}
+.pvp-sim-kpi{
+  padding:8px;
+  border:1px solid #ddcfb7;
+  border-radius:8px;
+  background:#fffdf8;
+  text-align:center;
+}
+.pvp-sim-kpi span{display:block;font-size:10px;color:#766650}
+.pvp-sim-kpi strong{display:block;margin-top:2px;font-size:15px}
+.pvp-sim-table{width:100%;border-collapse:collapse;font-size:11px}
+.pvp-sim-table th,.pvp-sim-table td{
+  padding:6px 5px;
+  border-bottom:1px solid #e5d9c6;
+  text-align:right;
+}
+.pvp-sim-table th:first-child,.pvp-sim-table td:first-child{text-align:left}
+.pvp-log-analyzer{margin-top:12px}
+.pvp-log-analyzer textarea{margin:8px 0}
+.pvp-readiness-list{
+  margin:5px 0 0;
+  padding-left:18px;
+  text-align:left;
+  color:#7a3e35;
+}
+
+/* ============================================================
+   v21.00 — Mapa: planer tras
+   ============================================================ */
+.map-route-planner{
+  margin-bottom:12px;
+  padding:11px;
+  border:1px solid #d7c5a7;
+  border-radius:11px;
+  background:#fffaf0;
+}
+.map-route-controls{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  align-items:end;
+}
+.map-route-controls label{display:grid;gap:4px}
+.map-route-controls label>span{font-size:11px;font-weight:800;color:#6a5943}
+.map-route-controls select{
+  width:100%;
+  border:1px solid #cbb797;
+  border-radius:8px;
+  background:#fffdf8;
+  padding:9px;
+}
+.map-mode-switch{
+  display:flex;
+  gap:5px;
+}
+.map-mode-switch button{
+  border:1px solid #c5b08d;
+  border-radius:8px;
+  background:#efe4d2;
+  padding:9px 10px;
+  font-weight:800;
+}
+.map-mode-switch button.active{background:#6a5136;color:#fff}
+.map-route-result{margin-top:10px}
+.map-route-kpis{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  margin:8px 0;
+}
+.map-route-kpi{
+  padding:7px;
+  border:1px solid #dfd1bb;
+  border-radius:8px;
+  background:#fff;
+  text-align:center;
+}
+.map-route-kpi span{display:block;font-size:9px;color:#776650}
+.map-route-kpi strong{display:block;font-size:14px}
+.map-route-steps{display:grid;gap:5px}
+.map-route-step{
+  display:grid;
+  grid-template-columns:24px minmax(0,1fr) auto;
+  gap:7px;
+  align-items:center;
+  padding:6px 7px;
+  border:1px solid #e4d8c5;
+  border-radius:7px;
+  background:#fffdf8;
+  font-size:11px;
+}
+.map-route-step .hop{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:#eee3d2;
+  font-weight:900;
+}
+.map-route-revisit{color:#8a622a;font-size:9px;font-weight:800}
+
+/* ============================================================
+   v21.00 — aktualizacja PWA
+   ============================================================ */
+.pwa-update-banner{
+  position:fixed;
+  left:50%;
+  bottom:14px;
+  transform:translateX(-50%);
+  z-index:9999;
+  width:min(92vw,520px);
+  padding:10px 11px;
+  border:1px solid #9b7d50;
+  border-radius:11px;
+  background:#fff8eb;
+  color:#3d3022;
+  box-shadow:0 8px 28px rgba(40,25,10,.28);
+  display:flex;
+  gap:9px;
+  align-items:center;
+  justify-content:space-between;
+}
+.pwa-update-banner button{white-space:nowrap}
+
+@media(max-width:600px){
+  .garden-phase-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .garden-phase-option{min-height:112px}
+  .garden-race-row{grid-template-columns:1fr}
+  .garden-race-label{justify-self:start}
+  .pvp-sim-grid{grid-template-columns:1fr}
+  .pvp-sim-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .map-route-controls{grid-template-columns:1fr}
+  .map-mode-switch{display:grid;grid-template-columns:1fr 1fr}
+  .map-route-kpis{grid-template-columns:1fr 1fr 1fr}
+}
+.admin-model-anomaly{margin-top:6px;padding:7px;border-radius:7px;border:1px solid #d6ad65;background:#fff3d6;font-size:12px;line-height:1.35}
+.admin-model-anomaly small{display:block;margin-top:3px;color:#76634a}
+
+/* v21.00 — wynik PvP Lab */
+.pvp-sim-result-card{
+  padding:10px;
+  margin-top:9px;
+  border:1px solid #d8c7aa;
+  border-radius:10px;
+  background:#fffdf8;
+}
+.pvp-sim-result-card h4{margin:0 0 7px;font-size:13px}
+.pvp-sim-score{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px 12px;
+  align-items:center;
+  padding:7px 8px;
+  border-radius:8px;
+  background:#f5ead7;
+  font-size:12px;
+}
+.pvp-sim-score b{font-size:14px}
+.pvp-sim-kpis{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:6px;
+  margin:8px 0;
+}
+.pvp-sim-kpis span{
+  display:block;
+  padding:7px;
+  border:1px solid #e1d5c2;
+  border-radius:8px;
+  background:#fffaf1;
+  font-size:10px;
+  line-height:1.3;
+}
+.pvp-sim-procs,
+.pvp-sim-assumptions,
+.pvp-log-summary{
+  padding:8px 9px;
+  border:1px solid #dfd1bb;
+  border-radius:8px;
+  background:#fffaf1;
+  font-size:11px;
+  line-height:1.45;
+}
+.pvp-sim-assumptions{margin-bottom:9px;background:#fff4d7;border-color:#d8bb75}
+.pvp-sim-procs{margin-top:7px}
+.pvp-log-summary{margin-top:7px}
+
+@media(max-width:600px){
+  .pvp-sim-kpis{grid-template-columns:1fr 1fr}
+  .pvp-sim-score{align-items:flex-start;flex-direction:column;gap:4px}
+}
+
+/* v21.00 — dodatkowe bloki wyników PvP */
+.pvp-hp-distribution,
+.pvp-side-note{
+  margin-top:7px;
+  padding:8px 10px;
+  border:1px solid #dfd2b8;
+  border-radius:10px;
+  background:#fffaf0;
+  font-size:11px;
+  line-height:1.45;
+}
+.pvp-side-note{margin-bottom:9px}
