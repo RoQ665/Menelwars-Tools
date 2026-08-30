@@ -14751,6 +14751,48 @@ function setupAdmin() {
   function pvpClamp(value,min,max) { return Math.max(min,Math.min(max,value)); }
   function pvpChance(percent) { return Math.random()*100 < pvpClamp(percent,0,100); }
 
+  // Pseudo-random distribution (PRD): po serii nieudanych prób chwilowa
+  // szansa rośnie, a po procu wraca do początku. Współczynnik dobieramy
+  // numerycznie tak, aby średni odsetek proców nadal był równy statystyce.
+  // To przybliżenie "proc meterów" opisanych w patch notes, nie kopia backendu.
+  const pvpPrdCoefficientCache = new Map();
+  function pvpPrdCoefficient(percent) {
+    const chance=pvpClamp(Number(percent)||0,0,100);
+    const key=chance.toFixed(6);
+    if (pvpPrdCoefficientCache.has(key)) return pvpPrdCoefficientCache.get(key);
+    if (chance<=0) return 0;
+    if (chance>=100) return 1;
+    const target=chance/100;
+    let low=0,high=1;
+    for (let i=0;i<42;i++) {
+      const middle=(low+high)/2;
+      let survival=1,expectedAttempts=0;
+      for (let attempt=1;attempt<=10000;attempt++) {
+        expectedAttempts+=survival;
+        survival*=1-Math.min(1,middle*attempt);
+        if (survival<1e-12) break;
+      }
+      const achieved=1/Math.max(1,expectedAttempts);
+      if (achieved<target) low=middle;
+      else high=middle;
+    }
+    pvpPrdCoefficientCache.set(key,high);
+    return high;
+  }
+
+  function pvpProc(fighter,key,percent) {
+    const chance=pvpClamp(Number(percent)||0,0,100);
+    if (chance<=0) return false;
+    if (chance>=100) { fighter.procMeters[key]=0; return true; }
+    const failures=Math.max(0,Number(fighter.procMeters[key])||0);
+    const momentaryChance=Math.min(100,100*pvpPrdCoefficient(chance)*(failures+1));
+    const success=pvpChance(momentaryChance);
+    fighter.procMeters[key]=success ? 0 : failures+1;
+    return success;
+  }
+
+  function pvpResetProc(fighter,key) { fighter.procMeters[key]=0; }
+
   function pvpConditionalEffects(calculated,hpPct) {
     const out={attackPct:0,damageReduction:0,regenFlat:0};
     (calculated.extras?.conditional || []).forEach(text=>{
@@ -14773,13 +14815,14 @@ function setupAdmin() {
       source,label,calculated,stats:calculated.stats,primary,
       maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
       bleeding:null,stunned:false,firstAttack:true,
+      procMeters:{crit:0,double:0,counter:0,stun:0,bleed:0,evasion:0},
       metrics:{
-        damage:0,crit:0,double:0,counter:0,bleed:0,stun:0,execute:0,evade:0,miss:0,hit:0,hitAttempts:0,lifesteal:0,regen:0,
+        damage:0,crit:0,double:0,counter:0,bleed:0,bleedProc:0,stun:0,execute:0,evade:0,miss:0,hit:0,hitAttempts:0,lifesteal:0,regen:0,
         normalHitDamage:0,normalHitCount:0,critDamage:0,critHitCount:0,counterDamage:0,counterHitCount:0,
         critOpportunities:0,critChanceSum:0,doubleOpportunities:0,doubleChanceSum:0,
         counterOpportunities:0,counterChanceSum:0,bleedOpportunities:0,bleedChanceSum:0,
         stunOpportunities:0,stunChanceSum:0,executeChecks:0,
-        eventTurns:{crit:[],double:[],counter:[],bleed:[],stun:[],execute:[]}
+        eventTurns:{crit:[],double:[],counter:[],bleed:[],bleedProc:[],stun:[],execute:[]}
       }
     };
   }
@@ -14844,14 +14887,15 @@ function setupAdmin() {
 
     const finalHit=pvpClamp((Number(attacker.stats.accuracy)||0)-(Number(defender.stats.evasion)||0),5,99);
     attacker.metrics.hitAttempts++;
-    if (!pvpChance(finalHit)) {
+    const evadeChance=100-finalHit;
+    if (pvpProc(defender,"evasion",evadeChance)) {
       attacker.metrics.miss++;
       defender.metrics.evade++;
       if (allowCounter) {
         const counterChance=pvpClamp(Number(defender.stats.counter)||0,0,100);
         defender.metrics.counterOpportunities++;
         defender.metrics.counterChanceSum+=counterChance;
-        if (pvpChance(counterChance)) {
+        if (pvpProc(defender,"counter",counterChance)) {
           defender.metrics.counter++;
           defender.metrics.eventTurns.counter.push(round);
           const counterResult=pvpStrike(defender,attacker,round,params,{allowExecute:false,allowCounter:false,consumeFirst:false,damageMultiplier:params.counterMult,isCounter:true});
@@ -14865,7 +14909,7 @@ function setupAdmin() {
     const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-(Number(defender.stats.critResist)||0));
     attacker.metrics.critOpportunities++;
     attacker.metrics.critChanceSum+=pvpClamp(critChance,0,100);
-    const crit=pvpChance(critChance);
+    const crit=pvpProc(attacker,"crit",critChance);
     if (crit) {
       attacker.metrics.crit++;
       attacker.metrics.eventTurns.crit.push(round);
@@ -14899,7 +14943,11 @@ function setupAdmin() {
     const bleedChance=Math.max(0,(Number(attacker.stats.bleed)||0)-(Number(defender.stats.bleedResist)||0));
     attacker.metrics.bleedOpportunities++;
     attacker.metrics.bleedChanceSum+=autoBleed?100:pvpClamp(bleedChance,0,100);
-    if (autoBleed || pvpChance(bleedChance)) {
+    const bleedProc=autoBleed || pvpProc(attacker,"bleed",bleedChance);
+    if (autoBleed) pvpResetProc(attacker,"bleed");
+    if (bleedProc) {
+      attacker.metrics.bleedProc++;
+      attacker.metrics.eventTurns.bleedProc.push(round);
       if (!defender.bleeding) {
         attacker.metrics.bleed++;
         attacker.metrics.eventTurns.bleed.push(round);
@@ -14909,7 +14957,7 @@ function setupAdmin() {
     const stunChance=Math.max(0,(Number(attacker.stats.stun)||0)-(Number(defender.stats.stunResist)||0));
     attacker.metrics.stunOpportunities++;
     attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
-    if (pvpChance(stunChance)) {
+    if (pvpProc(attacker,"stun",stunChance)) {
       defender.stunned=true; attacker.metrics.stun++;
       attacker.metrics.eventTurns.stun.push(round);
     }
@@ -14934,7 +14982,7 @@ function setupAdmin() {
     const doubleChance=pvpClamp(Number(actor.stats.doubleStrike)||0,0,100);
     actor.metrics.doubleOpportunities++;
     actor.metrics.doubleChanceSum+=doubleChance;
-    if (pvpChance(doubleChance)) {
+    if (pvpProc(actor,"double",doubleChance)) {
       actor.metrics.double++;
       actor.metrics.eventTurns.double.push(round);
       const second=pvpStrike(actor,enemy,round,params,{allowExecute:false,allowCounter:true,consumeFirst:false});
@@ -14998,7 +15046,7 @@ function setupAdmin() {
   }
 
   async function pvpMonteCarlo(sourceA,sourceB,runs,params,defenderSide="B") {
-    const eventKeys=["crit","double","counter","bleed","stun","execute"];
+    const eventKeys=["crit","double","counter","bleed","bleedProc","stun","execute"];
     const emptyEvents=()=>Object.fromEntries(eventKeys.map(key=>[key,0]));
     const agg={
       runs,winsA:0,winsB:0,ties:0,timeouts:0,rounds:[],
@@ -15103,7 +15151,7 @@ function setupAdmin() {
       row("💥","Krytyk","crit","critOpportunities","critChanceSum"),
       row("⚡","Double","double","doubleOpportunities","doubleChanceSum"),
       row("↩️","Kontratak","counter","counterOpportunities","counterChanceSum"),
-      row("🩸","Krwawienie","bleed","bleedOpportunities","bleedChanceSum"),
+      row("🩸","Proc krwawienia","bleedProc","bleedOpportunities","bleedChanceSum"),
       row("💫","Ogłuszenie","stun","stunOpportunities","stunChanceSum")
     ].join("");
   }
@@ -15228,7 +15276,7 @@ function setupAdmin() {
       // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
