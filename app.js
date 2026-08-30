@@ -14872,9 +14872,9 @@ function setupAdmin() {
     return Math.random()<params.firstMoverHigher ? higher : lower;
   }
 
-  function pvpOneBattle(sourceA,sourceB,params) {
+  function pvpOneBattle(sourceA,sourceB,params,defenderSide="B") {
     const a=pvpPrepareFighter(sourceA,"A"), b=pvpPrepareFighter(sourceB,"B");
-    let cause="timeout", rounds=15, winner=null;
+    let cause="timeout_hp", rounds=15, winner=null;
 
     // firstMover jest zdarzeniem startu walki. Losujemy go raz na walkę,
     // a nie ponownie w każdej turze. Algorytm wyboru pozostaje jawnie
@@ -14888,12 +14888,22 @@ function setupAdmin() {
       const r2=pvpActivity(second,first,round,params);
       if (r2) { winner=r2.winner;cause=r2.cause;rounds=round;break; }
     }
+
+    // Techniczny limit rund nie tworzy remisu:
+    // 1) wygrywa wyższy % pozostałego maksymalnego HP,
+    // 2) przy dokładnie takim samym % HP wygrywa obrońca.
     if (!winner) {
-      const pa=a.hp/a.maxHp, pb=b.hp/b.maxHp;
-      if (Math.abs(pa-pb)>1e-9) winner=pa>pb?a:b;
-      else cause="tie";
+      const pa=a.maxHp>0 ? a.hp/a.maxHp : 0;
+      const pb=b.maxHp>0 ? b.hp/b.maxHp : 0;
+      if (Math.abs(pa-pb)>1e-9) {
+        winner=pa>pb?a:b;
+        cause="timeout_hp";
+      } else {
+        winner=defenderSide==="A"?a:b;
+        cause="timeout_defender";
+      }
     }
-    return {winner:winner===a?"A":winner===b?"B":"tie",cause,rounds,a,b,timeout:cause==="timeout"||cause==="tie"};
+    return {winner:winner===a?"A":"B",cause,rounds,a,b,timeout:cause==="timeout_hp"||cause==="timeout_defender"};
   }
 
   function pvpHpBucketIndex(percent) {
@@ -14910,7 +14920,7 @@ function setupAdmin() {
     target[key]=(target[key]||0)+1;
   }
 
-  async function pvpMonteCarlo(sourceA,sourceB,runs,params) {
+  async function pvpMonteCarlo(sourceA,sourceB,runs,params,defenderSide="B") {
     const eventKeys=["crit","double","counter","bleed","stun","execute"];
     const emptyEvents=()=>Object.fromEntries(eventKeys.map(key=>[key,0]));
     const agg={
@@ -14923,7 +14933,7 @@ function setupAdmin() {
     };
 
     for (let i=0;i<runs;i++) {
-      const result=pvpOneBattle(sourceA,sourceB,params);
+      const result=pvpOneBattle(sourceA,sourceB,params,defenderSide);
       if (result.winner==="A") agg.winsA++;
       else if (result.winner==="B") agg.winsB++;
       else agg.ties++;
@@ -14991,13 +15001,11 @@ function setupAdmin() {
   function pvpRenderAggregate(agg,leftLabel,rightLabel,title) {
     const leftWin=pvpPct(agg.winsA,agg.runs);
     const rightWin=pvpPct(agg.winsB,agg.runs);
-    const ties=pvpPct(agg.ties,agg.runs);
     return `<section class="pvp-sim-result-card">
       <h4>${escapeHtml(title)}</h4>
-      <div class="pvp-result-scorecards">
+      <div class="pvp-result-scorecards two-way">
         <div class="pvp-result-scorecard winner-a"><span>${escapeHtml(leftLabel)}</span><strong>${leftWin}</strong></div>
         <div class="pvp-result-scorecard"><span>${escapeHtml(rightLabel)}</span><strong>${rightWin}</strong></div>
-        <div class="pvp-result-scorecard compact"><span>Remis</span><strong>${ties}</strong></div>
       </div>
       <div class="pvp-sim-kpis">
         <span>Śr. rund <b>${agg.avgRounds.toLocaleString("pl-PL",{maximumFractionDigits:1})}</b></span>
@@ -15027,7 +15035,7 @@ function setupAdmin() {
         <div class="pvp-result-details-body">
           <div><b>${escapeHtml(leftLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.A,Math.max(1,agg.winsA))}</div>
           <div><b>${escapeHtml(rightLabel)}:</b> ${pvpCauseLine(agg.causesByWinner.B,Math.max(1,agg.winsB))}</div>
-          <div><b>Remisy/timeouty:</b> ${pvpCauseLine(agg.causesByWinner.tie,Math.max(1,agg.ties))}</div>
+          <div><b>Timeouty:</b> ${pvpPct(agg.timeouts,agg.runs)} · przy limicie rund wygrywa wyższy % HP, a przy identycznym % HP obrońca.</div>
         </div>
       </details>
     </section>`;
@@ -15052,20 +15060,22 @@ function setupAdmin() {
       const blocks=[];
       let sideNote="";
 
-      // Z dostępnych danych nie wynika osobny mnożnik atakujący/obrońca ani
-      // deterministyczny first mover zależny od strony. Nie generujemy więc
-      // dwóch niezależnych próbek, które różniłyby się wyłącznie szumem Monte
-      // Carlo i mogłyby sugerować nieistniejącą przewagę strony.
+      // Poza rozstrzyganiem technicznego timeoutu nie mamy potwierdzonego
+      // ukrytego mnożnika atakujący/obrońca. Strona ma znaczenie tylko wtedy,
+      // gdy po limicie rund obaj mają identyczny procent pozostałego HP.
       if (mode==="both") {
-        const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params);
-        blocks.push(pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Oba warianty — brak potwierdzonej różnicy stron"));
-        sideNote='<div class="pvp-side-note">ℹ️ W obecnym modelu „atakuję” i „bronię” mają te same reguły. Jeśli logi/source pokażą mechanikę zależną od strony, warianty zostaną rozdzielone.</div>';
+        const attackAgg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
+        const defenseAgg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"A");
+        blocks.push(pvpRenderAggregate(attackAgg,leftItem.label,rightItem.label,"Ja atakuję"));
+        blocks.push(pvpRenderAggregate(defenseAgg,leftItem.label,rightItem.label,"Ja bronię"));
+        sideNote='<div class="pvp-side-note">ℹ️ Atak i obrona mają te same potwierdzone reguły walki. Różnica strony działa tylko przy technicznym timeoutcie: wygrywa wyższy % HP, a przy idealnym remisie % HP — obrońca.</div>';
       } else {
-        const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params);
+        const defenderSide=mode==="defense"?"A":"B";
+        const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,defenderSide);
         blocks.push(pvpRenderAggregate(agg,leftItem.label,rightItem.label,mode==="defense"?"Ja bronię":"Ja atakuję"));
       }
 
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Brak ukrytych mnożników atakujący/broniący.</div></details>${sideNote}${blocks.join("")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/stun/standardowy bleed pomniejszane o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), normalne obrażenia używają jawnego DEF K=${params.defenseK}, counter ×${params.counterMult}, wyższa inicjatywa zaczyna z prawdopodobieństwem ${(params.firstMoverHigher*100).toFixed(0)}%. Brak ukrytych mnożników atakujący/broniący. Po limicie 15 rund wygrywa strona z wyższym % pozostałego HP; przy identycznym % HP wygrywa obrońca. Remisy nie występują.</div></details>${sideNote}${blocks.join("")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");

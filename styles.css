@@ -3834,3 +3834,14 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
     opacity:.88;
   }
 }
+
+
+/* v21.00.7 — PvP: wynik zawsze dwustronny, bez karty remisu */
+.pvp-result-scorecards.two-way{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+@media (max-width:640px){
+  .pvp-result-scorecards.two-way{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
