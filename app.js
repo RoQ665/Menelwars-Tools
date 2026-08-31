@@ -14878,24 +14878,31 @@ function setupAdmin() {
     return Math.max(1,Math.round(damage));
   }
 
-  // Deterministyczna tabela kalibracyjna: pełne HP, zwykły cios, bez proca
-  // i bez First Strike. Dzięki temu można porównać konkretną turę z filmem,
-  // zamiast mylić ją ze średnią ze wszystkich walk i późnych rund.
+  // Determinystyczna tabela kalibracyjna: pełne HP i bez First Strike.
+  // Pokazuje osobno zwykły cios, krytyk i niekrytyczną kontrę dla tej samej
+  // tury, zamiast mieszać je ze średnią ze wszystkich walk.
   function pvpNormalDamageByRound(leftSource,rightSource,params) {
     const left=pvpPrepareFighter(leftSource,"left");
     const right=pvpPrepareFighter(rightSource,"right");
     return Array.from({length:15},(_,index)=>{
       const round=index+1;
+      const leftDamage=pvpDamageFormula(left,right,round,params,false,false);
+      const rightDamage=pvpDamageFormula(right,left,round,params,false,false);
       return {
         round,
-        leftDamage:pvpDamageFormula(left,right,round,params,false,false),
-        rightDamage:pvpDamageFormula(right,left,round,params,false,false)
+        leftDamage,
+        rightDamage,
+        leftCritDamage:pvpDamageFormula(left,right,round,params,true,false),
+        rightCritDamage:pvpDamageFormula(right,left,round,params,true,false),
+        leftCounterDamage:Math.max(1,Math.round(leftDamage*(Number(params.counterMult)||1))),
+        rightCounterDamage:Math.max(1,Math.round(rightDamage*(Number(params.counterMult)||1)))
       };
     });
   }
 
   function pvpRenderNormalDamageByRound(rows,leftLabel,rightLabel) {
-    return `<details class="pvp-result-details"><summary>📏 Tabela obrażeń według tur</summary><div class="pvp-result-details-body"><div>Wartości deterministyczne przy pełnym HP: bez kryta, double, kontry, First Strike i efektów poniżej progu HP. Rozpęd oraz eskalacja danej tury pozostają uwzględnione.</div><div class="table-wrap"><table><thead><tr><th>Tura</th><th>${escapeHtml(leftLabel)} → ${escapeHtml(rightLabel)}</th><th>${escapeHtml(rightLabel)} → ${escapeHtml(leftLabel)}</th></tr></thead><tbody>${rows.map(row=>`<tr><td>T${row.round}</td><td>${row.leftDamage} dmg</td><td>${row.rightDamage} dmg</td></tr>`).join("")}</tbody></table></div></div></details>`;
+    const cell=(normal,crit,counter)=>`N ${normal} · K ${crit} · C ${counter}`;
+    return `<details class="pvp-result-details"><summary>📏 Tabela obrażeń według tur</summary><div class="pvp-result-details-body"><div>Wartości deterministyczne przy pełnym HP i bez First Strike. N = normalny cios, K = krytyk, C = niekrytyczna kontra; double i efekty poniżej progu HP nie są tu mieszane z wartością bazową. Rozpęd oraz eskalacja danej tury pozostają uwzględnione.</div><div class="table-wrap"><table><thead><tr><th>Tura</th><th>${escapeHtml(leftLabel)} → ${escapeHtml(rightLabel)}</th><th>${escapeHtml(rightLabel)} → ${escapeHtml(leftLabel)}</th></tr></thead><tbody>${rows.map(row=>`<tr><td>T${row.round}</td><td>${cell(row.leftDamage,row.leftCritDamage,row.leftCounterDamage)} dmg</td><td>${cell(row.rightDamage,row.rightCritDamage,row.rightCounterDamage)} dmg</td></tr>`).join("")}</tbody></table></div></div></details>`;
   }
 
   function pvpApplyBleedTick(victim,round) {
@@ -15202,15 +15209,14 @@ function setupAdmin() {
     ].join("");
   }
 
-  function pvpDamageCard(label,detail,firstTurnNormalDamage) {
-    const metric=(icon,name,total,count)=>`<div class="pvp-damage-metric"><span>${icon} ${name}</span><b>${count?pvpAvg(total,count,0)+" dmg":"—"}</b><small>${count?Number(count).toLocaleString("pl-PL")+" trafień":"brak trafień"}</small></div>`;
-    const normalMetric=`<div class="pvp-damage-metric"><span>👊 Normalny cios · T1</span><b>${Number.isFinite(firstTurnNormalDamage)?firstTurnNormalDamage+" dmg":"—"}</b><small>bez kryta i First Strike</small></div>`;
+  function pvpDamageCard(label,detail,firstTurnDamage) {
+    const metric=(icon,name,value)=>`<div class="pvp-damage-metric"><span>${icon} ${name} · T1</span><b>${Number.isFinite(value)?value+" dmg":"—"}</b><small>bez First Strike</small></div>`;
     return `<div class="pvp-fighter-report">
       <div class="pvp-fighter-report-title">${escapeHtml(label)}</div>
       <div class="pvp-damage-grid">
-        ${normalMetric}
-        ${metric("💥","Krytyk",detail.critDamage||0,detail.critHitCount||0)}
-        ${metric("↩️","Kontra",detail.counterDamage||0,detail.counterHitCount||0)}
+        ${metric("👊","Normalny cios",firstTurnDamage?.normal)}
+        ${metric("💥","Krytyk",firstTurnDamage?.crit)}
+        ${metric("↩️","Kontra",firstTurnDamage?.counter)}
       </div>
     </div>`;
   }
@@ -15295,7 +15301,7 @@ function setupAdmin() {
 
       <details class="pvp-result-details" open>
         <summary>🥊 Obrażenia pojedynczych ciosów</summary>
-        <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA,perRoundDamage?.[0]?.leftDamage)}${pvpDamageCard(rightLabel,agg.detailB,perRoundDamage?.[0]?.rightDamage)}</div>
+        <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA,perRoundDamage?.[0] ? {normal:perRoundDamage[0].leftDamage,crit:perRoundDamage[0].leftCritDamage,counter:perRoundDamage[0].leftCounterDamage} : null)}${pvpDamageCard(rightLabel,agg.detailB,perRoundDamage?.[0] ? {normal:perRoundDamage[0].rightDamage,crit:perRoundDamage[0].rightCritDamage,counter:perRoundDamage[0].rightCounterDamage} : null)}</div>
       </details>
 
       <details class="pvp-result-details" open>
