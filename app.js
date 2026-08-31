@@ -15074,7 +15074,13 @@ function setupAdmin() {
 
     // Udany unik kończy sekwencję atakującego. Nie ma po nim Double Strike;
     // postać przechodzi tylko do regeneracji przypisanej do swojej tury.
+    // Pudło pozostaje jednak nieudaną okazją dla metera Double Strike, więc
+    // następny trafiony główny atak może mieć wyższą chwilową szansę.
     if (main.cause==="evade") {
+      const missedDoubleChance=pvpClamp(Number(actor.stats.doubleStrike)||0,0,100);
+      actor.metrics.doubleOpportunities++;
+      actor.metrics.doubleChanceSum+=missedDoubleChance;
+      pvpFailProc(actor,"double",missedDoubleChance);
       pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
       const evadedCond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
       pvpHeal(actor,evadedCond.regenFlat,enemy,"regen");
