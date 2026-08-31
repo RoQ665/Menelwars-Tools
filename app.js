@@ -14963,12 +14963,16 @@ function setupAdmin() {
       // Zmisowany atak jest nieudaną okazją na efekty atakującego.
       attacker.metrics.critOpportunities++;
       attacker.metrics.critChanceSum+=pvpClamp(critChance,0,100);
-      attacker.metrics.bleedOpportunities++;
-      attacker.metrics.bleedChanceSum+=pvpClamp(bleedChance,0,100);
       attacker.metrics.stunOpportunities++;
       attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
       pvpFailProc(attacker,"crit",critChance);
-      pvpFailProc(attacker,"bleed",bleedChance);
+      // Gdy ofiara już krwawi, kolejne próby nie mają skutku i nie są
+      // okazjami do raportu ani kolejnymi porażkami metera bleed.
+      if (!defender.bleeding) {
+        attacker.metrics.bleedOpportunities++;
+        attacker.metrics.bleedChanceSum+=pvpClamp(bleedChance,0,100);
+        pvpFailProc(attacker,"bleed",bleedChance);
+      }
       pvpFailProc(attacker,"stun",stunChance);
       if (allowCounter) {
         const counterChance=pvpClamp(Number(defender.stats.counter)||0,0,100);
@@ -15024,22 +15028,21 @@ function setupAdmin() {
     if (defender.hp<=0) return {killed:true,cause:options.damageMultiplier!=null?"counter":"damage"};
 
     // Mistrz Krwawienia / applies_bleed: krytyk automatycznie nakłada bleed.
-    // To nie jest dodatkowy rzut szansy i nie odejmujemy Bleed Resist od
-    // automatycznego proc-a. Gdy nie ma auto-bleed, działa zwykła szansa
-    // bleedChance - bleedResist.
-    const autoBleed = crit && Number(attacker.stats.appliesBleed) > 0;
-    attacker.metrics.bleedOpportunities++;
-    attacker.metrics.bleedChanceSum+=autoBleed?100:pvpClamp(bleedChance,0,100);
-    const bleedProc=autoBleed || pvpProc(attacker,"bleed",bleedChance);
-    if (autoBleed) pvpResetProc(attacker,"bleed");
-    if (bleedProc) {
-      attacker.metrics.bleedProc++;
-      attacker.metrics.eventTurns.bleedProc.push(round);
-      if (!defender.bleeding) {
+    // Po pierwszym skutecznym nałożeniu status trwa do końca walki, dlatego
+    // nie losujemy ani nie raportujemy kolejnych, niewidocznych "proców".
+    if (!defender.bleeding) {
+      const autoBleed = crit && Number(attacker.stats.appliesBleed) > 0;
+      attacker.metrics.bleedOpportunities++;
+      attacker.metrics.bleedChanceSum+=autoBleed?100:pvpClamp(bleedChance,0,100);
+      const bleedProc=autoBleed || pvpProc(attacker,"bleed",bleedChance);
+      if (autoBleed) pvpResetProc(attacker,"bleed");
+      if (bleedProc) {
+        attacker.metrics.bleedProc++;
+        attacker.metrics.eventTurns.bleedProc.push(round);
         attacker.metrics.bleed++;
         attacker.metrics.eventTurns.bleed.push(round);
+        defender.bleeding=attacker;
       }
-      defender.bleeding=attacker;
     }
     attacker.metrics.stunOpportunities++;
     attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
