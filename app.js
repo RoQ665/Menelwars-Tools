@@ -7878,6 +7878,7 @@ async function setAdminSubmissionStatus(
   // nie blokujemy administratora na czas odpowiedzi Apps Script, a przy
   // błędzie możemy bezpiecznie przywrócić dokładnie tę samą listę.
   const submissionsBeforeMutation = adminSubmissionsCache;
+  adminPendingSubmissionRows.add(String(row));
   if (
     submissionsBeforeMutation &&
     Array.isArray(submissionsBeforeMutation.submissions)
@@ -7934,10 +7935,12 @@ async function setAdminSubmissionStatus(
     await loadAdminSubmissions({force:true});
 
 
-    // Zatwierdzona receptura ma od razu trafić
-    // również do wspólnej bazy widocznej w PWA.
+    adminPendingSubmissionRows.delete(String(row));
+
+    // Baza receptur odświeży się przy kolejnym wejściu do Destylarni.
+    // Nie blokujemy panelu Admina drugim odczytem, który nie zmienia tej tabeli.
     if (isApprove) {
-      await fetchApprovedRecipes({force:true});
+      approvedRecipesRequestState = "idle";
     }
 
 
@@ -7963,6 +7966,7 @@ async function setAdminSubmissionStatus(
   } catch (err) {
 
     // Serwer nie potwierdził zmiany: pokazujemy zgłoszenie ponownie.
+    adminPendingSubmissionRows.delete(String(row));
     if (submissionsBeforeMutation) {
       adminSubmissionsCache = submissionsBeforeMutation;
       adminSubmissionsCacheAt = Date.now();
@@ -7994,6 +7998,9 @@ let adminSubmissionsCache = null;
 let adminSubmissionsCacheAt = 0;
 let adminSubmissionsCacheToken = "";
 let adminSubmissionsInFlight = null;
+// Kilka kliknięć może zakończyć się w innej kolejności. Ten zbiór sprawia,
+// że kafelek wysłany do serwera nie wraca na chwilę po starszym odczycie.
+const adminPendingSubmissionRows = new Set();
 const ADMIN_SUBMISSIONS_CACHE_TTL_MS = 60 * 1000;
 
 function invalidateAdminSubmissionsCache() {
@@ -8104,9 +8111,13 @@ async function loadAdminSubmissions(options={}) {
         ? payload.submissions
         : [];
 
+    const visibleSubmissions = submissions.filter(
+      item => !adminPendingSubmissionRows.has(String(item && item.row))
+    );
+
     setAdminSectionBadge(
       "admin-section-submissions",
-      submissions.length
+      visibleSubmissions.length
     );
 
     // Zbiorczy badge też aktualizujemy po pełnym odczycie sekcji.
@@ -8115,9 +8126,9 @@ async function loadAdminSubmissions(options={}) {
     el(
       "admin-submissions"
     ).innerHTML =
-      submissions.length
+      visibleSubmissions.length
 
-        ? submissions
+        ? visibleSubmissions
             .map(
               adminSubmissionCard
             )
@@ -13465,7 +13476,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.40" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.41" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
