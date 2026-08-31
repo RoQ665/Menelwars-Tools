@@ -14756,6 +14756,9 @@ function setupAdmin() {
   // numerycznie do bazowej statystyki. Meter przyspieszamy nieznacznie po
   // nieudanych próbach, aby średnie szanse częściej były odczuwalne w krótkiej walce.
   // To przybliżenie "proc meterów" opisanych w patch notes, nie kopia backendu.
+  // Współczynnik startowy jest kalibrowany z tym samym wzrostem, którego używa
+  // pvpProc(). Dzięki temu meter zmienia rozkład proców w czasie, ale nie
+  // podnosi ukrycie długoterminowej szansy ze statystyk.
   const pvpPrdCoefficientCache = new Map();
   const PVP_PRD_GROWTH = 1.25;
   function pvpPrdCoefficient(percent) {
@@ -14771,7 +14774,7 @@ function setupAdmin() {
       let survival=1,expectedAttempts=0;
       for (let attempt=1;attempt<=10000;attempt++) {
         expectedAttempts+=survival;
-        survival*=1-Math.min(1,middle*attempt);
+        survival*=1-Math.min(1,middle*(1+(attempt-1)*PVP_PRD_GROWTH));
         if (survival<1e-12) break;
       }
       const achieved=1/Math.max(1,expectedAttempts);
