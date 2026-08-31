@@ -7874,10 +7874,42 @@ async function setAdminSubmissionStatus(
   el("admin-status").textContent =
     loadingText;
 
+  // Kafelek znika od razu, ale zachowujemy jego lokalną kopię. Dzięki temu
+  // nie blokujemy administratora na czas odpowiedzi Apps Script, a przy
+  // błędzie możemy bezpiecznie przywrócić dokładnie tę samą listę.
+  const submissionsBeforeMutation = adminSubmissionsCache;
+  if (
+    submissionsBeforeMutation &&
+    Array.isArray(submissionsBeforeMutation.submissions)
+  ) {
+    const submissionsAfterMutation = submissionsBeforeMutation.submissions.filter(
+      item => Number(item && item.row) !== Number(row)
+    );
+    adminSubmissionsCache = Object.assign({}, submissionsBeforeMutation, {
+      submissions: submissionsAfterMutation,
+      count: submissionsAfterMutation.length
+    });
+    adminSubmissionsCacheAt = Date.now();
+    loadAdminSubmissions().catch(()=>{});
+  } else if (card) {
+    card.remove();
+  }
+
   criticalOperationStart(
     loadingText,
-    "Poczekaj aż receptura zostanie zapisana i lista odświeżona."
+    "Zgłoszenie znika teraz, a potwierdzenie serwera trwa w tle."
   );
+
+  let overlayReleased = false;
+  const releaseOverlay = () => {
+    if (overlayReleased) return;
+    overlayReleased = true;
+    criticalOperationFinish();
+  };
+  const releaseTimer = setTimeout(() => {
+    el("admin-status").textContent = "⌛ Potwierdzam zmianę w tle — możesz dalej pracować w panelu.";
+    releaseOverlay();
+  }, 700);
 
 
   try {
@@ -7930,6 +7962,15 @@ async function setAdminSubmissionStatus(
 
   } catch (err) {
 
+    // Serwer nie potwierdził zmiany: pokazujemy zgłoszenie ponownie.
+    if (submissionsBeforeMutation) {
+      adminSubmissionsCache = submissionsBeforeMutation;
+      adminSubmissionsCacheAt = Date.now();
+      await loadAdminSubmissions().catch(()=>{});
+    } else {
+      await loadAdminSubmissions({force:true}).catch(()=>{});
+    }
+
     el("admin-status").textContent =
       err && err.message
         ? err.message
@@ -7943,7 +7984,8 @@ async function setAdminSubmissionStatus(
       "❌ Operacja nieudana"
     );
   } finally {
-    criticalOperationFinish();
+    clearTimeout(releaseTimer);
+    releaseOverlay();
     loadAdminDashboardStatus().catch(()=>{});
   }
 }
@@ -12547,8 +12589,19 @@ function setupAdmin() {
 
     criticalOperationStart(
       isPublic ? "🌐 Udostępniam build…" : "💾 Zapisuję build…",
-      "Zapisuję build i czekam na jednoznaczne potwierdzenie serwera."
+      "Zapis uruchomiony — po krótkiej chwili możesz dalej edytować formularz."
     );
+
+    let overlayReleased = false;
+    const releaseOverlay = () => {
+      if (overlayReleased) return;
+      overlayReleased = true;
+      criticalOperationFinish();
+    };
+    const releaseTimer = setTimeout(() => {
+      status.textContent = "⌛ Zapis buildu trwa w tle. Możesz dalej przeglądać narzędzie.";
+      releaseOverlay();
+    }, 700);
 
     try {
       const result = await buildPostAction(payload);
@@ -12582,7 +12635,8 @@ function setupAdmin() {
       status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się zapisać buildu.");
     } finally {
       button.disabled = false;
-      criticalOperationFinish();
+      clearTimeout(releaseTimer);
+      releaseOverlay();
     }
   }
 
@@ -13002,11 +13056,26 @@ function setupAdmin() {
         sessionToken:playerAccountSessionToken(),
         id:item.id
       };
+      const publicBeforeDelete = buildPublicItems;
+      const myBeforeDelete = buildMyItems;
+      buildPublicItems = buildPublicItems.filter(entry=>entry.id !== item.id);
+      buildMyItems = buildMyItems.filter(entry=>entry.id !== item.id);
+      renderBuildLists();
+      host.hidden = true;
       status.textContent = "Usuwanie...";
       criticalOperationStart(
         "🗑 Usuwam build…",
-        "Usuwam zapisany build i czekam na potwierdzenie serwera."
+        "Build znika teraz, a potwierdzenie usunięcia trwa w tle."
       );
+      let overlayReleased = false;
+      const releaseOverlay = () => {
+        if (overlayReleased) return;
+        overlayReleased = true;
+        criticalOperationFinish();
+      };
+      const releaseTimer = setTimeout(()=>{
+        releaseOverlay();
+      },700);
       try {
         await buildPostAction(payload);
         status.textContent = "✅ Build został usunięty.";
@@ -13014,9 +13083,14 @@ function setupAdmin() {
         invalidateAppCache("builds");
         await fetchBuildLists(true);
       } catch(err) {
+        buildPublicItems = publicBeforeDelete;
+        buildMyItems = myBeforeDelete;
+        renderBuildLists();
+        host.hidden = false;
         status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się usunąć buildu.");
       } finally {
-        criticalOperationFinish();
+        clearTimeout(releaseTimer);
+        releaseOverlay();
       }
     });
   }
@@ -13391,7 +13465,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.39" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.40" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -13489,18 +13563,44 @@ function setupAdmin() {
     if (!own) return;
     const status=el("garden-action-status");
     if (!window.confirm("Potwierdzić timestamp: gra pokazuje „Gotowe do zbioru”? READY jest zapisywane niezależnie od klatki 9 i od późniejszego zbioru.")) return;
+    const observedAt=Date.now();
+    const pendingEventId=`local-ready-${observedAt}-${Math.random().toString(36).slice(2)}`;
+    gardenPendingPhase={experimentId:String(own.id),eventId:pendingEventId,eventType:"READY",observedAt};
+    gardenData={...gardenData,phases:[...(gardenData.phases||[]),gardenPendingPhase]};
+    gardenRenderPlots();
+    gardenRenderEditor();
     criticalOperationStart("✅ Zapisuję READY…","Zapisuję moment, w którym gra pokazała gotowość do zbioru.");
+    let overlayReleased=false;
+    const releaseOverlay=()=>{
+      if (overlayReleased) return;
+      overlayReleased=true;
+      criticalOperationFinish();
+    };
+    const releaseTimer=setTimeout(()=>{
+      if (status) status.textContent="⌛ READY zapisuje się w tle — możesz dalej korzystać z Ogrodu.";
+      releaseOverlay();
+    },700);
     try {
       const result=await gardenPostAction("gardenPhase",{
         id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
-        eventType:"READY",observedAtMs:Date.now()
+        eventType:"READY",observedAtMs:observedAt
       });
       if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać READY.");
+      gardenPendingPhase=null;
       if (status) status.textContent="✅ Zapisano READY. Zbiór możesz zakończyć osobnym przyciskiem, gdy faktycznie zbierzesz roślinę.";
       await gardenFetchData({force:true});
     } catch(err) {
+      if (gardenPendingPhase && gardenPendingPhase.eventId===pendingEventId) {
+        gardenPendingPhase=null;
+        gardenData={...gardenData,phases:(gardenData.phases||[]).filter(event=>String(event.eventId||"")!==pendingEventId)};
+        gardenRenderPlots();
+        gardenRenderEditor();
+      }
       if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd zapisu READY."}`;
-    } finally { criticalOperationFinish(); }
+    } finally {
+      clearTimeout(releaseTimer);
+      releaseOverlay();
+    }
   }
 
   function gardenRenderPhaseTools(own) {
