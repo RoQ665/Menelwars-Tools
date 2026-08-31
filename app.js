@@ -14857,7 +14857,11 @@ function setupAdmin() {
     const defenderLevel=Math.max(1,Number(defender.calculated?.characterLevel)||1);
     const earnedAttackerLevels=Math.max(0,attackerLevel-1);
     const earnedDefenderLevels=Math.max(0,defenderLevel-1);
-    const attack=(attacker.primary.attack+earnedAttackerLevels*0.5)*(1+(condA.attackPct+dynamicPct)/100)+5;
+    // Zwykłe premie do ATK (w tym momentum) tworzą podstawową wartość ataku.
+    // Premia warunkowa low HP jest osobnym, późniejszym etapem tego samego
+    // efektu — nie sumujemy jej z normalnymi premiami procentowymi.
+    const normalAttack=(attacker.primary.attack+earnedAttackerLevels*0.5)*(1+dynamicPct/100)+5;
+    const attack=normalAttack*(1+condA.attackPct/100);
     // Ukryty DEF za zdobyte poziomy traktujemy jak zwykłą obronę, więc
     // przebicie pancerza zmniejsza również tę część.
     const defenseBeforePen=defender.primary.defense+earnedDefenderLevels*1.65;
@@ -14870,14 +14874,17 @@ function setupAdmin() {
         ? Math.max(1,attacker.primary.attack*(Number(params.attackKScale)||0.8))
         : params.defenseK;
     const defenseFactor=defenseK/(effectiveDefense+defenseK);
-    const damageReduction=pvpClamp((Number(defender.stats.damageReduction)||0)+condD.damageReduction,0,60);
-    // Source mapa gry podaje drugą funkcję Evasion: pasywną redukcję obrażeń
-    // równą evasion / 3.5. Backendowa kolejność względem zwykłego DR nie jest
-    // dostępna, więc w modelu eksperymentalnym stosujemy ją jako osobny
-    // mnożnik po standardowym Damage Reduction, bez mieszania z capem 60%.
-    const evasionPassiveReduction=pvpClamp((Number(defender.stats.evasion)||0)/3.5,0,100);
+    // Pasywny unik jest częścią zwykłej redukcji obrażeń. Zwykły DR i unik/3,5
+    // sumują się przed wspólnym limitem 60%. Warunkowy DR low HP jest osobnym,
+    // późniejszym efektem i nie wchodzi do tego limitu.
+    const normalDamageReduction=pvpClamp(
+      (Number(defender.stats.damageReduction)||0)+(Number(defender.stats.evasion)||0)/3.5,
+      0,60
+    );
     const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(14,round-1))]||0)/100;
-    let damage=attack*defenseFactor*(1-damageReduction/100)*(1-evasionPassiveReduction/100)*escalation;
+    let damage=attack*defenseFactor*(1-normalDamageReduction/100);
+    damage*=1-condD.damageReduction/100;
+    damage*=escalation;
     if (isCrit) damage*=1+(Number(attacker.stats.critDmg)||0)/100;
     if (isFirst) damage*=1+(Number(attacker.stats.firstStrike)||0)/100;
     return Math.max(1,Math.round(damage));
@@ -14928,6 +14935,15 @@ function setupAdmin() {
     return {damage,killed:victim.hp<=0};
   }
 
+  // Pudło nie może dać crita, bleed ani stuna, ale jest nieudaną okazją dla
+  // każdego z tych meterów. Nie losujemy ukrytego sukcesu, tylko jawnie
+  // zapisujemy porażkę — dzięki temu następne trafienie ma wyższą szansę.
+  function pvpFailProc(fighter,key,percent) {
+    if (pvpClamp(Number(percent)||0,0,100)<=0) return;
+    const failures=Math.max(0,Number(fighter.procMeters[key])||0);
+    fighter.procMeters[key]=failures+1;
+  }
+
   function pvpStrike(attacker,defender,round,params,options={}) {
     if (attacker.hp<=0 || defender.hp<=0) return {killed:false,cause:""};
     const allowExecute=options.allowExecute!==false;
@@ -14935,21 +14951,25 @@ function setupAdmin() {
     const isFirst=Boolean(attacker.firstAttack && options.consumeFirst!==false);
     if (options.consumeFirst!==false) attacker.firstAttack=false;
 
-    if (allowExecute) {
-      attacker.metrics.executeChecks++;
-      if (100*defender.hp/defender.maxHp < (Number(attacker.stats.execute)||0)) {
-        defender.hp=0; attacker.metrics.execute++;
-        attacker.metrics.eventTurns.execute.push(round);
-        return {killed:true,cause:"execute"};
-      }
-    }
-
     const finalHit=pvpClamp((Number(attacker.stats.accuracy)||0)-(Number(defender.stats.evasion)||0),5,99);
+    const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-(Number(defender.stats.critResist)||0));
+    const bleedChance=Math.max(0,(Number(attacker.stats.bleed)||0)-(Number(defender.stats.bleedResist)||0));
+    const stunChance=Math.max(0,(Number(attacker.stats.stun)||0)-(Number(defender.stats.stunResist)||0));
     attacker.metrics.hitAttempts++;
     const evadeChance=100-finalHit;
     if (pvpProc(defender,"evasion",evadeChance)) {
       attacker.metrics.miss++;
       defender.metrics.evade++;
+      // Zmisowany atak jest nieudaną okazją na efekty atakującego.
+      attacker.metrics.critOpportunities++;
+      attacker.metrics.critChanceSum+=pvpClamp(critChance,0,100);
+      attacker.metrics.bleedOpportunities++;
+      attacker.metrics.bleedChanceSum+=pvpClamp(bleedChance,0,100);
+      attacker.metrics.stunOpportunities++;
+      attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
+      pvpFailProc(attacker,"crit",critChance);
+      pvpFailProc(attacker,"bleed",bleedChance);
+      pvpFailProc(attacker,"stun",stunChance);
       if (allowCounter) {
         const counterChance=pvpClamp(Number(defender.stats.counter)||0,0,100);
         defender.metrics.counterOpportunities++;
@@ -14965,7 +14985,16 @@ function setupAdmin() {
     }
 
     attacker.metrics.hit++;
-    const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-(Number(defender.stats.critResist)||0));
+    // Execute jest zwykłym głównym atakiem, który po trafieniu zamienia się w
+    // zabicie. Unik blokuje go; Double Strike przekazuje allowExecute=false.
+    if (allowExecute) {
+      attacker.metrics.executeChecks++;
+      if (100*defender.hp/defender.maxHp < (Number(attacker.stats.execute)||0)) {
+        defender.hp=0; attacker.metrics.execute++;
+        attacker.metrics.eventTurns.execute.push(round);
+        return {killed:true,cause:"execute"};
+      }
+    }
     attacker.metrics.critOpportunities++;
     attacker.metrics.critChanceSum+=pvpClamp(critChance,0,100);
     const crit=pvpProc(attacker,"crit",critChance);
@@ -14999,7 +15028,6 @@ function setupAdmin() {
     // automatycznego proc-a. Gdy nie ma auto-bleed, działa zwykła szansa
     // bleedChance - bleedResist.
     const autoBleed = crit && Number(attacker.stats.appliesBleed) > 0;
-    const bleedChance=Math.max(0,(Number(attacker.stats.bleed)||0)-(Number(defender.stats.bleedResist)||0));
     attacker.metrics.bleedOpportunities++;
     attacker.metrics.bleedChanceSum+=autoBleed?100:pvpClamp(bleedChance,0,100);
     const bleedProc=autoBleed || pvpProc(attacker,"bleed",bleedChance);
@@ -15013,7 +15041,6 @@ function setupAdmin() {
       }
       defender.bleeding=attacker;
     }
-    const stunChance=Math.max(0,(Number(attacker.stats.stun)||0)-(Number(defender.stats.stunResist)||0));
     attacker.metrics.stunOpportunities++;
     attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
     if (pvpProc(attacker,"stun",stunChance)) {
@@ -15027,10 +15054,14 @@ function setupAdmin() {
     const bleedTick=pvpApplyBleedTick(actor,round);
     if (bleedTick.killed) return {winner:enemy,cause:"bleed"};
 
-    const cond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
-    pvpHeal(actor,(Number(actor.stats.hpRegen)||0)+cond.regenFlat,enemy,"regen");
-
-    if (actor.stunned) { actor.stunned=false; return null; }
+    if (actor.stunned) {
+      actor.stunned=false;
+      // Ogłuszenie odbiera atak, nie regenerację przypisaną do tej tury.
+      pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
+      const stunnedCond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
+      pvpHeal(actor,stunnedCond.regenFlat,enemy,"regen");
+      return null;
+    }
     const main=pvpStrike(actor,enemy,round,params,{allowExecute:true,allowCounter:true,consumeFirst:true});
     if (enemy.hp<=0) return {winner:actor,cause:main.cause||"damage"};
     // Kontratak jest rozstrzygany wewnątrz pvpStrike(). Jeśli zabił aktywnego
@@ -15048,6 +15079,11 @@ function setupAdmin() {
       if (enemy.hp<=0) return {winner:actor,cause:second.cause||"double"};
       if (actor.hp<=0) return {winner:enemy,cause:second.cause||"counter"};
     }
+    // Leczenie następuje po wymianie ciosów. Bazowy regen i dodatek low HP
+    // są rozdzielone: drugi warunek oceniamy po zwykłej regeneracji.
+    pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
+    const cond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
+    pvpHeal(actor,cond.regenFlat,enemy,"regen");
     return null;
   }
 
@@ -15346,7 +15382,7 @@ function setupAdmin() {
         : params.defenseModel === "attack"
           ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
           : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD (eksperyment dla krótkich walk). Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
