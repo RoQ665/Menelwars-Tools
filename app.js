@@ -14862,7 +14862,10 @@ function setupAdmin() {
     // mnożnik po standardowym Damage Reduction, bez mieszania z capem 60%.
     const evasionPassiveReduction=pvpClamp((Number(defender.stats.evasion)||0)/3.5,0,100);
     const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(14,round-1))]||0)/100;
-    let damage=attack*defenseFactor*(1-damageReduction/100)*(1-evasionPassiveReduction/100)*escalation;
+    // Dotyczy wyłącznie bezpośredniego ciosu. Krwawienie ma odtworzony
+    // osobny wzór i nie dostaje tego mnożnika.
+    const directDamageMult=pvpClamp(Number(params.directDamageMult)||1,0.1,2);
+    let damage=attack*defenseFactor*(1-damageReduction/100)*(1-evasionPassiveReduction/100)*escalation*directDamageMult;
     if (isCrit) damage*=1+(Number(attacker.stats.critDmg)||0)/100;
     if (isFirst) damage*=1+(Number(attacker.stats.firstStrike)||0)/100;
     return Math.max(1,Math.round(damage));
@@ -15286,6 +15289,7 @@ function setupAdmin() {
       defenseModel,
       attackKScale:0.8,
       defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||300,50,5000),
+      directDamageMult:pvpClamp(Number(el("pvp-sim-direct-dmg-mult")?.value)||1,0.1,2),
       counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2)
     };
     const runs=[10,100,1000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):1000;
@@ -15298,7 +15302,7 @@ function setupAdmin() {
       const defenseAssumption=params.defenseModel === "attack"
         ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
         : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ${defenseAssumption}, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ${defenseAssumption}, bezpośredni cios ×${params.directDamageMult} (bez wpływu na bleed), counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
