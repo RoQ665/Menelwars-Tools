@@ -13427,6 +13427,19 @@ function setupAdmin() {
     if (!own) return;
     const status=el("garden-action-status");
     criticalOperationStart("🌿 Zapisuję etap…","Dopisuję obserwację do historii faz. Poprzednie raporty nie są nadpisywane.");
+    // Zapis fazy nie zmienia samej uprawy — jest tylko obserwacją pomocniczą.
+    // Po krótkim potwierdzeniu wysyłki zwalniamy interfejs, a bezpieczne
+    // oczekiwanie na ten sam nonce trwa dalej w tle tej funkcji.
+    let overlayReleased=false;
+    const releaseOverlay=()=>{
+      if (overlayReleased) return;
+      overlayReleased=true;
+      criticalOperationFinish();
+    };
+    const releaseTimer=setTimeout(()=>{
+      if (status) status.textContent="⌛ Zapis etapu trwa w tle — możesz dalej korzystać z Ogrodu.";
+      releaseOverlay();
+    },700);
     try {
       let result=await gardenPostAction("gardenPhase",{
         id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
@@ -13447,7 +13460,10 @@ function setupAdmin() {
       await gardenFetchData({force:true});
     } catch(err) {
       if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd zapisu etapu."}`;
-    } finally { criticalOperationFinish(); }
+    } finally {
+      clearTimeout(releaseTimer);
+      releaseOverlay();
+    }
   }
 
   async function gardenRecordReady() {
