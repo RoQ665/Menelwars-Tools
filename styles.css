@@ -3917,6 +3917,14 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   color:#81735f;
   font-size:.75rem;
 }
+.pvp-round-damage-details{max-width:760px}
+.pvp-round-legend{font-size:.76rem;color:#81735f;line-height:1.35}
+.pvp-round-damage-list{display:grid;gap:4px}
+.pvp-round-damage-row{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(0,1fr);gap:7px;align-items:center;padding:6px 8px;border:1px solid #eadfce;border-radius:7px;background:#fffaf2;font-size:.77rem;line-height:1.3}
+.pvp-round-damage-row>b{color:#8a5d26}
+.pvp-round-damage-row span{min-width:0}
+.pvp-round-damage-row small{display:none;color:#81735f;font-size:.68rem}
+@media(max-width:600px){.pvp-round-damage-row{grid-template-columns:30px minmax(0,1fr);font-size:.73rem}.pvp-round-damage-row span{display:grid;gap:1px}.pvp-round-damage-row small{display:block}.pvp-round-damage-row span:last-child{grid-column:2}}
 
 .pvp-mechanic-row{
   display:grid;
