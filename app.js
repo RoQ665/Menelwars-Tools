@@ -15052,8 +15052,10 @@ function setupAdmin() {
     return ia>ib ? a : b;
   }
 
-  function pvpOneBattle(sourceA,sourceB,params,defenderSide="B") {
+  function pvpOneBattle(sourceA,sourceB,params,defenderSide="B",initialProcMeters={}) {
     const a=pvpPrepareFighter(sourceA,"A"), b=pvpPrepareFighter(sourceB,"B");
+    a.procMeters={...a.procMeters,...(initialProcMeters.a||{})};
+    b.procMeters={...b.procMeters,...(initialProcMeters.b||{})};
     let cause="timeout_hp", rounds=15, winner=null;
 
     // Inicjatywa wyznacza pierwszy ruch; przy idealnym remisie losujemy raz
@@ -15112,10 +15114,14 @@ function setupAdmin() {
       detailA:{},detailB:{},eventTurnsA:Object.fromEntries(eventKeys.map(k=>[k,[]])),eventTurnsB:Object.fromEntries(eventKeys.map(k=>[k,[]])),
       causes:{},causesByWinner:{A:{},B:{},tie:{}}
     };
+    // Meter zachowuje ciągłość pomiędzy próbami Monte Carlo, aby jego
+    // długoterminowa częstotliwość była równa statystyce buildu. Resetowanie
+    // każdej krótkiej walki zaniżało rzadkie proce nieproporcjonalnie.
+    let carriedProcMeters={a:{},b:{}};
+
     for (let i=0;i<runs;i++) {
-      // Każda arena jest niezależną walką, więc proc metery zaczynają od zera.
-      // Zapobiega to rozpoczynaniu nowej symulowanej walki z naładowanym procem.
-      const result=pvpOneBattle(sourceA,sourceB,params,defenderSide);
+      const result=pvpOneBattle(sourceA,sourceB,params,defenderSide,carriedProcMeters);
+      carriedProcMeters={a:{...result.a.procMeters},b:{...result.b.procMeters}};
       if (result.winner==="A") agg.winsA++;
       else if (result.winner==="B") agg.winsB++;
       else agg.ties++;
