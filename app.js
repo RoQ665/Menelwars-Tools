@@ -15072,6 +15072,15 @@ function setupAdmin() {
     // kolejnych tur z HP=0.
     if (actor.hp<=0) return {winner:enemy,cause:main.cause||"counter"};
 
+    // Udany unik kończy sekwencję atakującego. Nie ma po nim Double Strike;
+    // postać przechodzi tylko do regeneracji przypisanej do swojej tury.
+    if (main.cause==="evade") {
+      pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
+      const evadedCond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
+      pvpHeal(actor,evadedCond.regenFlat,enemy,"regen");
+      return null;
+    }
+
     const doubleChance=pvpClamp(Number(actor.stats.doubleStrike)||0,0,100);
     actor.metrics.doubleOpportunities++;
     actor.metrics.doubleChanceSum+=doubleChance;
