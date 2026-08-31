@@ -13108,6 +13108,7 @@ function setupAdmin() {
   let gardenSelectedPlot = 1;
   let gardenLiveRefreshInFlight = null;
   let gardenLastRenderSignature = "";
+  let gardenPendingPhase = null;
 
   function gardenLoadLocalPlots() {
     try {
@@ -13426,6 +13427,12 @@ function setupAdmin() {
     const own=gardenOwnExperimentForPlot(gardenSelectedPlot);
     if (!own) return;
     const status=el("garden-action-status");
+    const observedAt=Date.now();
+    const pendingEventId=`local-phase-${observedAt}-${Math.random().toString(36).slice(2)}`;
+    gardenPendingPhase={experimentId:String(own.id),eventId:pendingEventId,eventType:"FRAME",atlasFrame:Number(atlasFrame),observedAt};
+    gardenData={...gardenData,phases:[...(gardenData.phases||[]),gardenPendingPhase]};
+    gardenRenderPlots();
+    gardenRenderEditor();
     criticalOperationStart("🌿 Zapisuję etap…","Dopisuję obserwację do historii faz. Poprzednie raporty nie są nadpisywane.");
     // Zapis fazy nie zmienia samej uprawy — jest tylko obserwacją pomocniczą.
     // Po krótkim potwierdzeniu wysyłki zwalniamy interfejs, a bezpieczne
@@ -13443,7 +13450,7 @@ function setupAdmin() {
     try {
       let result=await gardenPostAction("gardenPhase",{
         id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
-        eventType:"FRAME",atlasFrame:Number(atlasFrame),correction:correction?"1":"0",observedAtMs:Date.now()
+        eventType:"FRAME",atlasFrame:Number(atlasFrame),correction:correction?"1":"0",observedAtMs:observedAt
       });
       if (result && result.correctionRequired && !correction) {
         criticalOperationFinish();
@@ -13452,13 +13459,20 @@ function setupAdmin() {
         criticalOperationStart("🌿 Zapisuję korektę…","Dopisuję oznaczoną korektę do append-only historii faz.");
         result=await gardenPostAction("gardenPhase",{
           id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
-          eventType:"FRAME",atlasFrame:Number(atlasFrame),correction:"1",observedAtMs:Date.now()
+          eventType:"FRAME",atlasFrame:Number(atlasFrame),correction:"1",observedAtMs:observedAt
         });
       }
       if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać etapu.");
+      gardenPendingPhase=null;
       if (status) status.textContent=result.correction?`✅ Zapisano korektę: etap ${gardenDisplayStage(atlasFrame)}.`:`✅ Zapisano obserwację: etap ${gardenDisplayStage(atlasFrame)}.`;
       await gardenFetchData({force:true});
     } catch(err) {
+      if (gardenPendingPhase && gardenPendingPhase.eventId===pendingEventId) {
+        gardenPendingPhase=null;
+        gardenData={...gardenData,phases:(gardenData.phases||[]).filter(event=>String(event.eventId||"")!==pendingEventId)};
+        gardenRenderPlots();
+        gardenRenderEditor();
+      }
       if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd zapisu etapu."}`;
     } finally {
       clearTimeout(releaseTimer);
@@ -14135,11 +14149,15 @@ function setupAdmin() {
       }
       throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać Ogrodu.");
     }
+    const serverPhases=Array.isArray(payload.phases) ? payload.phases : [];
+    const phases=gardenPendingPhase
+      ? [...serverPhases.filter(event=>String(event.eventId||"")!==gardenPendingPhase.eventId),gardenPendingPhase]
+      : serverPhases;
     const nextGardenData = {
       plants:Array.isArray(payload.plants) ? payload.plants : ["Cebula"],
       active:Array.isArray(payload.active) ? payload.active : [],
       results:Array.isArray(payload.results) ? payload.results : [],
-      phases:Array.isArray(payload.phases) ? payload.phases : []
+      phases
     };
     // Odpowiedź Ogrodu przychodzi cyklicznie, często bez żadnej zmiany.
     // Nie przebudowujemy wtedy plotów i edytora, bo resetuje to wybór fazy
