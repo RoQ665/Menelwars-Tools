@@ -14895,7 +14895,7 @@ function setupAdmin() {
   }
 
   function pvpRenderNormalDamageByRound(rows,leftLabel,rightLabel) {
-    return `<details class="pvp-sim-assumptions"><summary>📏 Kalibracja: zwykły cios według tury</summary><div>Wartości deterministyczne przy pełnym HP: bez kryta, double, kontry, First Strike i efektów poniżej progu HP. Rozpęd oraz eskalacja danej tury pozostają uwzględnione.</div><div class="table-wrap"><table><thead><tr><th>Tura</th><th>${escapeHtml(leftLabel)} → ${escapeHtml(rightLabel)}</th><th>${escapeHtml(rightLabel)} → ${escapeHtml(leftLabel)}</th></tr></thead><tbody>${rows.map(row=>`<tr><td>T${row.round}</td><td>${row.leftDamage} dmg</td><td>${row.rightDamage} dmg</td></tr>`).join("")}</tbody></table></div></details>`;
+    return `<details class="pvp-result-details"><summary>📏 Tabela obrażeń według tur</summary><div class="pvp-result-details-body"><div>Wartości deterministyczne przy pełnym HP: bez kryta, double, kontry, First Strike i efektów poniżej progu HP. Rozpęd oraz eskalacja danej tury pozostają uwzględnione.</div><div class="table-wrap"><table><thead><tr><th>Tura</th><th>${escapeHtml(leftLabel)} → ${escapeHtml(rightLabel)}</th><th>${escapeHtml(rightLabel)} → ${escapeHtml(leftLabel)}</th></tr></thead><tbody>${rows.map(row=>`<tr><td>T${row.round}</td><td>${row.leftDamage} dmg</td><td>${row.rightDamage} dmg</td></tr>`).join("")}</tbody></table></div></div></details>`;
   }
 
   function pvpApplyBleedTick(victim,round) {
@@ -15202,12 +15202,13 @@ function setupAdmin() {
     ].join("");
   }
 
-  function pvpDamageCard(label,detail) {
+  function pvpDamageCard(label,detail,firstTurnNormalDamage) {
     const metric=(icon,name,total,count)=>`<div class="pvp-damage-metric"><span>${icon} ${name}</span><b>${count?pvpAvg(total,count,0)+" dmg":"—"}</b><small>${count?Number(count).toLocaleString("pl-PL")+" trafień":"brak trafień"}</small></div>`;
+    const normalMetric=`<div class="pvp-damage-metric"><span>👊 Normalny cios · T1</span><b>${Number.isFinite(firstTurnNormalDamage)?firstTurnNormalDamage+" dmg":"—"}</b><small>bez kryta i First Strike</small></div>`;
     return `<div class="pvp-fighter-report">
       <div class="pvp-fighter-report-title">${escapeHtml(label)}</div>
       <div class="pvp-damage-grid">
-        ${metric("👊","Normalny cios",detail.normalHitDamage||0,detail.normalHitCount||0)}
+        ${normalMetric}
         ${metric("💥","Krytyk",detail.critDamage||0,detail.critHitCount||0)}
         ${metric("↩️","Kontra",detail.counterDamage||0,detail.counterHitCount||0)}
       </div>
@@ -15273,7 +15274,7 @@ function setupAdmin() {
     return `<div class="pvp-fighter-report"><div class="pvp-fighter-report-title">${escapeHtml(label)}</div><div class="pvp-insight-grid">${items.join("")}</div></div>`;
   }
 
-  function pvpRenderAggregate(agg,leftLabel,rightLabel,title="Wynik symulacji") {
+  function pvpRenderAggregate(agg,leftLabel,rightLabel,title="Wynik symulacji",perRoundDamage=null) {
     const leftWin=pvpPct(agg.winsA,agg.runs), rightWin=pvpPct(agg.winsB,agg.runs);
     return `<section class="pvp-sim-result-card">
       <h4>${escapeHtml(title)}</h4>
@@ -15294,7 +15295,7 @@ function setupAdmin() {
 
       <details class="pvp-result-details" open>
         <summary>🥊 Obrażenia pojedynczych ciosów</summary>
-        <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA)}${pvpDamageCard(rightLabel,agg.detailB)}</div>
+        <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA,perRoundDamage?.[0]?.leftDamage)}${pvpDamageCard(rightLabel,agg.detailB,perRoundDamage?.[0]?.rightDamage)}</div>
       </details>
 
       <details class="pvp-result-details" open>
@@ -15332,7 +15333,7 @@ function setupAdmin() {
         : params.defenseModel === "attack"
           ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
           : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
