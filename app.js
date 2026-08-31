@@ -13107,6 +13107,7 @@ function setupAdmin() {
   let gardenData = {active:[],results:[],phases:[],plants:["Cebula"]};
   let gardenSelectedPlot = 1;
   let gardenLiveRefreshInFlight = null;
+  let gardenLastRenderSignature = "";
 
   function gardenLoadLocalPlots() {
     try {
@@ -14118,16 +14119,25 @@ function setupAdmin() {
       }
       throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać Ogrodu.");
     }
-    gardenData = {
+    const nextGardenData = {
       plants:Array.isArray(payload.plants) ? payload.plants : ["Cebula"],
       active:Array.isArray(payload.active) ? payload.active : [],
       results:Array.isArray(payload.results) ? payload.results : [],
       phases:Array.isArray(payload.phases) ? payload.phases : []
     };
+    // Odpowiedź Ogrodu przychodzi cyklicznie, często bez żadnej zmiany.
+    // Nie przebudowujemy wtedy plotów i edytora, bo resetuje to wybór fazy
+    // oraz niepotrzebnie obciąża telefon. Zegar aktualizuje się osobno.
+    const nextSignature = JSON.stringify(nextGardenData);
+    const changed = nextSignature !== gardenLastRenderSignature;
+    gardenData = nextGardenData;
     gardenDataLoaded = true;
-    gardenRenderPlots();
-    gardenRenderEditor();
-    gardenRenderRace();
+    if (changed) {
+      gardenLastRenderSignature = nextSignature;
+      gardenRenderPlots();
+      gardenRenderEditor();
+      gardenRenderRace();
+    }
     return true;
   }
 
@@ -16353,7 +16363,6 @@ fetchModuleAccessPolicy().catch(()=>{});
 
     if (activeToolModule === "garden") {
       gardenUpdateClock();
-      gardenRenderPlots();
       if (!gardenOwnExperimentForPlot(gardenSelectedPlot)) {
         gardenRenderComboStatus();
       }
