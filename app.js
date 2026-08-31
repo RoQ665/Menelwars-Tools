@@ -14753,9 +14753,11 @@ function setupAdmin() {
 
   // Pseudo-random distribution (PRD): po serii nieudanych prób chwilowa
   // szansa rośnie, a po procu wraca do początku. Współczynnik dobieramy
-  // numerycznie tak, aby średni odsetek proców nadal był równy statystyce.
+  // numerycznie do bazowej statystyki. Meter przyspieszamy nieznacznie po
+  // nieudanych próbach, aby średnie szanse częściej były odczuwalne w krótkiej walce.
   // To przybliżenie "proc meterów" opisanych w patch notes, nie kopia backendu.
   const pvpPrdCoefficientCache = new Map();
+  const PVP_PRD_GROWTH = 1.25;
   function pvpPrdCoefficient(percent) {
     const chance=pvpClamp(Number(percent)||0,0,100);
     const key=chance.toFixed(6);
@@ -14785,7 +14787,7 @@ function setupAdmin() {
     if (chance<=0) return false;
     if (chance>=100) { fighter.procMeters[key]=0; return true; }
     const failures=Math.max(0,Number(fighter.procMeters[key])||0);
-    const momentaryChance=Math.min(100,100*pvpPrdCoefficient(chance)*(failures+1));
+    const momentaryChance=Math.min(100,100*pvpPrdCoefficient(chance)*(1+failures*PVP_PRD_GROWTH));
     const success=pvpChance(momentaryChance);
     fighter.procMeters[key]=success ? 0 : failures+1;
     return success;
@@ -15341,7 +15343,7 @@ function setupAdmin() {
         : params.defenseModel === "attack"
           ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
           : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD (eksperyment dla krótkich walk). Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
