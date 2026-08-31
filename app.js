@@ -14898,6 +14898,8 @@ function setupAdmin() {
         rightDamage:rightFirstDamage,
         leftFirstDamage,
         rightFirstDamage,
+        leftBaseCritDamage:pvpDamageFormula(left,right,round,params,true,false),
+        rightBaseCritDamage:pvpDamageFormula(right,left,round,params,true,false),
         leftCritDamage:pvpDamageFormula(left,right,round,params,true,round===1),
         rightCritDamage:pvpDamageFormula(right,left,round,params,true,round===1),
         leftCounterDamage:Math.max(1,Math.round(leftBaseDamage*(Number(params.counterMult)||1))),
@@ -15216,14 +15218,13 @@ function setupAdmin() {
   }
 
   function pvpDamageCard(label,detail,firstTurnDamage) {
-    const metric=(icon,name,value)=>`<div class="pvp-damage-metric"><span>${icon} ${name} · T1</span><b>${Number.isFinite(value)?value+" dmg":"—"}</b><small>z płomykiem</small></div>`;
-    const baseMetric=`<div class="pvp-damage-metric"><span>👊 Cios baza · T1</span><b>${Number.isFinite(firstTurnDamage?.normal)?firstTurnDamage.normal+" dmg":"—"}</b><small>Pierwszy cios: ${Number.isFinite(firstTurnDamage?.first)?firstTurnDamage.first+" dmg":"—"}</small></div>`;
+    const baseMetric=(icon,name,base,first,firstLabel)=>`<div class="pvp-damage-metric"><span>${icon} ${name} · T1</span><b>${Number.isFinite(base)?base+" dmg":"—"}</b><small>${firstLabel}: ${Number.isFinite(first)?first+" dmg":"—"}</small></div>`;
     return `<div class="pvp-fighter-report">
       <div class="pvp-fighter-report-title">${escapeHtml(label)}</div>
       <div class="pvp-damage-grid">
-        ${baseMetric}
-        ${metric("💥","Krytyk",firstTurnDamage?.crit)}
-        ${metric("↩️","Kontra",firstTurnDamage?.counter)}
+        ${baseMetric("👊","Cios baza",firstTurnDamage?.normal,firstTurnDamage?.first,"Pierwszy cios")}
+        ${baseMetric("💥","Krytyk baza",firstTurnDamage?.crit,firstTurnDamage?.firstCrit,"Pierwszy krytyk")}
+        ${baseMetric("↩️","Kontra baza",firstTurnDamage?.counter,firstTurnDamage?.counter,"Kontra bez First Strike")}
       </div>
     </div>`;
   }
@@ -15307,8 +15308,8 @@ function setupAdmin() {
       </details>
 
       <details class="pvp-result-details" open>
-        <summary>🥊 Obrażenia pojedynczych ciosów</summary>
-        <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA,perRoundDamage?.[0] ? {normal:perRoundDamage[0].leftBaseDamage,first:perRoundDamage[0].leftFirstDamage,crit:perRoundDamage[0].leftCritDamage,counter:perRoundDamage[0].leftCounterDamage} : null)}${pvpDamageCard(rightLabel,agg.detailB,perRoundDamage?.[0] ? {normal:perRoundDamage[0].rightBaseDamage,first:perRoundDamage[0].rightFirstDamage,crit:perRoundDamage[0].rightCritDamage,counter:perRoundDamage[0].rightCounterDamage} : null)}</div>
+        <summary>🥊 Obrażenia Baza</summary>
+        <div class="pvp-result-details-body">${pvpDamageCard(leftLabel,agg.detailA,perRoundDamage?.[0] ? {normal:perRoundDamage[0].leftBaseDamage,first:perRoundDamage[0].leftFirstDamage,crit:perRoundDamage[0].leftBaseCritDamage,firstCrit:perRoundDamage[0].leftCritDamage,counter:perRoundDamage[0].leftCounterDamage} : null)}${pvpDamageCard(rightLabel,agg.detailB,perRoundDamage?.[0] ? {normal:perRoundDamage[0].rightBaseDamage,first:perRoundDamage[0].rightFirstDamage,crit:perRoundDamage[0].rightBaseCritDamage,firstCrit:perRoundDamage[0].rightCritDamage,counter:perRoundDamage[0].rightCounterDamage} : null)}</div>
       </details>
 
       <details class="pvp-result-details" open>
