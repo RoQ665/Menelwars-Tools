@@ -14846,14 +14846,19 @@ function setupAdmin() {
       // Pierwsze uderzenie nie otrzymuje więc jeszcze premii; od T2 jest
       // jedna warstwa +2% za każdy zakończony wcześniej atak/obrót.
       .reduce((sum,x)=>sum+(Number(x.amount)||0)*Math.max(0,round-1),0);
-    // Hipoteza z testu na 1. poziomie: bezpośredni cios ma ukrytą bazę +5.
-    // Dodajemy ją po premiach procentowych, aby bonusy do ATK nie wzmacniały
-    // niewidocznej stałej obrażeń.
-    const attack=attacker.primary.attack*(1+(condA.attackPct+dynamicPct)/100)+5;
-    const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
+    // Hipoteza poziomowa z testu na 1. poziomie: każdy poziom wnosi +5 do
+    // bazowego bezpośredniego obrażenia. Premie procentowe nie wzmacniają
+    // tej niewidocznej stałej.
+    const attackerLevel=Math.max(1,Number(attacker.calculated?.characterLevel)||1);
+    const defenderLevel=Math.max(1,Number(defender.calculated?.characterLevel)||1);
+    const attack=attacker.primary.attack*(1+(condA.attackPct+dynamicPct)/100)+5*attackerLevel;
+    // DEF nalicza się dopiero za zdobyte poziomy. Dzięki temu na poziomie 1
+    // nie psuje potwierdzonego testu 5–6 obrażeń. Traktujemy go jak zwykłą
+    // obronę, więc przebicie pancerza zmniejsza również tę część.
+    const defenseBeforePen=defender.primary.defense+5*Math.max(0,defenderLevel-1);
+    const effectiveDefense=Math.max(0,defenseBeforePen*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
     // Hipoteza z testu na 1. poziomie: K rośnie od 20 na poziomie 1 do 300
     // na poziomie 51. Warianty ręczny i ATK pozostają do porównywania.
-    const attackerLevel=Math.max(1,Number(attacker.calculated?.characterLevel)||1);
     const defenseK=params.defenseModel === "level"
       ? 20+5.6*(attackerLevel-1)
       : params.defenseModel === "attack"
@@ -15306,7 +15311,7 @@ function setupAdmin() {
         : params.defenseModel === "attack"
           ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
           : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK po premiach + ukryte 5, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK po premiach + 5 × poziom, DEF profilu + 5 × zdobyty poziom przed armor pen, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
