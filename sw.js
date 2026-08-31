@@ -1,12 +1,12 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v21.27";
+const CACHE = "menelwars-tools-v21.28";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=21.27",
+  "./styles.css?v=21.28",
   "./data.js?v=21.05",
-  "./app.js?v=21.27",
+  "./app.js?v=21.28",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",

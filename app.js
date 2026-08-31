@@ -15052,10 +15052,8 @@ function setupAdmin() {
     return ia>ib ? a : b;
   }
 
-  function pvpOneBattle(sourceA,sourceB,params,defenderSide="B",initialProcMeters={}) {
+  function pvpOneBattle(sourceA,sourceB,params,defenderSide="B") {
     const a=pvpPrepareFighter(sourceA,"A"), b=pvpPrepareFighter(sourceB,"B");
-    a.procMeters={...a.procMeters,...(initialProcMeters.a||{})};
-    b.procMeters={...b.procMeters,...(initialProcMeters.b||{})};
     let cause="timeout_hp", rounds=15, winner=null;
 
     // Inicjatywa wyznacza pierwszy ruch; przy idealnym remisie losujemy raz
@@ -15114,14 +15112,10 @@ function setupAdmin() {
       detailA:{},detailB:{},eventTurnsA:Object.fromEntries(eventKeys.map(k=>[k,[]])),eventTurnsB:Object.fromEntries(eventKeys.map(k=>[k,[]])),
       causes:{},causesByWinner:{A:{},B:{},tie:{}}
     };
-    // Meter zachowuje ciągłość pomiędzy próbami Monte Carlo, aby jego
-    // długoterminowa częstotliwość była równa statystyce buildu. Resetowanie
-    // każdej krótkiej walki zaniżało rzadkie proce nieproporcjonalnie.
-    let carriedProcMeters={a:{},b:{}};
-
     for (let i=0;i<runs;i++) {
-      const result=pvpOneBattle(sourceA,sourceB,params,defenderSide,carriedProcMeters);
-      carriedProcMeters={a:{...result.a.procMeters},b:{...result.b.procMeters}};
+      // Każda iteracja Monte Carlo jest odrębną walką arenową. Meter nie
+      // przechodzi między nimi i zaczyna od zera dla obu graczy.
+      const result=pvpOneBattle(sourceA,sourceB,params,defenderSide);
       if (result.winner==="A") agg.winsA++;
       else if (result.winner==="B") agg.winsB++;
       else agg.ties++;
