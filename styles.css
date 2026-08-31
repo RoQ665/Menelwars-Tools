@@ -3013,7 +3013,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   display:block;
   width:100%;
   aspect-ratio:1/1;
-  background-image:url("onion-growth-atlas.png?v=21.00");
+  background-image:var(--garden-atlas,url("onion-growth-atlas.png?v=21.09"));
   background-repeat:no-repeat;
   background-size:1000% 100%;
   background-position:calc(var(--garden-frame,0) * 11.111111%) 50%;
@@ -3440,7 +3440,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .garden-plot-visual::after{display:none!important;content:none!important}
 .garden-plot-visual{background-image:url("empty-soil.png?v=21.00.2")!important;background-position:center!important;background-size:cover!important;background-repeat:no-repeat!important}
 .garden-phase-option{background:#6a5136 url("empty-soil.png?v=21.00.2") center/cover no-repeat!important}
-.garden-phase-sprite,.garden-plot-sprite{background-image:url("onion-growth-atlas.png?v=21.00.2")!important}
+.garden-phase-sprite,.garden-plot-sprite{background-image:var(--garden-atlas,url("onion-growth-atlas.png?v=21.09"))!important}
 .garden-plot-sprite{z-index:1;inset:0!important}
 .garden-phase-tools{margin:0 0 14px}
 

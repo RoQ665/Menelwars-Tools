@@ -13390,10 +13390,14 @@ function setupAdmin() {
     return number+1;
   }
 
-  function gardenFrameSpriteHtml(frame,className="garden-phase-sprite") {
+  function gardenAtlasForPlant(plant) {
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.39" : "onion-growth-atlas.png?v=21.09";
+  }
+
+  function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
     const number=Number(frame);
     if (!Number.isInteger(number) || number<0 || number>9) return "";
-    return `<span class="${className}" style="--garden-frame:${number}" aria-label="Etap ${gardenDisplayStage(number)}"></span>`;
+    return `<span class="${className}" style="--garden-frame:${number};--garden-atlas:url('${gardenAtlasForPlant(plant)}')" aria-label="Etap ${gardenDisplayStage(number)}"></span>`;
   }
 
   async function gardenPostAction(action,payload) {
@@ -13507,7 +13511,7 @@ function setupAdmin() {
     const summary=gardenPhaseSummary(own);
     if (last) last.textContent=summary.lastFrame?`etap ${gardenDisplayStage(Number(summary.lastFrame.atlasFrame))}`:"brak raportu";
     if (grid) {
-      grid.innerHTML=Array.from({length:10},(_,frame)=>`<button type="button" class="garden-phase-option ${summary.lastFrame&&Number(summary.lastFrame.atlasFrame)===frame?"selected":""}" data-garden-frame="${frame}">${gardenFrameSpriteHtml(frame)}<b>${gardenDisplayStage(frame)}</b></button>`).join("");
+      grid.innerHTML=Array.from({length:10},(_,frame)=>`<button type="button" class="garden-phase-option ${summary.lastFrame&&Number(summary.lastFrame.atlasFrame)===frame?"selected":""}" data-garden-frame="${frame}">${gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant)}<b>${gardenDisplayStage(frame)}</b></button>`).join("");
       grid.querySelectorAll("[data-garden-frame]").forEach(button=>button.addEventListener("click",()=>{
         const picker=el("garden-phase-picker");
         if (picker) picker.hidden=true;
@@ -13872,7 +13876,7 @@ function setupAdmin() {
            <span class="garden-plot-time">⏱️ ${escapeHtml(growingFor)}</span>`
         : "";
       const frame = summary && summary.lastFrame ? Number(summary.lastFrame.atlasFrame) : null;
-      const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite") : "";
+      const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite",active.plant) : "";
       const frameBadge = "";
       const readyBadge = summary && summary.ready ? `<span class="garden-plot-ready-badge">✅ READY</span>` : "";
 
