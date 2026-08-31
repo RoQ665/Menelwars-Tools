@@ -7937,10 +7937,10 @@ async function setAdminSubmissionStatus(
 
     adminPendingSubmissionRows.delete(String(row));
 
-    // Baza receptur odświeży się przy kolejnym wejściu do Destylarni.
-    // Nie blokujemy panelu Admina drugim odczytem, który nie zmienia tej tabeli.
+    // Zatwierdzona receptura ma od razu trafić również do wspólnej bazy
+    // widocznej w Destylarni. Nie dotyczy to listy oczekujących w Adminie.
     if (isApprove) {
-      approvedRecipesRequestState = "idle";
+      await fetchApprovedRecipes({force:true});
     }
 
 
@@ -13476,7 +13476,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.41" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.42" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
