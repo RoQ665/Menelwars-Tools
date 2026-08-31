@@ -14878,6 +14878,26 @@ function setupAdmin() {
     return Math.max(1,Math.round(damage));
   }
 
+  // Deterministyczna tabela kalibracyjna: pełne HP, zwykły cios, bez proca
+  // i bez First Strike. Dzięki temu można porównać konkretną turę z filmem,
+  // zamiast mylić ją ze średnią ze wszystkich walk i późnych rund.
+  function pvpNormalDamageByRound(leftSource,rightSource,params) {
+    const left=pvpPrepareFighter(leftSource,"left");
+    const right=pvpPrepareFighter(rightSource,"right");
+    return Array.from({length:15},(_,index)=>{
+      const round=index+1;
+      return {
+        round,
+        leftDamage:pvpDamageFormula(left,right,round,params,false,false),
+        rightDamage:pvpDamageFormula(right,left,round,params,false,false)
+      };
+    });
+  }
+
+  function pvpRenderNormalDamageByRound(rows,leftLabel,rightLabel) {
+    return `<details class="pvp-sim-assumptions"><summary>📏 Kalibracja: zwykły cios według tury</summary><div>Wartości deterministyczne przy pełnym HP: bez kryta, double, kontry, First Strike i efektów poniżej progu HP. Rozpęd oraz eskalacja danej tury pozostają uwzględnione.</div><div class="table-wrap"><table><thead><tr><th>Tura</th><th>${escapeHtml(leftLabel)} → ${escapeHtml(rightLabel)}</th><th>${escapeHtml(rightLabel)} → ${escapeHtml(leftLabel)}</th></tr></thead><tbody>${rows.map(row=>`<tr><td>T${row.round}</td><td>${row.leftDamage} dmg</td><td>${row.rightDamage} dmg</td></tr>`).join("")}</tbody></table></div></details>`;
+  }
+
   function pvpApplyBleedTick(victim,round) {
     if (!victim.bleeding) return {damage:0,killed:false};
     const source=victim.bleeding;
@@ -15306,12 +15326,13 @@ function setupAdmin() {
       // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
+      const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
       const defenseAssumption=params.defenseModel === "level"
         ? "K zależy od poziomu atakującego: K = 20 + 5,6 × (poziom − 1)"
         : params.defenseModel === "attack"
           ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
           : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach, a średnia pozostaje równa statystyce. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie, Unik daje pasywną redukcję obrażeń = Unik/3.5 (kolejność względem DR eksperymentalna), standardowy DR ma limit 60%, normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji")}`;
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
