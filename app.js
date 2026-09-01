@@ -13539,7 +13539,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.45" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.46" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -14093,8 +14093,6 @@ function setupAdmin() {
     rows.forEach(row=>{
       row.times.sort((a,b)=>a-b);
       row.fastest=row.times[0];
-      const middle=Math.floor(row.times.length/2);
-      row.median=row.times.length%2 ? row.times[middle] : Math.round((row.times[middle-1]+row.times[middle])/2);
     });
     const resultSort=String(el("garden-race-sort")?.value||"time");
     rows.sort((a,b)=>{
@@ -14107,9 +14105,10 @@ function setupAdmin() {
       const item=row.item;
       const times=row.times.map(time=>escapeHtml(gardenFormatDuration(time))).join(" · ");
       const summary=row.times.length===1
-        ? `1 pomiar · ${times}`
-        : `${row.times.length} pomiary · najszybciej ${escapeHtml(gardenFormatDuration(row.fastest))} · mediana ${escapeHtml(gardenFormatDuration(row.median))}`;
-      return `<div class="garden-race-row ${index===0&&resultSort==="time"?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.plant)} · ☀️${item.sun}% 💧${item.water}% pH ${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>${summary}</span><span class="garden-result-times">czasy: ${times}</span></div></div><span class="garden-race-label">${index===0&&resultSort==="time"?"najszybsza":"pomiar"}</span></div>`;
+        ? "1 zgłoszony zbiór"
+        : `${row.times.length} zgłoszone zbiory · najkrótszy zapis ${escapeHtml(gardenFormatDuration(row.fastest))}`;
+      const label=index===0&&resultSort==="time" ? "najkrótszy zapis" : `${row.times.length} ${row.times.length===1?"zbiór":"zbiory"}`;
+      return `<div class="garden-race-row ${index===0&&resultSort==="time"?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.plant)} · ☀️${item.sun}% 💧${item.water}% pH ${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>${summary}</span><span class="garden-result-times">czas${row.times.length===1?"":"y"} zbioru: ${times}</span></div></div><span class="garden-race-label">${escapeHtml(label)}</span></div>`;
     }).join("")}</div>`;
     host.querySelectorAll("[data-garden-result-plant]").forEach(button=>button.addEventListener("click",()=>{
       gardenResultsSelectedPlant=String(button.dataset.gardenResultPlant||"");
