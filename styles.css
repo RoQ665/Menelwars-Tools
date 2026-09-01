@@ -3033,6 +3033,10 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 
 .garden-phase-note{margin-top:7px;line-height:1.35}
 .garden-ready-btn{width:100%}
+.garden-auto-phase-visual{max-width:150px;margin:auto}
+.garden-phase-question{display:grid;gap:8px;padding:10px;border-radius:9px;background:#f7eddd;border:1px solid #ddcfb7}
+.garden-phase-answer-actions{display:flex;gap:8px}
+.garden-phase-answer-actions button{flex:1}
 
 .garden-recommendation{
   padding:10px 11px;

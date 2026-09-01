@@ -13194,6 +13194,10 @@ function setupAdmin() {
   let gardenLiveRefreshInFlight = null;
   let gardenLastRenderSignature = "";
   let gardenPendingPhase = null;
+  const GARDEN_AUTO_MODEL_VERSION = "AUTO52";
+  const GARDEN_AUTO_MODEL_HOURS = 52;
+  const GARDEN_AUTO_STAGE_MS = (GARDEN_AUTO_MODEL_HOURS * 60 * 60 * 1000) / 10;
+  const GARDEN_OPTIMAL_LIMIT_MS = 56 * 60 * 60 * 1000;
 
   function gardenLoadLocalPlots() {
     try {
@@ -13430,7 +13434,7 @@ function setupAdmin() {
 
   function gardenPhaseSummary(experiment) {
     if (!experiment || !experiment.id) {
-      return {events:[],analysisEvents:[],frames:[],lastFrame:null,ready:null};
+      return {events:[],analysisEvents:[],frames:[],checks:[],lastFrame:null,ready:null};
     }
 
     // Historia pozostaje append-only. Korekta nie usuwa starego wiersza z OgrodFazy,
@@ -13449,6 +13453,11 @@ function setupAdmin() {
     const frames=analysisEvents.filter(
       event=>event.eventType==="FRAME" && Number.isInteger(Number(event.atlasFrame))
     );
+    const checks=analysisEvents.filter(
+      event=>event.eventType==="CHECK" &&
+        Number.isInteger(Number(event.expectedFrame)) &&
+        (event.answer==="YES" || event.answer==="NO")
+    );
     const readyEvents=analysisEvents.filter(event=>event.eventType==="READY");
     const ready=readyEvents.length?readyEvents[0]:null;
     const lastFrame=frames.length?frames[frames.length-1]:null;
@@ -13466,7 +13475,60 @@ function setupAdmin() {
       if (allBefore.length) entryLower=Number(allBefore[allBefore.length-1].observedAt)||entryLower;
     }
 
-    return {events,analysisEvents,frames,lastFrame,ready,entryLower,entryUpper};
+    return {events,analysisEvents,frames,checks,lastFrame,ready,entryLower,entryUpper};
+  }
+
+  function gardenUsesAutoModel(item) {
+    return String(item && item.modelVersion || "").toUpperCase() === GARDEN_AUTO_MODEL_VERSION;
+  }
+
+  function gardenAutoFrame(item,now=Date.now()) {
+    const age=Math.max(0,Number(now)-Number(item && item.startedAt || 0));
+    return Math.max(0,Math.min(9,Math.floor(age/GARDEN_AUTO_STAGE_MS)));
+  }
+
+  function gardenDisplayFrame(item,summary,now=Date.now()) {
+    if (gardenUsesAutoModel(item)) return gardenAutoFrame(item,now);
+    return summary && summary.lastFrame ? Number(summary.lastFrame.atlasFrame) : null;
+  }
+
+  function gardenCheckForFrame(summary,frame) {
+    return (summary && summary.checks || []).find(
+      event=>Number(event.expectedFrame)===Number(frame)
+    ) || null;
+  }
+
+  function gardenCheckStats(item,summary) {
+    const checks=(summary && summary.checks || []).slice().sort((a,b)=>Number(a.observedAt)-Number(b.observedAt));
+    const yes=checks.filter(event=>event.answer==="YES");
+    const no=checks.filter(event=>event.answer==="NO");
+    const gaps=checks.slice(1).map((event,index)=>Math.max(0,Number(event.observedAt)-Number(checks[index].observedAt)));
+    const last=checks.length ? checks[checks.length-1] : null;
+    const lastNonReadyYes=yes.filter(event=>Number(event.expectedFrame)<9).slice(-1)[0] || null;
+    return {
+      checks,yes,no,last,lastNonReadyYes,
+      medianGap:gardenMedian(gaps),
+      maxGap:gaps.length ? Math.max(...gaps) : 0,
+      agreement:checks.length ? yes.length/checks.length : null
+    };
+  }
+
+  function gardenEvidenceForResult(item) {
+    const summary=gardenPhaseSummary(item);
+    const stats=gardenCheckStats(item,summary);
+    const duration=Math.max(0,Number(item && item.durationMs) || 0);
+    const provenByDeadline=duration>0 && duration<=GARDEN_OPTIMAL_LIMIT_MS;
+    const provenSlow=Boolean(
+      stats.lastNonReadyYes &&
+      Number(stats.lastNonReadyYes.observedAt)-Number(item.startedAt||0)>GARDEN_OPTIMAL_LIMIT_MS
+    );
+    const finalGap=stats.last
+      ? Math.max(0,Number(item.finishedAt||0)-Number(stats.last.observedAt||0))
+      : 0;
+    let confidence="niska";
+    if (stats.checks.length>=3 && stats.last && finalGap<=6*60*60*1000) confidence="wysoka";
+    else if (stats.checks.length>=1) confidence="średnia";
+    return {summary,stats,duration,provenByDeadline,provenSlow,finalGap,confidence};
   }
 
   function gardenDisplayStage(frame) {
@@ -13476,7 +13538,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.42" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.43" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -13510,6 +13572,55 @@ function setupAdmin() {
       throw sendError || new Error("Serwer nie potwierdził zapisu Ogrodu.");
     }
     return result;
+  }
+
+  async function gardenRecordModelCheck(frame,answer) {
+    const own=gardenOwnExperimentForPlot(gardenSelectedPlot);
+    if (!own || !gardenUsesAutoModel(own)) return;
+    const summary=gardenPhaseSummary(own);
+    if (gardenCheckForFrame(summary,frame)) return;
+    const status=el("garden-action-status");
+    const observedAt=Date.now();
+    const pendingEventId=`local-check-${observedAt}-${Math.random().toString(36).slice(2)}`;
+    gardenPendingPhase={
+      experimentId:String(own.id),eventId:pendingEventId,eventType:"CHECK",
+      expectedFrame:Number(frame),answer:String(answer),observedAt,source:"AUTO_CHECK"
+    };
+    gardenData={...gardenData,phases:[...(gardenData.phases||[]),gardenPendingPhase]};
+    gardenRenderPlots();
+    gardenRenderEditor();
+    criticalOperationStart("🌿 Zapisuję odpowiedź…","Odpowiedź znika z ekranu, a potwierdzenie serwera trwa w tle.");
+    let overlayReleased=false;
+    const releaseOverlay=()=>{
+      if (overlayReleased) return;
+      overlayReleased=true;
+      criticalOperationFinish();
+    };
+    const releaseTimer=setTimeout(()=>{
+      if (status) status.textContent="⌛ Odpowiedź zapisuje się w tle — możesz dalej korzystać z Ogrodu.";
+      releaseOverlay();
+    },700);
+    try {
+      const result=await gardenPostAction("gardenCheck",{
+        id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
+        expectedFrame:Number(frame),answer:String(answer)
+      });
+      if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać odpowiedzi.");
+      gardenPendingPhase=null;
+      if (status) status.textContent=answer==="YES"?"✅ Zapisano zgodność etapu.":"✅ Zapisano niezgodność etapu.";
+      await gardenFetchData({force:true});
+    } catch(err) {
+      if (gardenPendingPhase && gardenPendingPhase.eventId===pendingEventId) {
+        gardenPendingPhase=null;
+        gardenData={...gardenData,phases:(gardenData.phases||[]).filter(event=>String(event.eventId||"")!==pendingEventId)};
+        gardenRenderPlots();
+        gardenRenderEditor();
+      }
+      if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd zapisu odpowiedzi."}`;
+    } finally {
+      clearTimeout(releaseTimer);
+      releaseOverlay();
+    }
   }
 
   async function gardenRecordPhase(atlasFrame,correction=false) {
@@ -13615,24 +13726,29 @@ function setupAdmin() {
   }
 
   function gardenRenderPhaseTools(own) {
-    const tools=el("garden-phase-tools"), grid=el("garden-phase-grid"), last=el("garden-phase-last"), readyButton=el("garden-ready");
+    const tools=el("garden-phase-tools");
     if (!tools) return;
     tools.hidden=!own;
-    if (!own) { if (el("garden-phase-picker")) el("garden-phase-picker").hidden=true; return; }
+    if (!own) return;
     const summary=gardenPhaseSummary(own);
-    if (last) last.textContent=summary.lastFrame?`etap ${gardenDisplayStage(Number(summary.lastFrame.atlasFrame))}`:"brak raportu";
-    if (grid) {
-      grid.innerHTML=Array.from({length:10},(_,frame)=>`<button type="button" class="garden-phase-option ${summary.lastFrame&&Number(summary.lastFrame.atlasFrame)===frame?"selected":""}" data-garden-frame="${frame}">${gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant)}<b>${gardenDisplayStage(frame)}</b></button>`).join("");
-      grid.querySelectorAll("[data-garden-frame]").forEach(button=>button.addEventListener("click",()=>{
-        const picker=el("garden-phase-picker");
-        if (picker) picker.hidden=true;
-        gardenRecordPhase(Number(button.dataset.gardenFrame));
-      }));
+    if (!gardenUsesAutoModel(own)) {
+      tools.innerHTML=`<strong>🌿 Starszy pomiar</strong><div class="muted">Historia ręcznie zgłoszonych etapów pozostaje zachowana. Nowe odpowiedzi Tak/Nie działają dla nowych upraw automatycznych.</div>`;
+      return;
     }
-    if (readyButton) {
-      readyButton.textContent=summary.ready?"✅ READY zapisane — potwierdź ponownie":"✅ Gra pokazuje: Gotowe do zbioru";
-      readyButton.classList.toggle("garden-ready-recorded",Boolean(summary.ready));
-    }
+    const frame=gardenAutoFrame(own);
+    const stage=gardenDisplayStage(frame);
+    const check=frame<9 ? gardenCheckForFrame(summary,frame) : null;
+    const sprite=gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant);
+    const stats=gardenCheckStats(own,summary);
+    const report=frame===9
+      ? `<div class="garden-phase-note">Etap 10 wygląda tak samo podczas dalszego wzrostu i przy gotowości. Zbierz roślinę dopiero, gdy gra pozwoli.</div>`
+      : check
+        ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
+        : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div></div>`;
+    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">Model 52 h · kolejny etap za ${escapeHtml(gardenFormatDuration(Math.max(0,(frame+1)*GARDEN_AUTO_STAGE_MS-(Date.now()-Number(own.startedAt||0)))))}.</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku. Tak/Nie zapisujemy z czasem serwera.</div>`;
+    tools.querySelectorAll("[data-garden-check]").forEach(button=>button.addEventListener("click",()=>{
+      gardenRecordModelCheck(frame,String(button.dataset.gardenCheck||""));
+    }));
   }
 
   function gardenObservedDuration(item) {
@@ -13645,6 +13761,28 @@ function setupAdmin() {
   }
 
   function gardenObservationForModel(item) {
+    if (gardenUsesAutoModel(item)) {
+      const evidence=gardenEvidenceForResult(item);
+      if (!evidence.duration) return null;
+
+      // Późny zbiór bez obserwacji nie dowodzi wolnego wzrostu — gracz mógł
+      // po prostu odebrać gotową roślinę później. Takiego wyniku nie używamy
+      // do uczenia suwaków, dopóki nie mamy dowodu, że roślina nie była READY.
+      if (!evidence.provenByDeadline && !evidence.provenSlow) return null;
+
+      const reportWeight=Math.min(0.28,evidence.stats.checks.length*0.08);
+      const agreementWeight=evidence.stats.agreement==null
+        ? 0
+        : Math.max(-0.16,Math.min(0.16,(evidence.stats.agreement-0.5)*0.32));
+      const timeWeight=evidence.provenByDeadline ? 0.58 : 0.46;
+      return {
+        duration:evidence.duration,
+        source:evidence.provenSlow ? "AUTO_PROVEN_SLOW" : "AUTO_HARVEST",
+        weight:Math.max(0.25,Math.min(1,timeWeight+reportWeight+agreementWeight)),
+        evidence
+      };
+    }
+
     const observed=gardenObservedDuration(item);
     if (!observed || !Number.isFinite(observed.duration) || observed.duration<=0) return null;
 
@@ -13910,9 +14048,9 @@ function setupAdmin() {
     host.hidden=false;
     const prediction=rec.prediction;
     const modelLine=prediction
-      ? `<div class="garden-model-prediction">🧪 Lokalny model 3D: przewidywany górny czas ~<b>${escapeHtml(gardenFormatDuration(prediction.predictedMs))}</b> · pewność ${escapeHtml(prediction.confidence)} · efektywne wsparcie ${Number(prediction.effectiveN).toLocaleString("pl-PL",{maximumFractionDigits:1})} · READY w sąsiedztwie ${prediction.readySupport}</div>`
-      : `<div class="garden-model-prediction muted">🧪 Model 3D: za mało porównywalnych zakończonych danych — rekomendacja opiera się głównie na eksploracji / rankingu.</div>`;
-    host.innerHTML=`<strong>🔬 Polecany eksperyment — 🧪 Eksperymentalne</strong><div class="garden-recommendation-values">☀️ ${c.sun} · 💧 ${c.water} · pH ${Number(c.ph).toFixed(1)}</div><div><b>${escapeHtml(rec.mode)}</b> · ${escapeHtml(rec.reason)}</div>${modelLine}<div class="muted">READY/HARVEST są traktowane jako górne ograniczenia czasu, MANUAL ma wagę 0,65. Frame porównujemy wyłącznie z tym samym frame — nigdy jako procent. Punkt 60/50/7 jest tylko kontrolą/startem, nie założonym optimum.</div><button type="button" class="secondary-btn" data-garden-use-recommendation>Ustaw te wartości</button>`;
+      ? `<div class="garden-model-prediction">🧪 Lokalny model: przewidywany górny czas ~<b>${escapeHtml(gardenFormatDuration(prediction.predictedMs))}</b> · pewność ${escapeHtml(prediction.confidence)} · wsparcie ${Number(prediction.effectiveN).toLocaleString("pl-PL",{maximumFractionDigits:1})}</div>`
+      : `<div class="garden-model-prediction muted">🧪 Za mało porównywalnych, wiarygodnych wyników — wybieramy test, który dostarczy nowej informacji.</div>`;
+    host.innerHTML=`<strong>🔬 Polecany eksperyment — 🧪 Eksperymentalne</strong><div class="garden-recommendation-values">☀️ ${c.sun} · 💧 ${c.water} · pH ${Number(c.ph).toFixed(1)}</div><div><b>${escapeHtml(rec.mode)}</b> · ${escapeHtml(rec.reason)}</div>${modelLine}<div class="muted">Nowe pomiary uwzględniają czas zbioru, odpowiedzi Tak/Nie i ich regularność. Późny zbiór bez obserwacji nie jest traktowany jako wolny wzrost.</div><button type="button" class="secondary-btn" data-garden-use-recommendation>Ustaw te wartości</button>`;
     host.querySelector("[data-garden-use-recommendation]")?.addEventListener("click",()=>{
       if (el("garden-sun")) el("garden-sun").value=String(c.sun);
       if (el("garden-water")) el("garden-water").value=String(c.water);
@@ -13986,21 +14124,19 @@ function setupAdmin() {
            </span>
            <span class="garden-plot-time">⏱️ ${escapeHtml(growingFor)}</span>`
         : "";
-      const frame = summary && summary.lastFrame ? Number(summary.lastFrame.atlasFrame) : null;
+      const frame = active ? gardenDisplayFrame(active,summary) : null;
       const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite",active.plant) : "";
       const frameBadge = "";
-      const readyBadge = summary && summary.ready ? `<span class="garden-plot-ready-badge">✅ READY</span>` : "";
 
       return `
         <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">
           <span class="garden-plot-visual">
             ${sprite}
             ${frameBadge}
-            ${readyBadge}
             ${stats}
           </span>
           <span class="garden-plot-name">Grządka ${plot}</span>
-          <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${summary&&summary.ready?"gotowe":frame===null?"bez etapu":`etap ${gardenDisplayStage(frame)}`}` : "Pusta"}</span>
+          <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${frame===null?"bez etapu":`etap ${gardenDisplayStage(frame)}`}` : "Pusta"}</span>
         </button>`;
     }).join("");
 
@@ -14163,14 +14299,26 @@ function setupAdmin() {
       const manualHint = String(result.startSource || "").toUpperCase() === "MANUAL"
         ? ` <small class="garden-manual-hint">🟡 start wpisany ręcznie</small>`
         : "";
-      const observed = gardenObservedDuration(result);
-      const observedDuration = observed && Number(observed.duration) > 0
-        ? Number(observed.duration)
-        : Number(result.durationMs) || 0;
-      const observedLabel = observed && observed.source === "READY"
-        ? "Czas wg READY"
-        : "Czas do zbioru (HARVEST)";
-      lines.push(`<div class="garden-known">✅ ${observedLabel}: ${escapeHtml(gardenFormatDuration(observedDuration))}${manualHint}</div>`);
+      if (gardenUsesAutoModel(result)) {
+        const evidence=gardenEvidenceForResult(result);
+        const quality=`${evidence.stats.checks.length} raportów · pewność ${evidence.confidence}`;
+        if (evidence.provenByDeadline) {
+          lines.push(`<div class="garden-known">✅ Zbiór do 56 h: ${escapeHtml(gardenFormatDuration(evidence.duration))} · ${escapeHtml(quality)}${manualHint}</div>`);
+        } else if (evidence.provenSlow) {
+          lines.push(`<div class="garden-known">↔️ Potwierdzona wolniejsza uprawa: zbiór ${escapeHtml(gardenFormatDuration(evidence.duration))} · ${escapeHtml(quality)}</div>`);
+        } else {
+          lines.push(`<div class="garden-known">🕒 Późny zbiór: ${escapeHtml(gardenFormatDuration(evidence.duration))} · READY mógł nastąpić wcześniej, więc wynik nie obniża rankingu.</div>`);
+        }
+      } else {
+        const observed = gardenObservedDuration(result);
+        const observedDuration = observed && Number(observed.duration) > 0
+          ? Number(observed.duration)
+          : Number(result.durationMs) || 0;
+        const observedLabel = observed && observed.source === "READY"
+          ? "Czas wg READY"
+          : "Czas do zbioru (HARVEST)";
+        lines.push(`<div class="garden-known">✅ ${observedLabel}: ${escapeHtml(gardenFormatDuration(observedDuration))}${manualHint}</div>`);
+      }
     } else {
       lines.push(`<div>🔬 Brak zapisanego wyniku dla tych ustawień.</div>`);
     }
@@ -14200,7 +14348,7 @@ function setupAdmin() {
     el("garden-editor-title").textContent = `Grządka ${gardenSelectedPlot}`;
     const ownPhaseSummary = own ? gardenPhaseSummary(own) : null;
     el("garden-editor-mode").textContent = own
-      ? (ownPhaseSummary && ownPhaseSummary.ready ? "gotowe do zbioru" : "rośnie")
+      ? (gardenUsesAutoModel(own) ? `etap ${gardenDisplayStage(gardenAutoFrame(own))}/10` : "starszy pomiar")
       : "pusta";
 
     const controls = [
@@ -14243,13 +14391,14 @@ function setupAdmin() {
     if (!box || box.hidden) return;
     const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
     if (!own) return;
-    const summary = gardenPhaseSummary(own);
-    if (summary.ready && Number(summary.ready.observedAt) > Number(own.startedAt || 0)) {
-      box.textContent =
-        `✅ READY od ${gardenFormatDuration(Date.now()-Number(summary.ready.observedAt))} · ` +
-        `od startu ${gardenFormatDuration(Date.now()-Number(own.startedAt || 0))}`;
+    const age=Math.max(0,Date.now()-Number(own.startedAt || 0));
+    if (gardenUsesAutoModel(own)) {
+      const frame=gardenAutoFrame(own);
+      const stats=gardenCheckStats(own,gardenPhaseSummary(own));
+      box.textContent=`⏱️ Rośnie już: ${gardenFormatDuration(age)} · model: etap ${gardenDisplayStage(frame)}/10 · raporty ${stats.yes.length} Tak / ${stats.no.length} Nie`;
+      gardenRenderPhaseTools(own);
     } else {
-      box.textContent = `⏱️ Rośnie już: ${gardenFormatDuration(Date.now()-Number(own.startedAt || 0))}`;
+      box.textContent = `⏱️ Starszy pomiar trwa: ${gardenFormatDuration(age)}`;
     }
   }
 
@@ -14313,13 +14462,9 @@ function setupAdmin() {
     // wywołać blur/change, bierzemy dokładnie wartości widoczne w polach.
     gardenCommitAllManualInputs();
     const combo = gardenCurrentControls();
-    let timing;
-    try {
-      timing = gardenStartTimingPayload();
-    } catch (err) {
-      if (status) status.textContent = `❌ ${err && err.message ? err.message : "Nieprawidłowy czas startu."}`;
-      return;
-    }
+    // Nowe badania startują wyłącznie od czasu potwierdzonego przez backend.
+    // Dzięki temu porównanie automatycznych etapów nie zależy od ręcznej daty.
+    const timing = {startMode:"now"};
 
     button.disabled = true;
     if (status) status.textContent = "⏳ Sprawdzam i rozpoczynam uprawę…";
@@ -14329,6 +14474,7 @@ function setupAdmin() {
       plot:gardenSelectedPlot,
       nick,
       ...timing,
+      modelVersion:GARDEN_AUTO_MODEL_VERSION,
       sessionToken:playerAccountSessionToken() || "",
       forceDuplicate:forceDuplicate ? "1" : "0"
     });
@@ -14388,21 +14534,7 @@ function setupAdmin() {
       // stanu „rośnie”, dzięki czemu nie da się kliknąć drugi raz zanim
       // użytkownik zobaczy sadzonkę.
       await gardenFetchData({force:true});
-      const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
-      if (timing.startMode === "now" && own && !gardenPhaseSummary(own).lastFrame) {
-        if (status) status.textContent = "🌱 Posadzono. Zapisuję etap 1…";
-        try {
-          const phaseResult = await gardenPostAction("gardenPhase",{
-            id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
-            eventType:"FRAME",atlasFrame:0,correction:"0",observedAtMs:Date.now()
-          });
-          if (!phaseResult || !phaseResult.ok) throw new Error(phaseResult&&phaseResult.error?phaseResult.error:"Nie udało się zapisać etapu 1.");
-          await gardenFetchData({force:true});
-          if (status) status.textContent = "✅ Posadzono i zapisano etap 1.";
-        } catch (phaseError) {
-          if (status) status.textContent = `⚠️ Posadzono, ale etap 1 nie zapisał się automatycznie: ${phaseError&&phaseError.message?phaseError.message:"błąd."}`;
-        }
-      }
+      if (status) status.textContent = "✅ Posadzono. Narzędzie pokazuje etap 1 i będzie zmieniać go automatycznie.";
       gardenRenderPlots();
       gardenRenderEditor();
     } catch (err) {
