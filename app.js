@@ -13191,6 +13191,7 @@ function setupAdmin() {
   const GARDEN_LOCAL_KEY = "menelwars_garden_plots_v1";
   let gardenData = {active:[],results:[],phases:[],plants:["Cebula"]};
   let gardenSelectedPlot = 1;
+  let gardenResultsSelectedPlant = "";
   let gardenLiveRefreshInFlight = null;
   let gardenLastRenderSignature = "";
   let gardenPendingPhase = null;
@@ -13538,7 +13539,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.44" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.45" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -14067,47 +14068,53 @@ function setupAdmin() {
   function gardenRenderRace() {
     const host=el("garden-race");
     if (!host) return;
-    const rows=(gardenData.active||[]).map(item=>{
-      const summary=gardenPhaseSummary(item);
-      const age=Math.max(0,Date.now()-Number(item.startedAt||0));
-      const upper=summary.lastFrame&&summary.entryUpper?Math.max(0,summary.entryUpper-Number(item.startedAt||0)):null;
-      const lower=summary.lastFrame&&summary.entryLower?Math.max(0,summary.entryLower-Number(item.startedAt||0)):null;
-      return {item,summary,age,upper,lower};
+    const plants=[...new Set([
+      ...(gardenData.plants||[]),
+      ...(gardenData.results||[]).map(item=>String(item&&item.plant||"").trim()).filter(Boolean)
+    ])];
+    if (!plants.length) plants.push("Cebula");
+    if (!plants.includes(gardenResultsSelectedPlant)) {
+      const currentPlant=String(gardenCurrentControls().plant||"").trim();
+      gardenResultsSelectedPlant=plants.includes(currentPlant) ? currentPlant : plants[0];
+    }
+    const tabs=`<div class="garden-result-tabs" role="tablist" aria-label="Roślina wyników">${plants.map(plant=>`<button type="button" class="garden-result-tab ${plant===gardenResultsSelectedPlant?"active":""}" data-garden-result-plant="${escapeHtml(plant)}" aria-pressed="${plant===gardenResultsSelectedPlant}">${escapeHtml(plant)}</button>`).join("")}</div>`;
+    const groups=new Map();
+    (gardenData.results||[]).filter(item=>String(item&&item.plant||"")===gardenResultsSelectedPlant).forEach(item=>{
+      if (!item || !Number.isFinite(Number(item.durationMs)) || Number(item.durationMs)<=0) return;
+      const key=gardenComboKey(item);
+      const current=groups.get(key) || {item,times:[],latest:0};
+      current.times.push(Number(item.durationMs));
+      current.latest=Math.max(current.latest,Number(item.finishedAt)||0);
+      groups.set(key,current);
     });
-    if (!rows.length) {host.innerHTML='<div class="empty">Brak aktywnych badań.</div>';return;}
+    const rows=[...groups.values()];
+    if (!rows.length) {host.innerHTML=`${tabs}<div class="empty">Brak zakończonych pomiarów dla tej rośliny. Po pierwszym zbiorze wynik pojawi się tutaj.</div>`;host.querySelectorAll("[data-garden-result-plant]").forEach(button=>button.addEventListener("click",()=>{gardenResultsSelectedPlant=String(button.dataset.gardenResultPlant||"");gardenRenderRace();}));return;}
 
-    const bestByFrame=new Map();
-    const countByFrame=new Map();
     rows.forEach(row=>{
-      if (!row.summary.lastFrame || row.upper==null) return;
-      const f=Number(row.summary.lastFrame.atlasFrame);
-      countByFrame.set(f,(countByFrame.get(f)||0)+1);
-      const current=bestByFrame.get(f);
-      if (!current || row.upper<current.upper) bestByFrame.set(f,row);
+      row.times.sort((a,b)=>a-b);
+      row.fastest=row.times[0];
+      const middle=Math.floor(row.times.length/2);
+      row.median=row.times.length%2 ? row.times[middle] : Math.round((row.times[middle-1]+row.times[middle])/2);
     });
-
-    const raceSort=String(el("garden-race-sort")?.value||"stage");
+    const resultSort=String(el("garden-race-sort")?.value||"time");
     rows.sort((a,b)=>{
-      const af=a.summary.lastFrame?Number(a.summary.lastFrame.atlasFrame):-1;
-      const bf=b.summary.lastFrame?Number(b.summary.lastFrame.atlasFrame):-1;
-      if (raceSort==="entry") return (a.upper??Infinity)-(b.upper??Infinity) || bf-af || a.age-b.age;
-      if (raceSort==="age") return a.age-b.age || bf-af || (a.upper??Infinity)-(b.upper??Infinity);
-      if (raceSort==="nick") return String(a.item.nick||"").localeCompare(String(b.item.nick||""),"pl",{sensitivity:"base"}) || bf-af;
-      return bf-af || (a.upper??Infinity)-(b.upper??Infinity) || a.age-b.age;
+      if (resultSort==="recent") return b.latest-a.latest || a.fastest-b.fastest;
+      if (resultSort==="samples") return b.times.length-a.times.length || a.fastest-b.fastest;
+      return a.fastest-b.fastest || b.times.length-a.times.length;
     });
 
-    host.innerHTML=`<div class="garden-race-list">${rows.map(row=>{
-      const item=row.item, summary=row.summary;
-      const frame=summary.lastFrame?Number(summary.lastFrame.atlasFrame):null;
-      const comparable=frame!=null && (countByFrame.get(frame)||0)>=2;
-      const leader=comparable && bestByFrame.get(frame)===row;
-      const best=comparable?bestByFrame.get(frame):null;
-      let label="mało danych";
-      if (leader) label="lider tego etapu";
-      else if (best && row.upper!=null && row.upper<=best.upper*1.15) label="obiecujące";
-      const interval=frame==null?"brak raportu etapu":`wejście w etap ${gardenDisplayStage(frame)}: ${gardenFormatDuration(row.lower||0)}–${gardenFormatDuration(row.upper||0)}`;
-      return `<div class="garden-race-row ${leader?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.nick)} · ☀️${item.sun} 💧${item.water} pH${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>wiek ${escapeHtml(gardenFormatDuration(row.age))}</span><span>${escapeHtml(interval)}</span><span>${escapeHtml(String(item.startSource||"LIVE"))}</span><span>${summary.ready?"✅ READY":"READY: nie"}</span></div></div><span class="garden-race-label">${escapeHtml(label)}</span></div>`;
+    host.innerHTML=`${tabs}<div class="garden-race-list">${rows.map((row,index)=>{
+      const item=row.item;
+      const times=row.times.map(time=>escapeHtml(gardenFormatDuration(time))).join(" · ");
+      const summary=row.times.length===1
+        ? `1 pomiar · ${times}`
+        : `${row.times.length} pomiary · najszybciej ${escapeHtml(gardenFormatDuration(row.fastest))} · mediana ${escapeHtml(gardenFormatDuration(row.median))}`;
+      return `<div class="garden-race-row ${index===0&&resultSort==="time"?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.plant)} · ☀️${item.sun}% 💧${item.water}% pH ${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>${summary}</span><span class="garden-result-times">czasy: ${times}</span></div></div><span class="garden-race-label">${index===0&&resultSort==="time"?"najszybsza":"pomiar"}</span></div>`;
     }).join("")}</div>`;
+    host.querySelectorAll("[data-garden-result-plant]").forEach(button=>button.addEventListener("click",()=>{
+      gardenResultsSelectedPlant=String(button.dataset.gardenResultPlant||"");
+      gardenRenderRace();
+    }));
   }
 
 
