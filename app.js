@@ -13538,7 +13538,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.43" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.44" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -13737,10 +13737,15 @@ function setupAdmin() {
     }
     const frame=gardenAutoFrame(own);
     const stage=gardenDisplayStage(frame);
-    const check=frame<9 ? gardenCheckForFrame(summary,frame) : null;
+    // Etap 1 jest potwierdzony samym udanym posadzeniem; pierwsza
+    // sensowna obserwacja porównawcza zaczyna się od etapu 2.
+    const canAskForCheck=frame>0 && frame<9;
+    const check=canAskForCheck ? gardenCheckForFrame(summary,frame) : null;
     const sprite=gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant);
     const stats=gardenCheckStats(own,summary);
-    const report=frame===9
+    const report=frame===0
+      ? `<div class="garden-phase-note">🌱 Etap 1 został potwierdzony przez posadzenie. Pierwsze pytanie pojawi się przy etapie 2.</div>`
+      : frame===9
       ? `<div class="garden-phase-note">Etap 10 wygląda tak samo podczas dalszego wzrostu i przy gotowości. Zbierz roślinę dopiero, gdy gra pozwoli.</div>`
       : check
         ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
