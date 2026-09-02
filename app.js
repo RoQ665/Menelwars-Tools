@@ -15320,7 +15320,7 @@ function setupAdmin() {
     const profile = buildProfileStats(source);
     const attrs = source.attributes || {};
     const allowMissingPerks=Boolean(source.allowMissingPerks);
-    if (!allowMissingPerks) BUILD_ATTR_ORDER.forEach(attrKey=>{
+    BUILD_ATTR_ORDER.forEach(attrKey=>{
       const value = Number(attrs[attrKey]);
       if (!Number.isInteger(value) || value < 0 || value > 50) {
         missing.push(`atrybut ${BUILD_ATTRS[attrKey].name}`);
@@ -15331,7 +15331,7 @@ function setupAdmin() {
       (sum,attrKey) => sum + (Number.isFinite(Number(attrs[attrKey])) ? Number(attrs[attrKey]) : 0),
       0
     );
-    BUILD_ATTR_ORDER.forEach(attrKey=>{
+    if (!allowMissingPerks) BUILD_ATTR_ORDER.forEach(attrKey=>{
       const value = Math.max(0,Math.min(50,Number(attrs[attrKey])||0));
       const tiers = Math.min(10,Math.floor(value/5));
       const perks = source.perks && source.perks[attrKey] ? source.perks[attrKey] : {};
