@@ -8286,6 +8286,13 @@ function renderGangDemandAdminToolsGlobal() {
   host.querySelectorAll("[data-gang-demand-unblock]").forEach(button=>button.addEventListener("click",()=>gangDemandSetTradableGlobal(Number(button.dataset.gangDemandUnblock),false)));
 }
 
+function refreshGangDemandChoicesIfOpenGlobal() {
+  const box=el("gang-demand-results");
+  if (box && !box.hidden) {
+    renderGangDemandChoicesGlobal(el("gang-demand-search")?.value||"");
+  }
+}
+
 function syncGangDemandAdminFromAccountGlobal(token) {
   if (gangDemandAdminGlobal || !token) return;
   playerAccountStatus({force:false,strict:false})
@@ -8297,7 +8304,7 @@ function syncGangDemandAdminFromAccountGlobal(token) {
       ) return;
       gangDemandAdminGlobal=true;
       renderGangDemandAdminToolsGlobal();
-      renderGangDemandChoicesGlobal(el("gang-demand-search")?.value||"");
+      refreshGangDemandChoicesIfOpenGlobal();
     })
     .catch(()=>{});
 }
@@ -8355,6 +8362,7 @@ async function loadGangDemandGlobal(options={}) {
       );
       renderGangDemandGlobal(payload);
       renderGangDemandAdminToolsGlobal();
+      refreshGangDemandChoicesIfOpenGlobal();
       syncGangDemandAdminFromAccountGlobal(token);
       return payload;
     } catch(err) {
