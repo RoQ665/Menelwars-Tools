@@ -13229,6 +13229,7 @@ function setupAdmin() {
   let gardenResultsSelectedPlant = "";
   let gardenLiveRefreshInFlight = null;
   let gardenLastRenderSignature = "";
+  let gardenLastPlotStateSignature = "";
   let gardenPendingPhase = null;
   const GARDEN_AUTO_MODEL_VERSION = "AUTO52";
   const GARDEN_AUTO_MODEL_HOURS = 52;
@@ -13581,7 +13582,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.52" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.53" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -14163,6 +14164,12 @@ function setupAdmin() {
     const host = el("garden-plots");
     if (!host) return;
 
+    gardenLastPlotStateSignature=(gardenData.active || [])
+      .map(item=>{
+        const summary=gardenPhaseSummary(item);
+        return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}`;
+      }).join("|");
+
     host.innerHTML = [1,2,3,4].map(plot => {
       const active = gardenOwnExperimentForPlot(plot);
       const summary = active ? gardenPhaseSummary(active) : null;
@@ -14187,9 +14194,9 @@ function setupAdmin() {
           <span class="garden-plot-visual">
             ${sprite}
             ${frameBadge}
-            ${needsCheck?'<span class="build-setup-attention garden-plot-attention" aria-label="Czeka pytanie Tak lub Nie">!</span>':""}
             ${stats}
           </span>
+          ${needsCheck?'<span class="build-setup-attention garden-plot-attention" aria-label="Czeka pytanie Tak lub Nie">!</span>':""}
           <span class="garden-plot-name">Grządka ${plot}</span>
           <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${frame===null?"bez etapu":`etap ${gardenDisplayStage(frame)}`}` : "Pusta"}</span>
         </button>`;
@@ -14452,6 +14459,11 @@ function setupAdmin() {
       const stats=gardenCheckStats(own,gardenPhaseSummary(own));
       box.textContent=`⏱️ Rośnie już: ${gardenFormatDuration(age)} · model: etap ${gardenDisplayStage(frame)}/10 · raporty ${stats.yes.length} Tak / ${stats.no.length} Nie`;
       gardenRenderPhaseTools(own);
+      const plotState=(gardenData.active || []).map(item=>{
+        const summary=gardenPhaseSummary(item);
+        return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}`;
+      }).join("|");
+      if (plotState !== gardenLastPlotStateSignature) gardenRenderPlots();
     } else {
       box.textContent = `⏱️ Starszy pomiar trwa: ${gardenFormatDuration(age)}`;
     }
