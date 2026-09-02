@@ -8296,7 +8296,17 @@ async function loadGangDemandGlobal(options={}) {
       if (!payload||!payload.ok) throw new Error(payload&&payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
       gangDemandCacheGlobal=payload;
       gangDemandBlockedIdsGlobal=new Set((Array.isArray(payload.blockedItemIds)?payload.blockedItemIds:[]).map(Number).filter(Number.isFinite));
-      gangDemandAdminGlobal=Boolean(payload.admin);
+      // Uprawnienia administratora znamy także z potwierdzonego statusu Konta.
+      // Dzięki temu starsza odpowiedź/cache endpointu zapotrzebowania nie ukrywa
+      // narzędzi administratora, jeśli samo Konto już poprawnie rozpoznało Admina.
+      gangDemandAdminGlobal=Boolean(
+        payload.admin ||
+        (
+          cachedAccountStatus &&
+          cachedAccountStatusToken===token &&
+          cachedAccountStatus.admin
+        )
+      );
       renderGangDemandGlobal(payload);
       renderGangDemandAdminToolsGlobal();
       return payload;

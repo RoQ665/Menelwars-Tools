@@ -1,16 +1,16 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v21.82";
+const CACHE = "menelwars-tools-v21.83";
 // Jednorazowa naprawa bardzo starych instalacji PWA, które nie pokazały
 // banera aktualizacji i nadal serwują app.js v21.58.
 const FORCE_LEGACY_RECOVERY = true;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=21.82",
+  "./styles.css?v=21.83",
   "./data.js?v=21.05",
-  "./app.js?v=21.82",
-  "./item-catalog.js?v=21.82",
+  "./app.js?v=21.83",
+  "./item-catalog.js?v=21.83",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
