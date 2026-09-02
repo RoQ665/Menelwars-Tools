@@ -12101,7 +12101,7 @@ function setupAdmin() {
     const hasBuild=buildPointsUsed()>0;
     const hasBonuses=Boolean(profile.bonusesConfirmed);
     const hasCombat=Boolean(profile.provided?.combatAttack && profile.provided?.combatDefense && profile.provided?.combatHp);
-    const card=(step,title,ready,text)=>`<button type="button" class="build-setup-step ${ready?"ready":""}" data-build-setup-open="${step}"><span class="build-setup-step-number">${ready?"✓":step}</span><span><strong>${title}</strong><small>${text}</small></span><span class="build-setup-step-state">${ready?"Gotowe":"Uzupełnij"}</span></button>`;
+    const card=(step,title,ready,text)=>`<button type="button" class="build-setup-step ${ready?"ready":""}" data-build-setup-open="${step}"><span class="build-setup-step-number">${ready?"✓":step}</span><span><strong>${title}</strong><small>${text}</small></span><span class="build-setup-step-state">${ready?"Gotowe":"Uzupełnij"}</span>${ready?"":'<span class="build-setup-attention" aria-label="Wymaga uzupełnienia">!</span>'}</button>`;
     host.innerHTML=`<div class="build-setup-title"><strong>🥊 Przygotuj build do symulatora</strong><span class="muted">Uzupełnij trzy kroki. Zielone karty oznaczają gotowość.</span></div><div class="build-setup-grid">${card(1,"Build",hasBuild,hasBuild?`${buildPointsUsed()} pkt · poziom ${buildRequiredLevel()}`:"Wklej „Kopiuj build” z gry")}${card(2,"Bonusy PvP",hasBonuses,hasBonuses?`${(buildState.bonuses||[]).length} rozpoznanych bonusów`:"Wklej „Łączne bonusy PvP”")}${card(3,"Start walki",hasCombat,hasCombat?`${profile.combatAttack} ATK · ${profile.combatDefense} DEF · ${profile.combatHp} HP`:"Przepisz trzy statystyki z walki")}</div>`;
     host.querySelectorAll("[data-build-setup-open]").forEach(button=>button.addEventListener("click",()=>{
       const step=String(button.dataset.buildSetupOpen||"");
@@ -13553,7 +13553,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.48" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.49" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
