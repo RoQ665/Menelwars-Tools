@@ -15426,6 +15426,24 @@ function setupAdmin() {
   function pvpGeneratedPresets() {
     if (pvpGeneratedPresetsCache) return pvpGeneratedPresetsCache;
     {
+      // API Rewirów nie zwraca wyborów A/B. Przyjmujemy spójną, mocną
+      // konfigurację, nastawioną na realną walkę: przebicie i tempo dla Siły,
+      // stały DR dla Wytrzymałości, unik/kontry/double dla Zręczności,
+      // przeżywalność dla Żywotności oraz krytyki/execute dla Precyzji.
+      // Używane są tylko perki faktycznie odblokowane liczbą punktów NPC.
+      const perkPaths={
+        strength:"BABBAABAAA",
+        endurance:"BABBBABAAA",
+        agility:"BABAABBBBB",
+        vitality:"AABBAABAAB",
+        precision:"BBAAABBAAA"
+      };
+      const inferredPerks=npc=>Object.fromEntries(
+        Object.entries(perkPaths).map(([attrKey,path])=>{
+          const tiers=Math.min(10,Math.floor(Math.max(0,Number(npc[attrKey])||0)/5));
+          return [attrKey,Object.fromEntries(Array.from({length:tiers},(_,index)=>[index+1,path[index]]))];
+        })
+      );
       const rewirPresets=PVP_REWIR_NPCS.map(npc=>({
         id:`rewir-${npc.id}`,
         gameNpc:true,
@@ -15443,7 +15461,7 @@ function setupAdmin() {
           vitality:npc.vitality,
           precision:npc.precision
         },
-        perks:{strength:{},endurance:{},agility:{},vitality:{},precision:{}},
+        perks:inferredPerks(npc),
         profile:{
           attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
           combatAttack:npc.attack,
@@ -15453,7 +15471,7 @@ function setupAdmin() {
           bonusesConfirmed:true
         },
         bonuses:[],
-        description:`Prawdziwy NPC z Rewirów. Dane gry: ${npc.attack} ATK · ${npc.defense} DEF · ${npc.hp} HP; STR ${npc.strength} · END ${npc.endurance} · AGI ${npc.agility} · VIT ${npc.vitality} · PRC ${npc.precision}. API nie podaje perków ani wyposażenia NPC.`
+        description:`Prawdziwy NPC z Rewirów. Dane gry: ${npc.attack} ATK · ${npc.defense} DEF · ${npc.hp} HP; STR ${npc.strength} · END ${npc.endurance} · AGI ${npc.agility} · VIT ${npc.vitality} · PRC ${npc.precision}. Wybory perków są mocnym oszacowaniem, ponieważ API ich nie podaje.`
       }));
       pvpGeneratedPresetsCache=rewirPresets;
       return rewirPresets;
@@ -16207,7 +16225,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom. DEF używa stałego modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom. DEF używa stałego modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP. NPC z Rewirów używają prawdziwych statystyk z gry, ale ich wybory perków są mocnym oszacowaniem, ponieważ API ich nie ujawnia.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
