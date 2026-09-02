@@ -8229,7 +8229,9 @@ function renderGangDemandChoicesGlobal(query) {
   if (!box) return;
   const needle=String(query||"").trim().toLocaleLowerCase("pl");
   const catalog=gangDemandCatalogGlobal().sort((a,b)=>a.name.localeCompare(b.name,"pl"));
-  const matches=(needle ? catalog.filter(item=>item.name.toLocaleLowerCase("pl").includes(needle)) : catalog).slice(0,40);
+  const matches=(needle ? catalog.filter(item=>[
+    item.name,item.subtitle,item.group
+  ].some(value=>String(value||"").toLocaleLowerCase("pl").includes(needle))) : catalog).slice(0,40);
   box.hidden=!matches.length;
   box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić.</div>':''}${matches.map(item=>`<button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIconGlobal(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group||"przedmiot")}</small></button>`).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
   box.querySelectorAll("[data-gang-demand-item]").forEach(button=>button.addEventListener("click",()=>{
