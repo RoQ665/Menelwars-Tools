@@ -3982,6 +3982,14 @@ function mapRenderRouteResult() {
     }).filter(category=>category.tier);
   }
 
+  function achievementOverallMedal(unlocked={}) {
+    const total=ACHIEVEMENT_CATEGORIES.reduce((sum,category)=>sum+category.items.length,0);
+    const complete=Object.keys(unlocked || {}).filter(id=>ACHIEVEMENT_CATEGORIES.some(category=>category.items.some(item=>item[0]===id))).length;
+    const percent=total ? complete/total*100 : 0;
+    const tier=percent>=100 ? "platinum" : percent>=75 ? "gold" : percent>=50 ? "silver" : percent>=25 ? "bronze" : "";
+    return tier ? {tier,complete,total,percent,medal:`assets/achievements/overall-${tier}.png`} : null;
+  }
+
   function adminPanelIsOpen() {
     const panel = el("admin-view");
     return Boolean(panel && !panel.hidden && panel.isConnected);
@@ -4176,10 +4184,12 @@ function mapRenderRouteResult() {
     setPlayerIdentityToken && setPlayerIdentityToken(playerAccountSessionToken());
 
     const profileMedals=achievementCategoryMedals(account.achievements || {});
+    const overallMedal=achievementOverallMedal(account.achievements || {});
 
     box.innerHTML = `
       <div class="account-card logged">
-        <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${profileMedals.length?`<div class="account-achievement-medals">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}</div>
+        <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${overallMedal?`<span class="account-overall-medal ${overallMedal.tier}" title="Postęp ogólny: ${overallMedal.complete} / ${overallMedal.total} (${Math.round(overallMedal.percent)}%)"><img src="${overallMedal.medal}" alt="Medal ogólnego postępu"></span>`:""}</div>
+        ${profileMedals.length?`<div class="account-achievement-medals" aria-label="Medale kategorii">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}
         <div style="margin-top:5px">✅ Zalogowany${account.admin ? " · 🛠 Administrator" : ""}</div>
         <div style="margin-top:7px"><span class="account-session-stat">📱 Aktywne sesje: ${Number(account.sessionCount)||0}</span></div>
         <div class="account-actions">
@@ -13645,7 +13655,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.59" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.60" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {

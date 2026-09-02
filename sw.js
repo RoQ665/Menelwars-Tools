@@ -1,18 +1,22 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v21.59";
+const CACHE = "menelwars-tools-v21.60";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=21.59",
+  "./styles.css?v=21.60",
   "./data.js?v=21.05",
-  "./app.js?v=21.59",
+  "./app.js?v=21.60",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
   "./mapa-warszawa.png",
   "./onion-growth-atlas.png?v=21.09",
-  "./potato-growth-atlas-v4.png?v=21.59",
+  "./potato-growth-atlas-v4.png?v=21.60",
+  "./assets/achievements/overall-bronze.png",
+  "./assets/achievements/overall-silver.png",
+  "./assets/achievements/overall-gold.png",
+  "./assets/achievements/overall-platinum.png",
   "./assets/achievements/distillery-medal.png",
   "./assets/achievements/garden-medal.png",
   "./assets/achievements/pvp-medal.png",
