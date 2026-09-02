@@ -3905,6 +3905,7 @@ function mapRenderRouteResult() {
             cachedAccountStatus = result;
             cachedAccountStatusAt = Date.now();
             cachedAccountStatusToken = token;
+            updateHomeAccountState(result);
             return result;
           } catch (err) {
             return cachedAccountStatusToken === token
@@ -3946,6 +3947,7 @@ function mapRenderRouteResult() {
         cachedAccountStatus = result;
         cachedAccountStatusAt = Date.now();
         cachedAccountStatusToken = token;
+        updateHomeAccountState(result);
         return result;
 
       } catch (err) {
@@ -16661,6 +16663,21 @@ function setupAdmin() {
     const isPaymentsOrCompany =
       target === "payments-view" ||
       target === "company-view";
+
+    // Zapotrzebowanie jest prostą listą. Otwieramy ją natychmiast, a odczyt
+    // serwera działa w tle — awaria nie może zatrzymać całej zakładki Gangu.
+    if (target === "demand-view") {
+      el("gang-tabs").hidden = false;
+      showToolView("demand-view","gang");
+      gangTrackIndecisiveEasterEgg(target);
+      const list=el("gang-demand-list");
+      if (!gangDemandCache && list) {
+        list.innerHTML='<div class="empty">⏳ Pobieram aktywne zapotrzebowanie…</div>';
+      }
+      loadGangDemand({force:forceRefresh}).catch(()=>{});
+      validateGangSessionInBackground();
+      return;
+    }
 
     // v20.71:
     // Wpłaty i Spółka są renderowane z tego samego payloadu.
