@@ -3977,8 +3977,8 @@ function mapRenderRouteResult() {
     return ACHIEVEMENT_CATEGORIES.map(category=>{
       const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;
       const percent=category.items.length ? complete/category.items.length*100 : 0;
-      const tier=percent>=75 ? "gold" : percent>=50 ? "silver" : percent>=25 ? "bronze" : "";
-      return Object.assign({},category,{complete,percent,tier,mastered:percent===100});
+      const tier=percent===100 ? "platinum" : percent>=75 ? "gold" : percent>=50 ? "silver" : percent>=25 ? "bronze" : "";
+      return Object.assign({},category,{complete,percent,tier});
     }).filter(category=>category.tier);
   }
 
@@ -4179,7 +4179,7 @@ function mapRenderRouteResult() {
 
     box.innerHTML = `
       <div class="account-card logged">
-        <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${profileMedals.length?`<div class="account-achievement-medals">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}${category.mastered?" mastered":""}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}</div>
+        <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${profileMedals.length?`<div class="account-achievement-medals">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}</div>
         <div style="margin-top:5px">✅ Zalogowany${account.admin ? " · 🛠 Administrator" : ""}</div>
         <div style="margin-top:7px"><span class="account-session-stat">📱 Aktywne sesje: ${Number(account.sessionCount)||0}</span></div>
         <div class="account-actions">
@@ -13645,7 +13645,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.57" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.58" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -16438,7 +16438,8 @@ function setupAdmin() {
 
     setGangOptionalButtonsChecking();
 
-    await loadGangMenuStatus();
+    const gangMenuStatus=await loadGangMenuStatus();
+    if (gangMenuStatus) achievementTrack(["gang_login"]);
 
     if (!playerAccountSessionToken()) {
       if (el("gang-tabs")) {
