@@ -1151,6 +1151,7 @@ function mapRenderRouteResult() {
         "✅ Receptura zarezerwowana na 24 godziny.",
         "success"
       );
+      achievementTrack(["distillery_reserve"]);
 
       await fetchApprovedRecipes({force:true});
 
@@ -1327,6 +1328,7 @@ function mapRenderRouteResult() {
         "✅ Wynik został wysłany do weryfikacji.",
         "success"
       );
+      achievementTrack(["distillery_result"]);
 
       // Tak jak w stabilnym v20: po zapisie pobieramy pełny stan.
       await fetchApprovedRecipes({force:true});
@@ -2368,6 +2370,7 @@ function mapRenderRouteResult() {
 
       el("submit-liters").value = "";
       el("submit-notes").value = "";
+      if (Number(result.insertedCount)>0) achievementTrack(["distillery_result"]);
 
     } catch (err) {
       status.textContent =
@@ -2711,6 +2714,7 @@ function mapRenderRouteResult() {
       el("recipe-batch-text").value = "";
       recipeBatchPreviewRows = [];
       renderRecipeBatchPreview();
+      if (Number(result.insertedCount)>0) achievementTrack(["distillery_import"]);
       await fetchApprovedRecipes({force:true});
 
     } catch (err) {
@@ -3020,6 +3024,7 @@ function mapRenderRouteResult() {
 
     if (mapModuleLoaded) {
       showToolView("map-view","map");
+      achievementTrack(["map_open"]);
       return;
     }
 
@@ -3050,6 +3055,7 @@ function mapRenderRouteResult() {
     }
 
     showToolView("map-view","map");
+    achievementTrack(["map_open"]);
   }
 
   function fetchApprovedRecipes(options={}) {
@@ -3944,6 +3950,29 @@ function mapRenderRouteResult() {
 
   let accountViewRenderInFlight = null;
 
+  const ACHIEVEMENT_CATEGORIES = [
+    {id:"distillery",icon:"🥃",title:"Destylarnia",items:[
+      ["distillery_reserve","Rezerwacja stolika","Zarezerwuj recepturę."],["distillery_result","Wynik spod lady","Wyślij poprawny wynik receptury."],["distillery_accepted","Receptura uznana","Twój wynik zostanie zaakceptowany."],["distillery_import","Księgowy z Excela","Użyj importu wyników z gry."]
+    ]},
+    {id:"garden",icon:"🌱",title:"Ogród",items:[
+      ["garden_plant_onion","Pierwsza cebulka","Posadź cebulę."],["garden_plant_potato","Ziemniak na próbę","Posadź młode ziemniaki."],["garden_harvest_onion","Cebulowy plon","Zbierz cebulę po co najmniej 40 h."],["garden_harvest_potato","Kartoflany plon","Zbierz ziemniaki po co najmniej 40 h."],["garden_check","Czujne oko","Odpowiedz Tak albo Nie na pytanie o etap."],["garden_checks_three","Dziennik ogrodnika","Zostaw trzy odpowiedzi Tak/Nie w jednej uprawie."]
+    ]},
+    {id:"pvp",icon:"⚔️",title:"PvP",items:[
+      ["pvp_build","Gotów do ustawki","Zapisz pierwszy kompletny build."],["pvp_simulation","Próba generalna","Uruchom pierwszą symulację."],["pvp_ai_first","Bolek poszedł spać","Pokonaj pierwszego przeciwnika AI."],["pvp_ai_district","Dzielnica oczyszczona","Pokonaj komplet trzech AI na jednym poziomie."],["pvp_ai_50","Poziom wyżej","Pokonaj AI lvl 50."],["pvp_ai_60","Stary wyjadacz","Pokonaj AI lvl 60."],["pvp_ai_all","Król melin","Pokonaj wszystkie 27 AI."],["pvp_underdog","Dawid kontra Goliat","Pokonaj AI co najmniej 5 poziomów wyżej."],["pvp_hp_2000","Dwa tysiące powodów","Zapisz build z minimum 2 000 HP."],["pvp_attack_1000","Tysiąc argumentów","Zapisz build z minimum 1 000 ATK."],["pvp_defense_1000","Mur z meliny","Zapisz build z minimum 1 000 DEF."],["pvp_public_build","Pokaż, co masz","Udostępnij publiczny build."],["pvp_stat_50","Specjalizacja","Rozdaj 50 punktów w jednym atrybucie."],["pvp_tree_single","Jedna droga","Przy 50 punktach wybierz wszystkie perki A albo wszystkie B."],["pvp_level_50","Weteran ustawki","Zapisz build na poziomie co najmniej 50."],["pvp_public_fight","Ustawka z ulicy","Symuluj walkę z publicznym buildem innej osoby."],["pvp_public_win","Wygrana na dzielni","W 1 000 walk osiągnij 80% wygranych z publicznym buildem innej osoby."]
+    ]},
+    {id:"map",icon:"🗺️",title:"Mapa",items:[["map_open","Znam teren","Sprawdź mapę."]]},
+    {id:"gang",icon:"🏢",title:"Gang",items:[
+      ["gang_overpay_10k","Nadpłata 10k","Osiągnij 10 000 nadpłaty."],["gang_overpay_50k","Nadpłata 50k","Osiągnij 50 000 nadpłaty."],["gang_overpay_100k","Nadpłata 100k","Osiągnij 100 000 nadpłaty."],["gang_overpay_250k","Nadpłata 250k","Osiągnij 250 000 nadpłaty."],["gang_overpay_500k","Nadpłata 500k","Osiągnij 500 000 nadpłaty."],["gang_overpay_1m","Nadpłata 1 mln","Osiągnij 1 000 000 nadpłaty."],["gang_top3","Podium wpłat","Znajdź się w TOP 3 wpłat."],["gang_employed","Etat w melinie","Bądź zatrudniony w Spółce."],["gang_salary_10k","Pensja 10k","Osiągnij należną pensję 10 000 zł."],["gang_salary_50k","Pensja 50k","Osiągnij należną pensję 50 000 zł."],["gang_salary_100k","Pensja 100k","Osiągnij należną pensję 100 000 zł."],["gang_salary_fund","Pensja dla ekipy","Przekaż wypłatę do Funduszu."],["gang_fund_10k","Fundusz 10k","Przekaż 10 000 pensji do Funduszu."],["gang_fund_50k","Fundusz 50k","Przekaż 50 000 pensji do Funduszu."],["gang_fund_100k","Fundusz 100k","Przekaż 100 000 pensji do Funduszu."],["gang_fund_250k","Fundusz 250k","Przekaż 250 000 pensji do Funduszu."],["gang_fund_500k","Fundusz 500k","Przekaż 500 000 pensji do Funduszu."],["gang_fund_1m","Fundusz 1 mln","Przekaż 1 000 000 pensji do Funduszu."],["gang_login","Swój wśród swoich","Zaloguj się do strefy Gangu."],["gang_vote","Głos ulicy","Oddaj głos w ankiecie."],["gang_goal","Plan ekipy","Sprawdź cele Gangu."],["gang_announcements","Wieści z meliny","Przeczytaj ogłoszenia."]
+    ]}
+  ];
+
+  function achievementsHtml(unlocked={}) {
+    const total=ACHIEVEMENT_CATEGORIES.reduce((sum,category)=>sum+category.items.length,0);
+    const count=Object.keys(unlocked || {}).filter(id=>ACHIEVEMENT_CATEGORIES.some(category=>category.items.some(item=>item[0]===id))).length;
+    const percent=total ? Math.round(count/total*100) : 0;
+    return `<section class="achievements-card"><div class="achievements-head"><div><strong>🏆 Osiągnięcia</strong><small>${count} odblokowane · ${total-count} pozostałe · ${total} łącznie</small></div><b>${percent}%</b></div><div class="achievements-progress"><i style="width:${percent}%"></i></div>${ACHIEVEMENT_CATEGORIES.map(category=>{const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;return `<details class="achievement-category"><summary><span>${category.icon} ${category.title}</span><small>${complete} / ${category.items.length}</small></summary><div class="achievement-grid">${category.items.map(([id,title,description])=>{const done=Boolean(unlocked && unlocked[id]);return `<span class="achievement-badge ${done?"done":"locked"}" tabindex="0" title="${escapeHtml(description)}"><b>${category.icon}</b><span>${escapeHtml(title)}</span><small>${escapeHtml(description)}</small></span>`;}).join("")}</div></details>`;}).join("")}</section>`;
+  }
+
   function adminPanelIsOpen() {
     const panel = el("admin-view");
     return Boolean(panel && !panel.hidden && panel.isConnected);
@@ -4152,6 +4181,7 @@ function mapRenderRouteResult() {
           <button id="account-change-save" class="primary-btn" type="button">✅ Zapisz nowe hasło</button>
         </div>
       </div>
+      ${achievementsHtml(account.achievements || {})}
     `;
 
     if (account.admin) {
@@ -5362,6 +5392,7 @@ async function loadAccountAdminPermissions(
 
                 invalidateGangPollsCache();
                 await loadGangPolls({force:true});
+                achievementTrack(["gang_vote"]);
 
               } catch (err) {
                 window.alert(
@@ -5745,6 +5776,7 @@ const goal = payload && payload.goal;
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać celu.");
       }
       renderGangGoal(payload);
+      achievementTrack(["gang_goal"]);
       return payload;
     })();
 
@@ -5764,6 +5796,7 @@ const goal = payload && payload.goal;
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać ogłoszeń.");
       }
       renderGangAnnouncements(payload);
+      achievementTrack(["gang_announcements"]);
       return payload;
     })();
 
@@ -6034,6 +6067,7 @@ const goal = payload && payload.goal;
       status.textContent = "";
 
       await loadPayments();
+      achievementTrack(["gang_login"]);
 
     } catch (err) {
 
@@ -12676,6 +12710,16 @@ function setupAdmin() {
               : "✅ Utworzono nowy prywatny build."
           );
 
+      const primary=buildFinalPrimaryStats(buildCalculateStats(buildState));
+      const values=Object.values(buildState.attributes || {}).map(Number);
+      const fiftyAttr=values.some(value=>value>=50);
+      const monoTree=BUILD_ATTR_ORDER.some(attrKey=>{
+        if (Number(buildState.attributes?.[attrKey]) < 50) return false;
+        const picks=Object.values(buildState.perks?.[attrKey] || {});
+        return picks.length===10 && (picks.every(x=>x==="A") || picks.every(x=>x==="B"));
+      });
+      achievementTrack(["pvp_build",isPublic?"pvp_public_build":"",primary.hp>=2000?"pvp_hp_2000":"",primary.attack>=1000?"pvp_attack_1000":"",primary.defense>=1000?"pvp_defense_1000":"",fiftyAttr?"pvp_stat_50":"",monoTree?"pvp_tree_single":"",buildRequiredLevel()>=50?"pvp_level_50":""].filter(Boolean));
+
       await fetchBuildLists(true);
     } catch (err) {
       status.textContent = "❌ " + (err && err.message ? err.message : "Nie udało się zapisać buildu.");
@@ -13582,7 +13626,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.53" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.55" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -13616,6 +13660,34 @@ function setupAdmin() {
       throw sendError || new Error("Serwer nie potwierdził zapisu Ogrodu.");
     }
     return result;
+  }
+
+  async function achievementTrack(ids) {
+    if (!playerAccountSessionToken()) return null;
+    try {
+      const result=await playerAccountPostAction("achievementTrack",{sessionToken:playerAccountSessionToken(),ids:Array.isArray(ids)?ids:[ids]});
+      if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
+      return result;
+    } catch (err) {
+      console.warn("[MenelWars Tools] Osiągnięcie nie zostało zapisane:",err);
+      return null;
+    }
+  }
+
+  async function achievementTrackAiWin(presetId,ownLevel) {
+    if (!playerAccountSessionToken()) return null;
+    try {
+      const result=await playerAccountPostAction("achievementAiWin",{
+        sessionToken:playerAccountSessionToken(),
+        presetId,
+        ownLevel
+      });
+      if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
+      return result;
+    } catch (err) {
+      console.warn("[MenelWars Tools] Wygrana z AI nie została zapisana:",err);
+      return null;
+    }
   }
 
   async function gardenRecordModelCheck(frame,answer) {
@@ -13653,6 +13725,9 @@ function setupAdmin() {
       gardenPendingPhase=null;
       if (status) status.textContent=answer==="YES"?"✅ Zapisano zgodność etapu.":"✅ Zapisano niezgodność etapu.";
       await gardenFetchData({force:true});
+      const updatedOwn=gardenOwnExperimentForPlot(gardenSelectedPlot);
+      const checkCount=updatedOwn ? gardenCheckStats(updatedOwn,gardenPhaseSummary(updatedOwn)).checks.length : 0;
+      achievementTrack(["garden_check",checkCount>=3?"garden_checks_three":""].filter(Boolean));
     } catch(err) {
       if (gardenPendingPhase && gardenPendingPhase.eventId===pendingEventId) {
         gardenPendingPhase=null;
@@ -14602,6 +14677,7 @@ function setupAdmin() {
       // użytkownik zobaczy sadzonkę.
       await gardenFetchData({force:true});
       if (status) status.textContent = "✅ Posadzono. Narzędzie pokazuje etap 1 i będzie zmieniać go automatycznie.";
+      achievementTrack([/ziemniak/i.test(combo.plant)?"garden_plant_potato":"garden_plant_onion"]);
       gardenRenderPlots();
       gardenRenderEditor();
     } catch (err) {
@@ -14635,6 +14711,7 @@ function setupAdmin() {
       gardenSetLocalPlot(gardenSelectedPlot,null);
       if (status) status.textContent = `✅ Zapisano wynik: ${gardenFormatDuration(result.durationMs)}.`;
       await gardenFetchData({force:true});
+      if (Number(result.durationMs)>=40*60*60*1000) achievementTrack([/ziemniak/i.test(own.plant)?"garden_harvest_potato":"garden_harvest_onion"]);
       gardenRenderPlots();
       gardenRenderEditor();
     } catch (err) {
@@ -15784,6 +15861,19 @@ function setupAdmin() {
           ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
           : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
       host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      const achievementIds=["pvp_simulation"];
+      const ownNick=normalizedPlayerNick(cachedAccountNick());
+      const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
+      if (fightsOtherPublic) {
+        achievementIds.push("pvp_public_fight");
+        if (runs===1000 && agg.winsA/runs>=0.8) achievementIds.push("pvp_public_win");
+      }
+      achievementTrack(achievementIds);
+      // Przeciwnik AI jest zaliczany dopiero na wiarygodnej próbie 1 000 walk.
+      // „Pokonaj” oznacza przewagę w symulacji, nie pojedynczy szczęśliwy rzut.
+      if (rightItem.group==="preset" && runs===1000 && agg.winsA/runs>0.5) {
+        achievementTrackAiWin(rightItem.source.id,buildRequiredLevel());
+      }
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
