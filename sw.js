@@ -1,13 +1,16 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v21.66";
+const CACHE = "menelwars-tools-v21.67";
+// Jednorazowa naprawa bardzo starych instalacji PWA, które nie pokazały
+// banera aktualizacji i nadal serwują app.js v21.58.
+const FORCE_LEGACY_RECOVERY = true;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=21.66",
+  "./styles.css?v=21.67",
   "./data.js?v=21.05",
-  "./app.js?v=21.66",
-  "./item-catalog.js?v=21.66",
+  "./app.js?v=21.67",
+  "./item-catalog.js?v=21.67",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
@@ -40,9 +43,12 @@ async function cacheCoreBestEffort() {
 }
 
 self.addEventListener("install",event => {
-  // Celowo bez skipWaiting(): działająca karta nie jest podmieniana w trakcie
-  // operacji. UI pokaże przycisk „Odśwież”, gdy nowy worker czeka.
-  event.waitUntil(cacheCoreBestEffort());
+  event.waitUntil((async () => {
+    await cacheCoreBestEffort();
+    // Tylko ten release naprawczy omija oczekiwanie. Kolejne aktualizacje
+    // pozostaną ręczne, przez banner „Odśwież”.
+    if (FORCE_LEGACY_RECOVERY) await self.skipWaiting();
+  })());
 });
 
 self.addEventListener("message",event => {
@@ -60,6 +66,10 @@ self.addEventListener("activate",event => {
         .map(key => caches.delete(key))
     );
     await self.clients.claim();
+    if (FORCE_LEGACY_RECOVERY) {
+      const clients = await self.clients.matchAll({type:"window",includeUncontrolled:true});
+      await Promise.allSettled(clients.map(client => client.navigate(client.url)));
+    }
   })());
 });
 
