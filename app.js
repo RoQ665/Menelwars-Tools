@@ -15519,13 +15519,9 @@ function setupAdmin() {
     // przebicie pancerza zmniejsza również tę część.
     const defenseBeforePen=defender.primary.defense+earnedDefenderLevels*1.65;
     const effectiveDefense=Math.max(0,defenseBeforePen*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
-    // Hipoteza z testu na 1. poziomie: K rośnie od 20 na poziomie 1 do 300
-    // na poziomie 51. Warianty ręczny i ATK pozostają do porównywania.
-    const defenseK=params.defenseModel === "level"
-      ? 20+5.6*(attackerLevel-1)
-      : params.defenseModel === "attack"
-        ? Math.max(1,attacker.primary.attack*(Number(params.attackKScale)||0.8))
-        : params.defenseK;
+    // Jedyny aktywny model DEF: K rośnie z poziomem atakującego.
+    // Został dobrany do obserwacji z walk na niskich poziomach i RoQ vs Bulax.
+    const defenseK=20+5.6*(attackerLevel-1);
     const defenseFactor=defenseK/(effectiveDefense+defenseK);
     // Pasywny unik jest częścią zwykłej redukcji obrażeń. Zwykły DR i unik/3,5
     // sumują się przed wspólnym limitem 60%. Warunkowy DR low HP jest osobnym,
@@ -15710,12 +15706,16 @@ function setupAdmin() {
     const bleedTick=pvpApplyBleedTick(actor,round);
     if (bleedTick.killed) return {winner:enemy,cause:"bleed"};
 
+    // Z logów: po ticku krwawienia postać dostaje zwykłą regenerację,
+    // a dopiero potem wykonuje swoją część tury. Dodatek low HP oceniamy
+    // po zwykłej regeneracji, jako osobny efekt warunkowy.
+    pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
+    const regenCond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
+    pvpHeal(actor,regenCond.regenFlat,enemy,"regen");
+
     if (actor.stunned) {
       actor.stunned=false;
       // Ogłuszenie odbiera atak, nie regenerację przypisaną do tej tury.
-      pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
-      const stunnedCond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
-      pvpHeal(actor,stunnedCond.regenFlat,enemy,"regen");
       return null;
     }
     const main=pvpStrike(actor,enemy,round,params,{allowExecute:true,allowCounter:true,consumeFirst:true});
@@ -15725,8 +15725,7 @@ function setupAdmin() {
     // kolejnych tur z HP=0.
     if (actor.hp<=0) return {winner:enemy,cause:main.cause||"counter"};
 
-    // Udany unik kończy sekwencję atakującego. Nie ma po nim Double Strike;
-    // postać przechodzi tylko do regeneracji przypisanej do swojej tury.
+    // Udany unik kończy sekwencję atakującego. Nie ma po nim Double Strike.
     // Pudło pozostaje jednak nieudaną okazją dla metera Double Strike, więc
     // następny trafiony główny atak może mieć wyższą chwilową szansę.
     if (main.cause==="evade") {
@@ -15734,9 +15733,6 @@ function setupAdmin() {
       actor.metrics.doubleOpportunities++;
       actor.metrics.doubleChanceSum+=missedDoubleChance;
       pvpFailProc(actor,"double",missedDoubleChance);
-      pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
-      const evadedCond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
-      pvpHeal(actor,evadedCond.regenFlat,enemy,"regen");
       return null;
     }
 
@@ -15750,11 +15746,6 @@ function setupAdmin() {
       if (enemy.hp<=0) return {winner:actor,cause:second.cause||"double"};
       if (actor.hp<=0) return {winner:enemy,cause:second.cause||"counter"};
     }
-    // Leczenie następuje po wymianie ciosów. Bazowy regen i dodatek low HP
-    // są rozdzielone: drugi warunek oceniamy po zwykłej regeneracji.
-    pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
-    const cond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
-    pvpHeal(actor,cond.regenFlat,enemy,"regen");
     return null;
   }
 
@@ -16032,12 +16023,7 @@ function setupAdmin() {
     if (!leftItem || !rightItem) return;
     const lready=buildSimulationReadiness(leftItem.source), rready=buildSimulationReadiness(rightItem.source);
     if (!lready.ok || !rready.ok) { pvpUpdateReadiness(); return; }
-    const selectedDefenseModel=el("pvp-sim-defense-model")?.value;
-    const defenseModel=["level","fixed","attack"].includes(selectedDefenseModel) ? selectedDefenseModel : "level";
     const params={
-      defenseModel,
-      attackKScale:0.8,
-      defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||300,50,5000),
       // Potwierdzone przez logi gry: kontratak ma 75% zwykłych obrażeń;
       // nadal może krytować, co obsługuje pvpStrike().
       counterMult:0.75
@@ -16050,12 +16036,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
-      const defenseAssumption=params.defenseModel === "level"
-        ? "K zależy od poziomu atakującego: K = 20 + 5,6 × (poziom − 1)"
-        : params.defenseModel === "attack"
-          ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
-          : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom. DEF używa stałego modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
@@ -16890,10 +16871,20 @@ function setupAdmin() {
 
     try {
       if (playerAccountSessionToken()) {
-        account =
-          await playerAccountStatus({
-            force:true
-          });
+        // Ekran startowy nie może czekać na dwie długie próby JSONP.
+        // Weryfikacja biegnie dalej w tle, ale po 3 s pokazujemy uczciwy
+        // komunikat zamiast pozostawić "Sprawdzam konto..." bez końca.
+        const statusPromise=playerAccountStatus({force:true});
+        const earlyResult=await Promise.race([
+          statusPromise,
+          new Promise(resolve=>setTimeout(()=>resolve("pending"),3000))
+        ]);
+        if (earlyResult === "pending") {
+          updateHomeAccountState(null);
+          statusPromise.then(updateHomeAccountState).catch(()=>updateHomeAccountState(null));
+          return;
+        }
+        account=earlyResult;
       }
     } catch (err) {
       console.warn(
