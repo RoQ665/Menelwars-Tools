@@ -11366,9 +11366,8 @@ function setupAdmin() {
     buildState.statCaps = buildNormalizeDynamicStatCaps(parsed.statCaps || {});
     buildState.bonusText = text;
     if (!buildState.profile || typeof buildState.profile !== "object") buildState.profile = buildEmptyState().profile;
-    buildState.profile.bonusesConfirmed = Boolean(el("build-bonus-confirmed")?.checked);
-
     const capCount = Object.keys(buildState.statCaps).length;
+    buildState.profile.bonusesConfirmed = Boolean(parsed.entries.length || capCount);
 
     if (!parsed.entries.length && !capCount) {
       status.textContent = parsed.unknown.length
@@ -11393,7 +11392,6 @@ function setupAdmin() {
     buildState.bonusText = "";
     if (!buildState.profile || typeof buildState.profile !== "object") buildState.profile = buildEmptyState().profile;
     buildState.profile.bonusesConfirmed = false;
-    if (el("build-bonus-confirmed")) el("build-bonus-confirmed").checked = false;
     if (el("build-bonus-text")) el("build-bonus-text").value = "";
     if (el("build-bonus-status")) el("build-bonus-status").textContent = "Bonusy dodatkowe zostały wyczyszczone.";
     buildRenderBonusPreview();
@@ -11439,9 +11437,6 @@ function setupAdmin() {
         ? Boolean(supplied[keyName])
         : Object.prototype.hasOwnProperty.call(profile,keyName);
 
-    const validCharacterLevel =
-      Number.isInteger(Number(profile.characterLevel)) &&
-      Number(profile.characterLevel) >= 1;
     const validPositive = keyName =>
       Number.isFinite(Number(profile[keyName])) && Number(profile[keyName]) >= 1;
     const validNonNegative = keyName =>
@@ -11454,13 +11449,18 @@ function setupAdmin() {
       baseHp:cleanPositive(profile.baseHp,100),
       petHp:cleanNonNegative(profile.petHp,0),
       eqHp:cleanNonNegative(profile.eqHp,0),
+      combatAttack:cleanPositive(profile.combatAttack,0),
+      combatDefense:cleanPositive(profile.combatDefense,0),
+      combatHp:cleanPositive(profile.combatHp,0),
       provided:{
-        characterLevel:has("characterLevel") && validCharacterLevel,
         attack:has("attack") && validPositive("attack"),
         defense:has("defense") && validPositive("defense"),
         baseHp:has("baseHp") && validPositive("baseHp"),
         petHp:has("petHp") && validNonNegative("petHp"),
-        eqHp:has("eqHp") && validNonNegative("eqHp")
+        eqHp:has("eqHp") && validNonNegative("eqHp"),
+        combatAttack:has("combatAttack") && validPositive("combatAttack"),
+        combatDefense:has("combatDefense") && validPositive("combatDefense"),
+        combatHp:has("combatHp") && validPositive("combatHp")
       },
       bonusesConfirmed:Boolean(profile.bonusesConfirmed)
     };
@@ -11486,10 +11486,9 @@ function setupAdmin() {
         Math.ceil(usedAttributePoints / 2)
       );
 
-    const characterLevel =
-      profile.provided && profile.provided.characterLevel
-        ? Math.max(1,Math.floor(Number(profile.characterLevel) || 1))
-        : requiredLevel;
+    // Poziom wynika bezpośrednio z liczby rozdanych punktów. Dokładne
+    // ATK/DEF/HP pobieramy z ekranu startowego walki, bez rozbijania HP.
+    const characterLevel = requiredLevel;
 
     const stats = buildNewStatBag();
     const extras = {
@@ -11571,10 +11570,12 @@ function setupAdmin() {
     // maksymalnego HP na turę. Najpierw wyliczamy końcowe HP po bonusie %,
     // a dopiero potem zamieniamy procent regeneracji na wartość / turę.
     const maxHpForRegen =
-      buildStatNumber(
-        (Number(stats.maxHpFlat) || 0) *
-        (1 + (Number(stats.maxHpPct) || 0) / 100)
-      );
+      profile.provided && profile.provided.combatHp
+        ? profile.combatHp
+        : buildStatNumber(
+            (Number(stats.maxHpFlat) || 0) *
+            (1 + (Number(stats.maxHpPct) || 0) / 100)
+          );
 
     if (stats.hpRegenPct) {
       stats.hpRegen +=
@@ -11622,7 +11623,13 @@ function setupAdmin() {
       extras,
       requiredLevel,
       characterLevel,
-      characterLevelProvided:Boolean(profile.provided && profile.provided.characterLevel)
+      characterLevelProvided:true,
+      combatStart:{
+        attack:profile.combatAttack,
+        defense:profile.combatDefense,
+        hp:profile.combatHp,
+        provided:Boolean(profile.provided && profile.provided.combatAttack && profile.provided.combatDefense && profile.provided.combatHp)
+      }
     };
   }
 
@@ -11658,6 +11665,14 @@ function setupAdmin() {
   }
 
   function buildFinalPrimaryStats(calculated) {
+    const combatStart=calculated && calculated.combatStart;
+    if (combatStart && combatStart.provided) {
+      return {
+        attack:buildStatNumber(combatStart.attack),
+        defense:buildStatNumber(combatStart.defense),
+        hp:buildStatNumber(combatStart.hp)
+      };
+    }
     const stats =
       calculated && calculated.stats
         ? calculated.stats
@@ -11691,6 +11706,7 @@ function setupAdmin() {
   function buildStatsHtml(source) {
     const calculated = buildCalculateStats(source);
     const extras = calculated.extras;
+    const usesCombatStart=Boolean(calculated.combatStart && calculated.combatStart.provided);
     const finalPrimary =
       buildFinalPrimaryStats(calculated);
 
@@ -11829,7 +11845,9 @@ function setupAdmin() {
 
               let formula = "";
 
-              if (group.finalKind === "attack") {
+              if (usesCombatStart) {
+                formula="wartość z ekranu „Statystyki startowe w walce”";
+              } else if (group.finalKind === "attack") {
                 formula =
                   `${finalPrimaryValue(calculated.stats.attackFlat)} × ` +
                   `(1 + ${finalPrimaryValue(calculated.stats.attackPct)}%)`;
@@ -11878,7 +11896,7 @@ function setupAdmin() {
 
           <div class="build-stat-grid">
             ${
-              group.levelHpRow
+              group.levelHpRow && !usesCombatStart
                 ? `
                   <div class="build-stat-row build-stat-level-hp-row">
                     <span class="build-stat-name">
@@ -11911,7 +11929,7 @@ function setupAdmin() {
                 `
                 : ""
             }
-            ${group.keys.map(key => `
+            ${group.keys.filter(key=>!usesCombatStart || !["attackFlat","attackPct","defenseFlat","defensePct","maxHpFlat","maxHpPct"].includes(key)).map(key => `
               <div class="build-stat-row">
                 <span class="build-stat-name">${escapeHtml(BUILD_STAT_META[key][0])}</span>
                 <span class="build-stat-base">${escapeHtml(sourceValue(key,baseStats[key] || 0,true))}</span>
@@ -12073,6 +12091,27 @@ function setupAdmin() {
     const host = el("build-stats");
     if (!host) return;
     host.innerHTML = buildStatsHtml(buildState);
+    buildRenderSetupSteps();
+  }
+
+  function buildRenderSetupSteps() {
+    const host=el("build-setup-steps");
+    if (!host) return;
+    const profile=buildProfileStats(buildState);
+    const hasBuild=buildPointsUsed()>0;
+    const hasBonuses=Boolean(profile.bonusesConfirmed);
+    const hasCombat=Boolean(profile.provided?.combatAttack && profile.provided?.combatDefense && profile.provided?.combatHp);
+    const card=(step,title,ready,text)=>`<button type="button" class="build-setup-step ${ready?"ready":""}" data-build-setup-open="${step}"><span class="build-setup-step-number">${ready?"✓":step}</span><span><strong>${title}</strong><small>${text}</small></span><span class="build-setup-step-state">${ready?"Gotowe":"Uzupełnij"}</span></button>`;
+    host.innerHTML=`<div class="build-setup-title"><strong>🥊 Przygotuj build do symulatora</strong><span class="muted">Uzupełnij trzy kroki. Zielone karty oznaczają gotowość.</span></div><div class="build-setup-grid">${card(1,"Build",hasBuild,hasBuild?`${buildPointsUsed()} pkt · poziom ${buildRequiredLevel()}`:"Wklej „Kopiuj build” z gry")}${card(2,"Bonusy PvP",hasBonuses,hasBonuses?`${(buildState.bonuses||[]).length} rozpoznanych bonusów`:"Wklej „Łączne bonusy PvP”")}${card(3,"Start walki",hasCombat,hasCombat?`${profile.combatAttack} ATK · ${profile.combatDefense} DEF · ${profile.combatHp} HP`:"Przepisz trzy statystyki z walki")}</div>`;
+    host.querySelectorAll("[data-build-setup-open]").forEach(button=>button.addEventListener("click",()=>{
+      const step=String(button.dataset.buildSetupOpen||"");
+      const dialog=el(`build-setup-${step=== "1" ? "build" : step === "2" ? "bonuses" : "combat"}-dialog`);
+      if (!dialog) return;
+      if (step==="1") el("build-setup-build-input").value=el("build-game-string")?.value||"";
+      if (step==="2") el("build-setup-bonuses-input").value=el("build-bonus-text")?.value||"";
+      if (step==="3") { el("build-setup-combat-attack").value=profile.provided?.combatAttack?profile.combatAttack:""; el("build-setup-combat-defense").value=profile.provided?.combatDefense?profile.combatDefense:""; el("build-setup-combat-hp").value=profile.provided?.combatHp?profile.combatHp:""; }
+      dialog.showModal();
+    }));
   }
 
 
@@ -12097,13 +12136,15 @@ function setupAdmin() {
       name:"",
       description:"",
       profile:{
-        characterLevel:1,
         attack:1,
         defense:1,
         baseHp:100,
         petHp:0,
         eqHp:0,
-        provided:{characterLevel:false,attack:false,defense:false,baseHp:false,petHp:false,eqHp:false},
+        combatAttack:0,
+        combatDefense:0,
+        combatHp:0,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:false,combatDefense:false,combatHp:false},
         bonusesConfirmed:false
       },
       bonuses:[],
@@ -12439,46 +12480,25 @@ function setupAdmin() {
         ? buildStatNumber(value)
         : fallback;
     };
-    const readNonNegative = (id,fallback=0) => {
-      const value = Number(rawValue(id));
-      return Number.isFinite(value) && value >= 0 && rawValue(id) !== ""
-        ? buildStatNumber(value)
-        : fallback;
-    };
-
-    const levelRaw = rawValue("build-profile-level");
-    const levelNumber = Number(levelRaw);
-    const characterLevel =
-      Number.isInteger(levelNumber) && levelNumber >= 1
-        ? Math.min(100000,levelNumber)
-        : 1;
     const validPositiveInput = id => {
       const raw = rawValue(id);
       const value = Number(raw);
       return raw !== "" && Number.isFinite(value) && value >= 1;
     };
-    const validNonNegativeInput = id => {
-      const raw = rawValue(id);
-      const value = Number(raw);
-      return raw !== "" && Number.isFinite(value) && value >= 0;
-    };
-
     buildState.profile = {
-      characterLevel,
-      attack:readPositive("build-profile-attack",1),
-      defense:readPositive("build-profile-defense",1),
-      baseHp:readPositive("build-profile-hp",100),
-      petHp:readNonNegative("build-profile-pet-hp",0),
-      eqHp:readNonNegative("build-profile-eq-hp",0),
+      // Zachowujemy stare pola jako bezpieczny fallback dla wcześniej
+      // zapisanych buildów, ale nowe buildy używają trzech statystyk walki.
+      attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+      combatAttack:readPositive("build-combat-attack",0),
+      combatDefense:readPositive("build-combat-defense",0),
+      combatHp:readPositive("build-combat-hp",0),
       provided:{
-        characterLevel:levelRaw !== "" && Number.isInteger(levelNumber) && levelNumber >= 1,
-        attack:validPositiveInput("build-profile-attack"),
-        defense:validPositiveInput("build-profile-defense"),
-        baseHp:validPositiveInput("build-profile-hp"),
-        petHp:validNonNegativeInput("build-profile-pet-hp"),
-        eqHp:validNonNegativeInput("build-profile-eq-hp")
+        attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,
+        combatAttack:validPositiveInput("build-combat-attack"),
+        combatDefense:validPositiveInput("build-combat-defense"),
+        combatHp:validPositiveInput("build-combat-hp")
       },
-      bonusesConfirmed:Boolean(el("build-bonus-confirmed")?.checked)
+      bonusesConfirmed:Boolean(buildState.profile && buildState.profile.bonusesConfirmed)
     };
 
     return buildState.profile;
@@ -12492,15 +12512,9 @@ function setupAdmin() {
       if (input) input.value = provided[keyName] ? value : "";
     };
 
-    setValue("build-profile-level","characterLevel",clean.characterLevel);
-    setValue("build-profile-attack","attack",clean.attack);
-    setValue("build-profile-defense","defense",clean.defense);
-    setValue("build-profile-hp","baseHp",clean.baseHp);
-    setValue("build-profile-pet-hp","petHp",clean.petHp);
-    setValue("build-profile-eq-hp","eqHp",clean.eqHp);
-    if (el("build-bonus-confirmed")) {
-      el("build-bonus-confirmed").checked = Boolean(clean.bonusesConfirmed);
-    }
+    setValue("build-combat-attack","combatAttack",clean.combatAttack);
+    setValue("build-combat-defense","combatDefense",clean.combatDefense);
+    setValue("build-combat-hp","combatHp",clean.combatHp);
   }
 
 
@@ -13162,7 +13176,7 @@ function setupAdmin() {
       : (
           includeBonuses
             ? "📦 Skopiowano build razem z itemami. Zapis utworzy nowy build."
-            : "📋 Skopiowano atrybuty i perki bez danych profilu i itemów autora. Wpisz swój faktyczny poziom postaci, Atak, Obronę, Bazowe HP, HP z pancerza peta, HP ze zwykłego EQ (bez bonusu seta) i wklej własne bonusy."
+            : "📋 Skopiowano atrybuty i perki bez danych autora. Uzupełnij trzy kroki nad kreatorem: build, własne bonusy PvP oraz statystyki startowe w walce."
         );
     renderBuildEditor();
     el("build-skill-editor").hidden = true;
@@ -13539,7 +13553,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.46" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.48" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -14837,12 +14851,6 @@ function setupAdmin() {
     if (!source || typeof source !== "object") return {ok:false,missing:["build"]};
 
     const profile = buildProfileStats(source);
-    const level =
-      profile.provided && profile.provided.characterLevel
-        ? Number(profile.characterLevel)
-        : NaN;
-    if (!Number.isInteger(level) || level < 1) missing.push("faktyczny poziom postaci");
-
     const attrs = source.attributes || {};
     BUILD_ATTR_ORDER.forEach(attrKey=>{
       const value = Number(attrs[attrKey]);
@@ -14855,12 +14863,6 @@ function setupAdmin() {
       (sum,attrKey) => sum + (Number.isFinite(Number(attrs[attrKey])) ? Number(attrs[attrKey]) : 0),
       0
     );
-    if (Number.isFinite(level) && level >= 1 && usedAttributePoints > level * 2) {
-      missing.push(
-        `poziom zbyt niski dla ${Math.round(usedAttributePoints)} pkt atrybutów (min. ${Math.ceil(usedAttributePoints/2)})`
-      );
-    }
-
     BUILD_ATTR_ORDER.forEach(attrKey=>{
       const value = Math.max(0,Math.min(50,Number(attrs[attrKey])||0));
       const tiers = Math.min(10,Math.floor(value/5));
@@ -14873,11 +14875,9 @@ function setupAdmin() {
     });
 
     const profileLabels = {
-      attack:"Atak z profilu",
-      defense:"Obrona z profilu",
-      baseHp:"bazowe HP",
-      petHp:"HP z pancerza peta",
-      eqHp:"HP ze zwykłego EQ"
+      combatAttack:"ATK startowe w walce",
+      combatDefense:"DEF startowe w walce",
+      combatHp:"HP startowe w walce"
     };
     Object.keys(profileLabels).forEach(keyName=>{
       if (!profile.provided || !profile.provided[keyName]) missing.push(profileLabels[keyName]);
@@ -15785,12 +15785,9 @@ function setupAdmin() {
     el("build-bonus-clear")?.addEventListener("click",buildClearBonuses);
 
     [
-      "build-profile-level",
-      "build-profile-attack",
-      "build-profile-defense",
-      "build-profile-hp",
-      "build-profile-pet-hp",
-      "build-profile-eq-hp"
+      "build-combat-attack",
+      "build-combat-defense",
+      "build-combat-hp"
     ].forEach(id => {
       el(id)?.addEventListener("input",()=>{
         buildReadProfileInputs();
@@ -15798,9 +15795,39 @@ function setupAdmin() {
       });
     });
 
-    el("build-bonus-confirmed")?.addEventListener("change",()=>{
+    el("build-setup-build-save")?.addEventListener("click",()=>{
+      if (el("build-game-string")) el("build-game-string").value=el("build-setup-build-input")?.value||"";
+      buildImportOfficialString();
+      const ok=buildPointsUsed()>0;
+      if (el("build-setup-build-status")) el("build-setup-build-status").textContent=ok?"✅ Build wczytany.":(el("build-game-string-status")?.textContent||"Nie udało się wczytać buildu.");
+      if (ok) el("build-setup-build-dialog")?.close();
+    });
+    el("build-setup-bonuses-save")?.addEventListener("click",()=>{
+      if (el("build-bonus-text")) el("build-bonus-text").value=el("build-setup-bonuses-input")?.value||"";
+      buildImportBonuses();
+      const ok=Boolean(buildState.profile?.bonusesConfirmed);
+      if (el("build-setup-bonuses-status")) el("build-setup-bonuses-status").textContent=ok?"✅ Bonusy wczytane.":(el("build-bonus-status")?.textContent||"Nie udało się wczytać bonusów.");
+      if (ok) el("build-setup-bonuses-dialog")?.close();
+    });
+    el("build-setup-combat-save")?.addEventListener("click",()=>{
+      const copy=(target,source)=>{if(el(target)) el(target).value=el(source)?.value||"";};
+      copy("build-combat-attack","build-setup-combat-attack");
+      copy("build-combat-defense","build-setup-combat-defense");
+      copy("build-combat-hp","build-setup-combat-hp");
       buildReadProfileInputs();
       renderBuildStats();
+      const profile=buildProfileStats(buildState);
+      const ok=Boolean(profile.provided?.combatAttack&&profile.provided?.combatDefense&&profile.provided?.combatHp);
+      if (el("build-setup-combat-status")) el("build-setup-combat-status").textContent=ok?"✅ Statystyki zapisane.":"Podaj poprawne ATK, DEF i HP.";
+      if (ok) el("build-setup-combat-dialog")?.close();
+    });
+    document.querySelectorAll("[data-build-setup-close]").forEach(button=>button.addEventListener("click",()=>button.closest("dialog")?.close()));
+
+    el("build-combat-stats-help")?.addEventListener("click",()=>{
+      el("build-combat-stats-tutorial")?.showModal();
+    });
+    el("build-combat-stats-tutorial-close")?.addEventListener("click",()=>{
+      el("build-combat-stats-tutorial")?.close();
     });
 
     buildWriteProfileInputs(buildState.profile);

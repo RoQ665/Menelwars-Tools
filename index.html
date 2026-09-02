@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=21.46">
+  <link rel="stylesheet" href="styles.css?v=21.48">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1179,7 +1179,33 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
         </div>
 
         <div id="build-editor">
-          <details class="content-accordion build-string-tools" open>
+          <section id="build-setup-steps" class="build-setup-steps" aria-label="Przygotowanie buildu do symulatora"></section>
+
+          <dialog id="build-setup-build-dialog" class="build-setup-dialog">
+            <div class="panel-head">1. 📋 Wczytaj build</div>
+            <p>W grze: <b>PvP → Atrybuty PvP → Kopiuj build</b>. Wklej skopiowany tekst poniżej.</p>
+            <input id="build-setup-build-input" type="text" spellcheck="false" placeholder="0/50/4/50/0:/ABBABABAAA//AAAAAABAAA/">
+            <div class="build-bonus-actions"><button id="build-setup-build-save" type="button" class="primary-btn">Wczytaj build</button><button data-build-setup-close type="button" class="secondary-btn">Anuluj</button></div>
+            <div id="build-setup-build-status" class="submit-status"></div>
+          </dialog>
+
+          <dialog id="build-setup-bonuses-dialog" class="build-setup-dialog">
+            <div class="panel-head">2. 🎒 Wczytaj bonusy PvP</div>
+            <p>W grze przewiń do <b>Łączne bonusy PvP</b>, skopiuj cały blok i wklej go tutaj.</p>
+            <textarea id="build-setup-bonuses-input" rows="8" placeholder="Powyższe atrybuty zostały powiększone..."></textarea>
+            <div class="build-bonus-actions"><button id="build-setup-bonuses-save" type="button" class="primary-btn">Wczytaj bonusy</button><button data-build-setup-close type="button" class="secondary-btn">Anuluj</button></div>
+            <div id="build-setup-bonuses-status" class="submit-status"></div>
+          </dialog>
+
+          <dialog id="build-setup-combat-dialog" class="build-setup-dialog">
+            <div class="panel-head">3. ⚔️ Statystyki startowe</div>
+            <p>Rozpocznij dowolną walkę PvP. Na dole ekranu „Łączne bonusy PvP” przepisz trzy liczby z pola <b>Statystyki startowe w walce</b>.</p>
+            <div class="build-profile-stats-grid"><label><span>⚔️ ATK</span><input id="build-setup-combat-attack" type="number" min="1" step="1" inputmode="numeric"></label><label><span>🛡️ DEF</span><input id="build-setup-combat-defense" type="number" min="1" step="1" inputmode="numeric"></label><label><span>❤️ HP</span><input id="build-setup-combat-hp" type="number" min="1" step="1" inputmode="numeric"></label></div>
+            <div class="build-bonus-actions"><button id="build-setup-combat-save" type="button" class="primary-btn">Zapisz statystyki</button><button data-build-setup-close type="button" class="secondary-btn">Anuluj</button></div>
+            <div id="build-setup-combat-status" class="submit-status"></div>
+          </dialog>
+
+          <details class="content-accordion build-string-tools" hidden>
             <summary>
               <span>🔁 Oficjalny format buildu MenelWars</span>
               <span class="accordion-chevron">⌄</span>
@@ -1209,52 +1235,46 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
           <div id="build-skill-editor" class="build-skill-editor" hidden></div>
 
-          <div class="build-profile-stats">
+          <div class="build-profile-stats" hidden>
             <div class="build-profile-stats-head">
-              <strong>🧍 Statystyki z profilu postaci</strong>
-              <span class="muted">Przepisz wartości widoczne w menu Postaci. Bazowe HP to zwykle 100.</span>
+              <strong>⚔️ Statystyki startowe w walce</strong>
+              <button id="build-combat-stats-help" type="button" class="secondary-btn build-profile-help">❔ Jak skopiować?</button>
             </div>
 
             <div class="build-profile-stats-grid">
               <label>
-                <span>🎚️ Faktyczny poziom postaci</span>
-                <input id="build-profile-level" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 50">
-                <small>To Twój aktualny poziom w grze, nie minimalny poziom wymagany przez rozkład atrybutów.</small>
+                <span>⚔️ ATK</span>
+                <input id="build-combat-attack" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 423">
               </label>
 
               <label>
-                <span>⚔️ Atak z profilu</span>
-                <input id="build-profile-attack" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 364">
+                <span>🛡️ DEF</span>
+                <input id="build-combat-defense" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 1085">
               </label>
 
               <label>
-                <span>🛡️ Obrona z profilu</span>
-                <input id="build-profile-defense" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 449">
-              </label>
-
-              <label>
-                <span>❤️ Bazowe HP</span>
-                <input id="build-profile-hp" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 105">
-              </label>
-
-              <label>
-                <span>🐾 HP z pancerza peta</span>
-                <input id="build-profile-pet-hp" type="number" min="0" step="1" inputmode="numeric" placeholder="np. 200">
-              </label>
-
-              <label>
-                <span>❤️ HP ze zwykłego EQ</span>
-                <input id="build-profile-eq-hp" type="number" min="0" step="1" inputmode="numeric" placeholder="np. 150">
-                <small>Bez bonusu za komplet/set — ten jest pobierany z importu.</small>
+                <span>❤️ HP</span>
+                <input id="build-combat-hp" type="number" min="1" step="1" inputmode="numeric" placeholder="np. 2316">
               </label>
             </div>
 
             <div class="build-profile-stats-note">
-              Faktyczny poziom postaci jest używany do HP za poziom i do symulatora. „Wymagany poziom” buildu pozostaje osobno minimalnym poziomem wynikającym z wydanych punktów atrybutów. Atak i Obrona zawierają już zwykłe bonusy postaci. HP z pancerza peta i HP ze zwykłego EQ wpisz osobno. W polu EQ nie dodawaj bonusu za komplet/set — jest on pobierany z importu.
+              W grze rozpocznij dowolną walkę PvP i przepisz trzy wartości z ekranu „Statystyki startowe w walce”. Poziom jest wyliczany automatycznie z rozdanych punktów atrybutów.
             </div>
+
+            <dialog id="build-combat-stats-tutorial" class="build-combat-stats-tutorial">
+              <div class="panel-head">📋 Jak przygotować build do symulatora</div>
+              <ol>
+                <li>W grze: <b>PvP → Atrybuty PvP → Kopiuj build</b>. Wklej tekst do pola importu w Tools.</li>
+                <li>W grze przewiń do <b>Łączne bonusy PvP</b>, skopiuj cały blok i wklej go w „Bonusy dodatkowe z gry”.</li>
+                <li>Na dole tego samego ekranu przepisz <b>ATK, OBRONA i HP</b> z „Statystyki startowe w walce”.</li>
+              </ol>
+              <p class="muted">Te trzy liczby są wartością używaną przez grę na początku walki.</p>
+              <button id="build-combat-stats-tutorial-close" type="button" class="primary-btn">Rozumiem</button>
+            </dialog>
           </div>
 
-          <details class="content-accordion build-bonus-import">
+          <details class="content-accordion build-bonus-import" hidden>
             <summary>
               <span>🎒 Bonusy dodatkowe z gry</span>
               <span class="accordion-chevron">⌄</span>
@@ -1266,10 +1286,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
                 <button id="build-bonus-import" type="button" class="secondary-btn">📋 Wczytaj bonusy</button>
                 <button id="build-bonus-clear" type="button" class="secondary-btn">🧹 Wyczyść bonusy</button>
               </div>
-              <label class="build-sim-confirm">
-                <input id="build-bonus-confirmed" type="checkbox">
-                <span>Potwierdzam, że wkleiłem pełne bonusy PvP itemów / setu / akcesoriów / gangu dla tego buildu.</span>
-              </label>
               <div id="build-bonus-status" class="submit-status"></div>
               <div id="build-bonus-preview" class="build-bonus-preview"></div>
             </div>
@@ -2009,6 +2025,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ</footer>
 
 <script src="data.js?v=21.05"></script>
-<script src="app.js?v=21.46"></script>
+<script src="app.js?v=21.48"></script>
 </body>
 </html>
