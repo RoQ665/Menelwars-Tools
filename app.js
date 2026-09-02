@@ -13574,7 +13574,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.50" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.51" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -14942,43 +14942,85 @@ function setupAdmin() {
     return {source:`Preset · ${source}`,name,key,value,percent};
   }
 
+  // Przeciwnicy treningowi używają realnych bonusów akcesoriów ze sklepu
+  // (katalog z 2.09.2026). Tier rośnie wraz z poziomem, bo API sklepu nie
+  // podaje osobnego wymogu levelu dla przedmiotu.
+  const PVP_PRESET_GEAR = {
+    offense:[
+      ["Bandana Grzmotu",[["attackPct",6.6],["armorPen",7.5],["accuracy",4.8],["critDmg",36]]],
+      ["Pas Pękniętej Apteczki",[["maxHpPct",7.5],["damageReduction",3.6],["defensePct",12.3],["healingReduction",10.5]]],
+      ["Sygnet Twardej Pięści",[["counter",10.8],["critChance",12.9],["doubleStrike",8.1],["lifesteal",10.8]]]
+    ],
+    bruiser:[
+      ["Bandana Łowcy Głów",[["attackPct",6.6],["armorPen",7.5],["accuracy",4.8],["execute",4.2]]],
+      ["Pas Obitej Szczęki",[["maxHpPct",7.5],["damageReduction",3.6],["critResist",10.5],["stunResist",10.5]]],
+      ["Sygnet Cichego Ciosu",[["evasion",4.8],["critChance",12.9],["lifesteal",10.8],["stun",8.1]]]
+    ],
+    skirmish:[
+      ["Bandana Refleksu",[["attackPct",6.6],["armorPen",7.5],["accuracy",4.8],["firstStrike",4.2]]],
+      ["Pas Zbitego Boku",[["maxHpPct",7.8],["damageReduction",3.6],["critResist",10.5],["bleedResist",11.1]]],
+      ["Sygnet Szybkiej Ręki",[["evasion",4.8],["doubleStrike",8.1],["counter",10.8],["lifesteal",10.8]]]
+    ]
+  };
+
+  const PVP_PRESET_GEAR_BY_TIER = {
+    offense:[
+      PVP_PRESET_GEAR.offense,
+      [["Bandana Łamacza Szczęk",[["attackPct",12.1],["armorPen",13.75],["accuracy",8.8],["critDmg",66]]],["Pas Fałszywego Medyka",[["maxHpPct",13.75],["damageReduction",6.6],["defensePct",22.55],["healingReduction",19.25]]],["Sygnet Ulicznego Łowcy",[["critChance",23.65],["doubleStrike",14.85],["evasion",8.8],["lifesteal",19.8]]]],
+      [["Bandana Nokautu",[["attackPct",16.5],["armorPen",18.75],["accuracy",12],["critDmg",90]]],["Pas Zatrutej Igły",[["maxHpPct",18.75],["damageReduction",9],["defensePct",30.75],["healingReduction",26.25]]],["Sygnet Nocnego Rzeźnika",[["critChance",32.25],["doubleStrike",20.25],["evasion",12],["lifesteal",27]]]],
+      [["Bandana Ciężkiej Pięści",[["attackPct",18.7],["armorPen",21.25],["accuracy",13.6],["critDmg",102]]],["Pas Bez Znieczulenia",[["maxHpPct",21.25],["damageReduction",10.2],["defensePct",34.85],["healingReduction",29.75]]],["Sygnet Ulicznej Zemsty",[["counter",30.6],["critChance",36.55],["doubleStrike",22.95],["lifesteal",30.6]]]],
+      [["Bandana Tytanicznego Ciosu",[["attackPct",20.9],["armorPen",23.75],["accuracy",15.2],["critDmg",114]]],["Pas Końca Kuracji",[["maxHpPct",23.75],["damageReduction",11.4],["defensePct",38.95],["healingReduction",33.25]]],["Sygnet Ostatniej Odpłaty",[["counter",34.2],["critChance",40.85],["doubleStrike",25.65],["lifesteal",34.2]]]]
+    ],
+    bruiser:[
+      PVP_PRESET_GEAR.bruiser,
+      [["Bandana Ulicznego Kata",[["attackPct",12.1],["armorPen",13.75],["accuracy",8.8],["execute",7.7]]],["Pas Twardego Karku",[["maxHpPct",13.75],["damageReduction",6.6],["critResist",19.25],["stunResist",19.25]]],["Sygnet Brudnego Nokautu",[["evasion",8.8],["critChance",23.65],["lifesteal",19.8],["stun",14.85]]]],
+      [["Bandana Wyroku",[["attackPct",16.5],["armorPen",18.75],["accuracy",12],["execute",10.5]]],["Pas Żelaznej Gardy",[["maxHpPct",18.75],["damageReduction",9],["critResist",26.25],["stunResist",26.25]]],["Sygnet Krwawego Rabusia",[["evasion",12],["critChance",32.25],["lifesteal",27],["stun",20.25]]]],
+      [["Bandana Skazańca",[["attackPct",18.7],["armorPen",21.25],["accuracy",13.6],["execute",11.9]]],["Pas Niezłomnego Bramkarza",[["maxHpPct",21.25],["damageReduction",10.2],["critResist",29.75],["stunResist",29.75]]],["Sygnet Nocnego Oprawcy",[["evasion",13.6],["critChance",36.55],["lifesteal",30.6],["stun",22.95]]]],
+      [["Bandana Egzekucji",[["attackPct",20.9],["armorPen",23.75],["accuracy",15.2],["execute",13.3]]],["Pas Ostatniego Bastionu",[["maxHpPct",23.75],["damageReduction",11.4],["critResist",33.25],["stunResist",33.25]]],["Sygnet Wiecznego Nokautu",[["evasion",15.2],["critChance",40.85],["lifesteal",34.2],["stun",25.65]]]]
+    ],
+    skirmish:[
+      PVP_PRESET_GEAR.skirmish,
+      [["Bandana Pierwszej Krwi",[["attackPct",12.1],["armorPen",13.75],["accuracy",8.8],["firstStrike",7.7]]],["Pas Polowego Opatrunku",[["bleedResist",20.35],["damageReduction",6.6],["defensePct",21.45],["maxHpPct",14.3]]],["Sygnet Brudnej Kontry",[["evasion",8.8],["doubleStrike",14.85],["counter",19.8],["lifesteal",19.8]]]],
+      [["Bandana Zasadzki",[["attackPct",16.5],["armorPen",18.75],["accuracy",12],["firstStrike",10.5]]],["Pas Zszytego Boku",[["bleedResist",27.75],["damageReduction",9],["defensePct",29.25],["maxHpPct",19.5]]],["Sygnet Ulicznego Rewanżu",[["evasion",12],["doubleStrike",20.25],["counter",27],["lifesteal",27]]]],
+      [["Bandana Bez Ostrzeżenia",[["attackPct",18.7],["armorPen",21.25],["accuracy",13.6],["firstStrike",11.9]]],["Pas Nie do Zdarcia",[["maxHpPct",22.1],["damageReduction",10.2],["critResist",29.75],["bleedResist",31.45]]],["Sygnet Krwawego Odwetu",[["evasion",13.6],["doubleStrike",22.95],["counter",30.6],["lifesteal",30.6]]]],
+      [["Bandana Pierwszego Ciosu",[["attackPct",20.9],["armorPen",23.75],["accuracy",15.2],["firstStrike",13.3]]],["Pas Ostatniej Twierdzy",[["maxHpPct",24.7],["damageReduction",11.4],["critResist",33.25],["bleedResist",35.15]]],["Sygnet Wiecznego Odwetu",[["evasion",15.2],["doubleStrike",25.65],["counter",34.2],["lifesteal",34.2]]]]
+    ]
+  };
+
+  function pvpPresetGearBonuses(style,tier) {
+    const items = (PVP_PRESET_GEAR_BY_TIER[style] || [])[tier-1] || [];
+    return items.flatMap(([name,stats]) =>
+      stats.map(([key,value]) => pvpPresetBonus(`Wyposażenie · ${name}`,name,key,value,true))
+    );
+  }
+
   function pvpGeneratedPresets() {
     if (pvpGeneratedPresetsCache) return pvpGeneratedPresetsCache;
     const archetypes = [
       {
-        id:"glass",name:"Glass Cannon",weights:[5,1,1,1,4],choices:"AB",
-        description:"Przeciwnik treningowy / wygenerowany. Testuje przeżycie burstu, krytyków, first strike i Execute.",
-        bonuses:[["Atak","attackPct",25],["Kryt","critChance",18],["Crit dmg","critDmg",38],["Pierwszy cios","firstStrike",8],["Egzekucja","execute",6]]
+        id:"offense",role:"napastnik",weights:[3.8,1.5,1.4,1.7,3.6],choices:"ABBA",
+        names:["Bolek Bimberek","Włodek Wyrwa","Rysiek Rozwałka","Zdzichu Zawał","Grzesiu Grzmot","Mirek Młot","Franek Furia","Darek Dynamit","Wiesiek Wycisk"],
+        description:"Wszechstronny napastnik: obrażenia, przebicie i krytyki, ale z punktami w Żywotność oraz Wytrzymałość.",
+        primary:(level,tier)=>({attack:Math.round(100+level*5.7+tier*17),defense:Math.round(150+level*6.2+tier*25),hp:Math.round(330+level*27+tier*75)})
       },
       {
-        id:"tank",name:"Tank",weights:[1,5,1,5,1],choices:"BA",
-        description:"Przeciwnik treningowy / wygenerowany. Testuje sustain, przebicie, Execute i odporności.",
-        bonuses:[["Obrona","defensePct",38],["Maks. HP","maxHpPct",34],["Redukcja obrażeń","damageReduction",18],["Odp. kryt","critResist",16],["Regeneracja","hpRegen",7,false],["Odp. krwawienie","bleedResist",12]]
+        id:"bruiser",role:"twardziel",weights:[2.1,3.7,1.3,3.7,2.8],choices:"BAAB",
+        names:["Heniek Hart","Czesiek Cegła","Mietek Murem","Józek Żelazo","Wacek Wał","Bogdan Barykada","Tadzio Twardy","Roman Rykoszet","Stefan Schron"],
+        description:"Twardziel z realną presją: odporności i redukcje, lecz także celność, ogłuszenie oraz Egzekucja.",
+        primary:(level,tier)=>({attack:Math.round(85+level*4.5+tier*12),defense:Math.round(175+level*8.7+tier*35),hp:Math.round(450+level*31+tier*90)})
       },
       {
-        id:"dodge",name:"Dodge / Counter",weights:[1,2,4,2,3],choices:"ABBA",
-        description:"Przeciwnik treningowy / wygenerowany. Testuje Celność, Unik, Kontratak i Double Strike.",
-        bonuses:[["Unik","evasion",12],["Kontratak","counter",10],["Podwójne","doubleStrike",8],["Celność","accuracy",10]]
-      },
-      {
-        id:"bleed",name:"Bleed",weights:[4,1,3,2,3],choices:"AABB",
-        description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na krwawienie i tempo zabicia pod DoT.",
-        bonuses:[["Krwawienie","bleed",28],["Obrażenia krwawienia","bleedDamage",75],["Atak","attackPct",12],["Kradzież życia","lifesteal",8]]
-      },
-      {
-        id:"control",name:"Control / Stun",weights:[2,2,2,2,5],choices:"BABA",
-        description:"Przeciwnik treningowy / wygenerowany. Testuje odporność na ogłuszenie, Celność i presję Execute.",
-        bonuses:[["Ogłuszenie","stun",17],["Celność","accuracy",18],["Redukcja leczenia","healingReduction",16],["Odp. ogłuszenie","stunResist",14],["Egzekucja","execute",5]]
-      },
-      {
-        id:"sustain",name:"Sustain / Wampir",weights:[2,3,1,5,2],choices:"BBAA",
-        description:"Przeciwnik treningowy / wygenerowany. Testuje długą walkę, lifesteal, regen i Healing Reduction.",
-        bonuses:[["Maks. HP","maxHpPct",28],["Kradzież życia","lifesteal",18],["Regeneracja","hpRegen",8,false],["Redukcja obrażeń","damageReduction",12],["Redukcja leczenia","healingReduction",10]]
+        id:"skirmish",role:"uliczny spryciarz",weights:[2.5,1.6,3.4,2.2,3.3],choices:"ABAB",
+        names:["Dżesika Drybling","Krycha Kontra","Andrzej Antylopa","Basia Błysk","Norbert Nurek","Kinga Kropelka","Madzia Migawka","Olek Odbicie","Patryk Półcień"],
+        description:"Zwinny mieszaniec: unik, kontra i podwójne uderzenie, wsparty Precją oraz zdrowiem na dłuższą walkę.",
+        primary:(level,tier)=>({attack:Math.round(95+level*5.1+tier*14),defense:Math.round(145+level*7.1+tier*26),hp:Math.round(360+level*27.5+tier*78)})
       }
     ];
 
     const out = [];
-    [40,50,60].forEach(level=>{
+    const levels=[30,35,40,45,50,55,60,65,70];
+    levels.forEach((level,levelIndex)=>{
+      const tier=Math.min(5,1+Math.floor(levelIndex/2));
       archetypes.forEach((arch,archIndex)=>{
         const values = pvpPresetAllocate(level,arch.weights);
         const attributes = {};
@@ -14991,29 +15033,26 @@ function setupAdmin() {
             perks[attrKey][tier] = arch.choices[(tier+index+archIndex)%arch.choices.length];
           }
         });
-        // Treningowe buildy mają jawnie mocniejszy profil bazowy niż wcześniej.
-        // To nie jest ukryty mnożnik w silniku — wartości trafiają normalnie
-        // do stat blocku przeciwnika i przechodzą przez te same formuły co gracz.
+        const primary=arch.primary(level,tier);
         const profile = {
-          characterLevel:level,
-          attack:Math.round(220+level*5.0),
-          defense:Math.round(275+level*6.0),
-          baseHp:125,
-          petHp:Math.round(level*5.2),
-          eqHp:Math.round(level*4.2),
-          provided:{characterLevel:true,attack:true,defense:true,baseHp:true,petHp:true,eqHp:true},
+          attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+          combatAttack:primary.attack,
+          combatDefense:primary.defense,
+          combatHp:primary.hp,
+          provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
           bonusesConfirmed:true
         };
-        const bonuses = arch.bonuses.map(def=>pvpPresetBonus(arch.name,def[0],def[1],def[2],def.length<4?true:def[3]));
+        const bonuses=pvpPresetGearBonuses(arch.id,tier);
+        const equipment=(PVP_PRESET_GEAR_BY_TIER[arch.id][tier-1] || []).map(item=>item[0]).join(" · ");
         out.push({
           id:`preset-${level}-${arch.id}`,
-          name:`Lvl ${level} · ${arch.name}`,
-          authorNick:"MenelWars Tools · przeciwnik treningowy",
+          name:`${arch.names[levelIndex]} · Lvl ${level}`,
+          authorNick:"MenelWars Tools · przeciwnik",
           ownerNick:"",
           public:false,
           level,
           attributes,perks,profile,bonuses,
-          description:`${arch.description} Jawny stat block; bez ukrytych mnożników trudności.`
+          description:`${arch.description} Wyposażenie T${tier}: ${equipment}. Statystyki startowe walki: ${primary.attack} ATK · ${primary.defense} DEF · ${primary.hp} HP.`
         });
       });
     });
