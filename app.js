@@ -11860,7 +11860,9 @@ function setupAdmin() {
 
     // Poziom wynika bezpośrednio z liczby rozdanych punktów. Dokładne
     // ATK/DEF/HP pobieramy z ekranu startowego walki, bez rozbijania HP.
-    const characterLevel = requiredLevel;
+    const characterLevel = Number.isInteger(Number(source && source.simulationLevel))
+      ? Math.max(1,Number(source.simulationLevel))
+      : requiredLevel;
 
     const stats = buildNewStatBag();
     const extras = {
@@ -15317,7 +15319,8 @@ function setupAdmin() {
 
     const profile = buildProfileStats(source);
     const attrs = source.attributes || {};
-    BUILD_ATTR_ORDER.forEach(attrKey=>{
+    const allowMissingPerks=Boolean(source.allowMissingPerks);
+    if (!allowMissingPerks) BUILD_ATTR_ORDER.forEach(attrKey=>{
       const value = Number(attrs[attrKey]);
       if (!Number.isInteger(value) || value < 0 || value > 50) {
         missing.push(`atrybut ${BUILD_ATTRS[attrKey].name}`);
@@ -15499,6 +15502,29 @@ function setupAdmin() {
           description:`${arch.description} Wyposażenie T${tier}: ${equipment}. Statystyki startowe walki: ${primary.attack} ATK · ${primary.defense} DEF · ${primary.hp} HP.`
         });
       });
+    });
+    // Jedyny testowy NPC z Rewirów. Wszystkie szanse mechanik wynikają
+    // wyłącznie z jego prawdziwych atrybutów; brak dopisanych perków, itemów
+    // i bonusów. simulationLevel=13 zachowuje faktyczny poziom widoczny w grze.
+    out.push({
+      id:"rewir-test-kamil-zdun",
+      name:"Kamil Zdun · Lvl 13 · Rewiry TEST",
+      authorNick:"MenelWars · Rewiry (test)",
+      ownerNick:"",
+      public:false,
+      level:13,
+      simulationLevel:13,
+      allowMissingPerks:true,
+      attributes:{strength:42,endurance:32,agility:42,vitality:28,precision:42},
+      perks:{strength:{},endurance:{},agility:{},vitality:{},precision:{}},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:470,combatDefense:460,combatHp:1350,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      description:"Test Rewirów: 470 ATK · 460 DEF · 1350 HP; STR 42 · END 32 · AGI 42 · VIT 28 · PRC 42. Bez perków i wyposażenia — efekty wynikają wyłącznie z atrybutów."
     });
     pvpGeneratedPresetsCache = out;
     return out;
