@@ -3931,6 +3931,11 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .gang-demand-form .gang-demand-search{grid-column:1/-1}
 .gang-demand-form button{justify-self:start}
 .gang-demand-results{grid-column:1/-1;max-height:255px;overflow:auto;border:1px solid #d7c19a;border-radius:10px;background:#fffdf8;box-shadow:0 5px 16px rgba(76,52,27,.12)}
+.gang-demand-admin-tools{grid-column:1/-1;padding:9px;border:1px dashed #bd9467;border-radius:9px;background:#fff8ec;font-size:12px;color:#684e34}
+.gang-demand-admin-tools>button{margin-bottom:7px}
+.gang-demand-admin-tools details summary{cursor:pointer;font-weight:700}
+.gang-demand-blocked-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.gang-demand-blocked-list button{padding:5px 7px;font-size:11px}
 .gang-demand-list-hint{padding:8px 10px;color:#806d55;font-size:12px}
 .gang-demand-choice{display:flex;width:100%;align-items:center;gap:9px;padding:7px 9px;border:0;border-bottom:1px solid #eee1ca;background:transparent;text-align:left;color:#47341f}
 .gang-demand-choice:hover{background:#f6ead6}
