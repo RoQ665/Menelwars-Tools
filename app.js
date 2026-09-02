@@ -2027,6 +2027,13 @@ function mapRenderRouteResult() {
       if (MAP_ROUTE_DISTRICTS.includes(preferred)) startSelect.value = preferred;
       startSelect.addEventListener("change",() => {
         localStorage.setItem("menelwars_map_start_v1",startSelect.value);
+        if (mapEasterSessionActive) {
+          mapEasterVisitedDistricts.add(startSelect.value);
+          if (MAP_ROUTE_DISTRICTS.every(name=>mapEasterVisitedDistricts.has(name))) {
+            mapEasterSessionActive = false;
+            achievementTrack(["easter_all_districts"]);
+          }
+        }
         mapRenderRouteResult();
       });
     }
@@ -2742,6 +2749,8 @@ function mapRenderRouteResult() {
   let distilleryDataLoaded = false;
   let gardenDataLoaded = false;
   let mapModuleLoaded = false;
+  let mapEasterVisitedDistricts = new Set();
+  let mapEasterSessionActive = false;
 
   const moduleOpenInFlight = {
     distillery:null,
@@ -3005,6 +3014,7 @@ function mapRenderRouteResult() {
   }
 
   async function openMapModule() {
+    const startsNewMapSession = activeToolModule !== "map";
     if (!mapModuleLoaded) {
       showModuleLoading(
         "map",
@@ -3024,6 +3034,10 @@ function mapRenderRouteResult() {
 
     if (mapModuleLoaded) {
       showToolView("map-view","map");
+      if (startsNewMapSession) {
+        mapEasterVisitedDistricts = new Set();
+        mapEasterSessionActive = true;
+      }
       achievementTrack(["map_open"]);
       return;
     }
@@ -3055,6 +3069,8 @@ function mapRenderRouteResult() {
     }
 
     showToolView("map-view","map");
+    mapEasterVisitedDistricts = new Set();
+    mapEasterSessionActive = true;
     achievementTrack(["map_open"]);
   }
 
@@ -3966,15 +3982,30 @@ function mapRenderRouteResult() {
     ]}
   ];
 
+  const EASTER_EGG_CATEGORY = {
+    id:"easter-eggs",icon:"🥚",medal:"assets/achievements/easter-egg-medal.png",title:"Easter eggi",items:[
+      ["easter_bolek_mirror","Bolek w lustrze","Zapisz build nazwany Bolek Bimberek i uruchom nim 1 000 walk przeciw Bolekowi Bimberkowi."],
+      ["easter_indecisive_president","Niezdecydowany prezes","Po wejściu do Gangu przejdź trzy razy: Spółka → Wpłaty."],
+      ["easter_all_districts","Mieszkaniec wszystkich dzielnic","W jednej otwartej sesji Mapy wskaż „Jestem tutaj” w każdej dzielnicy."],
+      ["easter_forgetful_watering","Zapominalski podlewacz","W ciągu 30 sekund ustaw suwak podlewania kolejno: 1%, 100%, 1%, 100%. Wartości pomiędzy nie przeszkadzają."]
+    ]
+  };
+
+  function achievementCategoriesFor(unlocked={}) {
+    const eggUnlocked = EASTER_EGG_CATEGORY.items.some(item=>Boolean(unlocked && unlocked[item[0]]));
+    return eggUnlocked ? [...ACHIEVEMENT_CATEGORIES,EASTER_EGG_CATEGORY] : ACHIEVEMENT_CATEGORIES;
+  }
+
   function achievementsHtml(unlocked={},expandedCategories=new Set()) {
-    const total=ACHIEVEMENT_CATEGORIES.reduce((sum,category)=>sum+category.items.length,0);
-    const count=Object.keys(unlocked || {}).filter(id=>ACHIEVEMENT_CATEGORIES.some(category=>category.items.some(item=>item[0]===id))).length;
+    const categories=achievementCategoriesFor(unlocked);
+    const total=categories.reduce((sum,category)=>sum+category.items.length,0);
+    const count=Object.keys(unlocked || {}).filter(id=>categories.some(category=>category.items.some(item=>item[0]===id))).length;
     const percent=total ? Math.round(count/total*100) : 0;
-    return `<section class="achievements-card"><div class="achievements-head"><div><strong>🏆 Osiągnięcia</strong><small>${count} odblokowane · ${total-count} pozostałe · ${total} łącznie</small></div><b>${percent}%</b></div><div class="achievements-progress"><i style="width:${percent}%"></i></div>${ACHIEVEMENT_CATEGORIES.map(category=>{const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;return `<details class="achievement-category" data-achievement-category="${category.id}"${expandedCategories.has(category.id)?" open":""}><summary><span>${category.icon} ${category.title}</span><small>${complete} / ${category.items.length}</small></summary><div class="achievement-grid">${category.items.map(([id,title,description])=>{const done=Boolean(unlocked && unlocked[id]);return `<span class="achievement-badge ${done?"done":"locked"}" tabindex="0" title="${escapeHtml(description)}"><b><img src="${category.medal}" alt="" aria-hidden="true"></b><span>${escapeHtml(title)}</span><small>${escapeHtml(description)}</small></span>`;}).join("")}</div></details>`;}).join("")}</section>`;
+    return `<section class="achievements-card"><div class="achievements-head"><div><strong>🏆 Osiągnięcia</strong><small>${count} odblokowane · ${total-count} pozostałe · ${total} łącznie</small></div><b>${percent}%</b></div><div class="achievements-progress"><i style="width:${percent}%"></i></div>${categories.map(category=>{const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;const secretCategory=category.id==="easter-eggs";return `<details class="achievement-category" data-achievement-category="${category.id}"${expandedCategories.has(category.id)?" open":""}><summary><span>${category.icon} ${category.title}</span><small>${complete} / ${category.items.length}</small></summary><div class="achievement-grid">${category.items.map(([id,title,description])=>{const done=Boolean(unlocked && unlocked[id]);const visibleTitle=!secretCategory || done ? title : "???";const visibleDescription=!secretCategory || done ? description : "???";return `<span class="achievement-badge ${done?"done":"locked"}" tabindex="0" title="${escapeHtml(visibleDescription)}"><b><img src="${category.medal}" alt="" aria-hidden="true"></b><span>${escapeHtml(visibleTitle)}</span><small>${escapeHtml(visibleDescription)}</small></span>`;}).join("")}</div></details>`;}).join("")}</section>`;
   }
 
   function achievementCategoryMedals(unlocked={}) {
-    return ACHIEVEMENT_CATEGORIES.map(category=>{
+    return achievementCategoriesFor(unlocked).map(category=>{
       const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;
       const percent=category.items.length ? complete/category.items.length*100 : 0;
       const tier=percent===100 ? "platinum" : percent>=75 ? "gold" : percent>=50 ? "silver" : percent>=25 ? "bronze" : "";
@@ -3983,8 +4014,9 @@ function mapRenderRouteResult() {
   }
 
   function achievementOverallMedal(unlocked={}) {
-    const total=ACHIEVEMENT_CATEGORIES.reduce((sum,category)=>sum+category.items.length,0);
-    const complete=Object.keys(unlocked || {}).filter(id=>ACHIEVEMENT_CATEGORIES.some(category=>category.items.some(item=>item[0]===id))).length;
+    const categories=achievementCategoriesFor(unlocked);
+    const total=categories.reduce((sum,category)=>sum+category.items.length,0);
+    const complete=Object.keys(unlocked || {}).filter(id=>categories.some(category=>category.items.some(item=>item[0]===id))).length;
     const percent=total ? complete/total*100 : 0;
     const tier=percent>=100 ? "platinum" : percent>=75 ? "gold" : percent>=50 ? "silver" : percent>=25 ? "bronze" : "";
     return tier ? {tier,complete,total,percent,medal:`assets/achievements/overall-${tier}.png`} : null;
@@ -13304,6 +13336,8 @@ function setupAdmin() {
   let gardenLastRenderSignature = "";
   let gardenLastPlotStateSignature = "";
   let gardenPendingPhase = null;
+  let gardenEasterWaterSequence = [];
+  let gardenEasterWaterStartedAt = 0;
   const GARDEN_AUTO_MODEL_VERSION = "AUTO52";
   const GARDEN_AUTO_MODEL_HOURS = 52;
   const GARDEN_AUTO_STAGE_MS = (GARDEN_AUTO_MODEL_HOURS * 60 * 60 * 1000) / 10;
@@ -13380,6 +13414,29 @@ function setupAdmin() {
     const value = gardenClampValue(raw,config.min,config.max,config.step,range.value || config.fallback);
     range.value = String(value);
     input.value = kind === "ph" ? value.toFixed(1) : String(Math.round(value));
+  }
+
+  function gardenTrackWaterEasterEgg(value) {
+    const endpoint=Number(value);
+    if (endpoint!==1 && endpoint!==100) return;
+    const now=Date.now();
+    const expected=[1,100,1,100];
+    if (gardenEasterWaterStartedAt && now-gardenEasterWaterStartedAt>30000) {
+      gardenEasterWaterSequence=[];
+      gardenEasterWaterStartedAt=0;
+    }
+    if (endpoint===expected[gardenEasterWaterSequence.length]) {
+      if (!gardenEasterWaterSequence.length) gardenEasterWaterStartedAt=now;
+      gardenEasterWaterSequence.push(endpoint);
+      if (gardenEasterWaterSequence.length===expected.length) {
+        gardenEasterWaterSequence=[];
+        gardenEasterWaterStartedAt=0;
+        achievementTrack(["easter_forgetful_watering"]);
+      }
+      return;
+    }
+    gardenEasterWaterSequence=endpoint===1 ? [1] : [];
+    gardenEasterWaterStartedAt=endpoint===1 ? now : 0;
   }
 
   // Synchronizacja podczas wpisywania: pole liczbowe jest źródłem prawdy już
@@ -14807,6 +14864,7 @@ function setupAdmin() {
 
       range?.addEventListener("input",()=>{
         gardenSyncManualInput(kind,"range");
+        if (kind === "water") gardenTrackWaterEasterEgg(range.value);
         gardenRenderEditor();
       });
       range?.addEventListener("change",()=>{
@@ -15897,6 +15955,13 @@ function setupAdmin() {
         achievementIds.push("pvp_public_fight");
         if (runs===1000 && agg.winsA/runs>=0.8) achievementIds.push("pvp_public_win");
       }
+      const fightsMirrorBolek=
+        leftItem.group==="mine" &&
+        normalizedPlayerNick(leftItem.source.name)===normalizedPlayerNick("Bolek Bimberek") &&
+        rightItem.group==="preset" &&
+        rightItem.source.id==="preset-30-offense" &&
+        runs===1000;
+      if (fightsMirrorBolek) achievementIds.push("easter_bolek_mirror");
       achievementTrack(achievementIds);
       // Przeciwnik AI jest zaliczany dopiero na wiarygodnej próbie 1 000 walk.
       // „Pokonaj” oznacza przewagę w symulacji, nie pojedynczy szczęśliwy rzut.
@@ -16423,6 +16488,23 @@ function setupAdmin() {
     }
   }
 
+  let gangEasterNavigationSequence = [];
+  let gangEasterNavigationOpen = false;
+
+  function gangTrackIndecisiveEasterEgg(target) {
+    if (!gangEasterNavigationOpen) return;
+    const expected=["company-view","payments-view","company-view","payments-view","company-view","payments-view"];
+    if (target===expected[gangEasterNavigationSequence.length]) {
+      gangEasterNavigationSequence.push(target);
+      if (gangEasterNavigationSequence.length===expected.length) {
+        gangEasterNavigationOpen=false;
+        gangEasterNavigationSequence=[];
+        achievementTrack(["easter_indecisive_president"]);
+      }
+      return;
+    }
+    gangEasterNavigationSequence=target==="company-view" ? [target] : [];
+  }
 
   async function openGangLanding() {
     if (!playerAccountSessionToken()) {
@@ -16449,7 +16531,11 @@ function setupAdmin() {
     setGangOptionalButtonsChecking();
 
     const gangMenuStatus=await loadGangMenuStatus();
-    if (gangMenuStatus) achievementTrack(["gang_login"]);
+    if (gangMenuStatus) {
+      gangEasterNavigationSequence=[];
+      gangEasterNavigationOpen=true;
+      achievementTrack(["gang_login"]);
+    }
 
     if (!playerAccountSessionToken()) {
       if (el("gang-tabs")) {
@@ -16499,6 +16585,7 @@ function setupAdmin() {
         target,
         "gang"
       );
+      gangTrackIndecisiveEasterEgg(target);
 
       const payloadAge =
         Date.now() - latestGangPayloadAt;
@@ -16587,6 +16674,7 @@ function setupAdmin() {
 
     el("gang-tabs").hidden = false;
     showToolView(target,"gang");
+    gangTrackIndecisiveEasterEgg(target);
 
     if (
       latestGangPayload &&

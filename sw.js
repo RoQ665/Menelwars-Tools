@@ -1,12 +1,12 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v21.60";
+const CACHE = "menelwars-tools-v21.61";
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=21.60",
+  "./styles.css?v=21.61",
   "./data.js?v=21.05",
-  "./app.js?v=21.60",
+  "./app.js?v=21.61",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
@@ -22,6 +22,7 @@ const CORE_ASSETS = [
   "./assets/achievements/pvp-medal.png",
   "./assets/achievements/map-medal.png",
   "./assets/achievements/gang-medal.png",
+  "./assets/achievements/easter-egg-medal.png",
   "./empty-soil.png?v=21.09"
 ];
 
