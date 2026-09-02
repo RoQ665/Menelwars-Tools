@@ -7991,6 +7991,103 @@ async function setAdminSubmissionStatus(
     card.remove();
   }
 
+  let gangDemandLoadInFlight = null;
+  let gangDemandCache = null;
+
+  function gangDemandCatalog() {
+    const raw=Array.isArray(window.MENELWARS_GAME_ITEMS) ? window.MENELWARS_GAME_ITEMS : [];
+    return raw.map(item=>({id:Number(item[0]),name:String(item[1] || ""),iconUrl:String(item[2] || ""),group:String(item[3] || ""),subtitle:String(item[4] || "")})).filter(item=>Number.isFinite(item.id) && item.name);
+  }
+
+  function gangDemandItem(itemId) {
+    return gangDemandCatalog().find(item=>item.id===Number(itemId)) || {id:Number(itemId)||0,name:`Przedmiot #${itemId}`,iconUrl:"",group:"",subtitle:""};
+  }
+
+  function gangDemandIcon(item) {
+    return item.iconUrl ? `<img class="gang-demand-item-icon" src="${escapeHtml(item.iconUrl)}" alt="" loading="lazy">` : `<span class="gang-demand-item-icon" aria-hidden="true">📦</span>`;
+  }
+
+  function renderGangDemandChoices(query) {
+    const box=el("gang-demand-results");
+    if (!box) return;
+    const needle=String(query || "").trim().toLocaleLowerCase("pl");
+    if (needle.length<2) { box.hidden=true; box.innerHTML=""; return; }
+    const matches=gangDemandCatalog().filter(item=>item.name.toLocaleLowerCase("pl").includes(needle)).slice(0,30);
+    box.hidden=!matches.length;
+    box.innerHTML=matches.map(item=>`<button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIcon(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group || "przedmiot")}</small></button>`).join("");
+    box.querySelectorAll("[data-gang-demand-item]").forEach(button=>button.addEventListener("click",()=>{
+      const item=gangDemandItem(button.dataset.gangDemandItem);
+      el("gang-demand-item-id").value=String(item.id);
+      el("gang-demand-search").value=item.name;
+      box.hidden=true;
+      box.innerHTML="";
+    }));
+  }
+
+  function renderGangDemand(payload) {
+    const box=el("gang-demand-list");
+    if (!box) return;
+    const entries=Array.isArray(payload && payload.entries) ? payload.entries : [];
+    box.innerHTML=entries.length ? entries.map(entry=>{
+      const item=gangDemandItem(entry.itemId);
+      const action=entry.canClose ? `<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete ? "🗑 Usuń" : "✅ Załatwione"}</button>` : "";
+      return `<article class="gang-demand-card">${gangDemandIcon(item)}<div class="gang-demand-card-main"><strong>${escapeHtml(item.name)} × ${Math.max(1,Number(entry.amount)||1)}</strong><span class="gang-demand-card-meta">${escapeHtml(entry.nick || "Członek Gangu")} · ${escapeHtml(gangAnnouncementDate(entry.createdAt))}</span>${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}</div>${action}</article>`;
+    }).join("") : `<div class="empty">📦 Brak aktywnego zapotrzebowania. Dodaj pierwszy przedmiot, którego szukasz.</div>`;
+    box.querySelectorAll("[data-gang-demand-close]").forEach(button=>button.addEventListener("click",()=>gangDemandClose(button.dataset.gangDemandClose,button.textContent.includes("Usuń"))));
+  }
+
+  async function loadGangDemand(options={}) {
+    if (gangDemandLoadInFlight) return gangDemandLoadInFlight;
+    gangDemandLoadInFlight=(async()=>{
+      const token=playerAccountSessionToken();
+      if (!token) return null;
+      const payload=await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""});
+      if (!payload || !payload.ok) throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
+      gangDemandCache=payload;
+      renderGangDemand(payload);
+      return payload;
+    })();
+    try { return await gangDemandLoadInFlight; }
+    finally { gangDemandLoadInFlight=null; }
+  }
+
+  async function gangDemandClose(id,isDelete) {
+    const status=el("gang-demand-status");
+    if (status) status.textContent="⏳ Zapisuję zmianę…";
+    try {
+      await playerAccountPostAction("gangDemandClose",{sessionToken:playerAccountSessionToken(),id,delete:Boolean(isDelete)});
+      if (status) status.textContent="✅ Wpis został usunięty z aktywnego zapotrzebowania.";
+      await loadGangDemand({force:true});
+    } catch (err) { if (status) status.textContent="❌ "+(err.message || "Nie udało się zmienić wpisu."); }
+  }
+
+  function setupGangDemand() {
+    const form=el("gang-demand-form");
+    const search=el("gang-demand-search");
+    search?.addEventListener("input",()=>{
+      el("gang-demand-item-id").value="";
+      renderGangDemandChoices(search.value);
+    });
+    form?.addEventListener("submit",async event=>{
+      event.preventDefault();
+      const status=el("gang-demand-status");
+      const itemId=Number(el("gang-demand-item-id").value);
+      const selected=gangDemandItem(itemId);
+      if (!itemId || selected.id!==itemId || el("gang-demand-search").value!==selected.name) {
+        if (status) status.textContent="⚠️ Wybierz przedmiot z podpowiedzi.";
+        return;
+      }
+      if (status) status.textContent="⏳ Dodaję zapotrzebowanie…";
+      try {
+        await playerAccountPostAction("gangDemandAdd",{sessionToken:playerAccountSessionToken(),itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value});
+        form.reset();
+        el("gang-demand-amount").value="1";
+        if (status) status.textContent="✅ Zapotrzebowanie dodane dla całej ekipy.";
+        await loadGangDemand({force:true});
+      } catch (err) { if (status) status.textContent="❌ "+(err.message || "Nie udało się dodać wpisu."); }
+    });
+  }
+
   criticalOperationStart(
     loadingText,
     "Zgłoszenie znika teraz, a potwierdzenie serwera trwa w tle."
@@ -16619,7 +16716,8 @@ function setupAdmin() {
       "company-view":"🏢 Ładowanie Spółki...",
       "polls-view":"📊 Ładowanie Ankiet...",
       "goals-view":"🎯 Ładowanie Celów...",
-      "announcements-view":"📢 Ładowanie Ogłoszeń..."
+      "announcements-view":"📢 Ładowanie Ogłoszeń...",
+      "demand-view":"📦 Ładowanie zapotrzebowania..."
     };
 
     showModuleLoading(
@@ -16651,6 +16749,10 @@ function setupAdmin() {
 
     if (target === "announcements-view") {
       requests.push(loadGangAnnouncements());
+    }
+
+    if (target === "demand-view") {
+      requests.push(loadGangDemand({force:forceRefresh}));
     }
 
     const gangLoadKey = isPaymentsOrCompany ? "payments-company" : target;
@@ -16802,6 +16904,7 @@ setupRecipeBatchImport();
 setupBuildCreator();
   setupGarden();
 setupPayments();
+setupGangDemand();
 setupAdmin();
 
 showToolView("home-view", "");
@@ -16897,6 +17000,11 @@ fetchModuleAccessPolicy().catch(()=>{});
 
     if (viewId === "announcements-view") {
       await loadGangAnnouncements();
+      return;
+    }
+
+    if (viewId === "demand-view") {
+      await loadGangDemand({force:true});
       return;
     }
 
