@@ -3968,7 +3968,10 @@ function mapRenderRouteResult() {
 
   let accountViewRenderInFlight = null;
 
-  // Prawdziwi przeciwnicy z Rewirów. ATK / DEF / HP są wartościami
+  // Prawdziwi przeciwnicy z Rewirów. Pole level z API oznacza kolejność
+  // Rewiru, nie poziom profilu używany przez wzory walki. Poziom bojowy
+  // odtwarzamy z punktów atrybutów dokładnie tak jak u gracza.
+  // ATK / DEF / HP są wartościami
   // startowymi walki zwróconymi przez grę, a atrybuty zasilają wyłącznie
   // znane mechaniki PvP (celność, unik, krytyki itd.). Bossowie nie dostają
   // wymyślonych przedmiotów ani perków, których API Rewirów nie podaje.
@@ -3999,7 +4002,9 @@ function mapRenderRouteResult() {
     [28,"Ochroniarz Mirek \"Byk\"",24,755,900,2800,48,56,38,52,44,"https://images.menelgame.online/items/boss-22-ochroniarz-mirek-byk-120.png"],
     [25,"Cwaniak Zenek",25,845,867,2900,47,47,52,45,50,"https://images.menelgame.online/items/boss-28-cwaniak-zenek-120.png"]
   ].map(([id,name,level,attack,defense,hp,strength,endurance,agility,vitality,precision,iconUrl])=>({
-    id,name,level,attack,defense,hp,strength,endurance,agility,vitality,precision,iconUrl
+    id,name,rewirOrder:level,
+    combatLevel:Math.max(1,Math.ceil((strength+endurance+agility+vitality+precision)/2)),
+    attack,defense,hp,strength,endurance,agility,vitality,precision,iconUrl
   }));
 
   const ACHIEVEMENT_CATEGORIES = [
@@ -4011,7 +4016,7 @@ function mapRenderRouteResult() {
     ]},
     {id:"pvp",icon:"⚔️",medal:"assets/achievements/pvp-medal.png",title:"PvP",items:[
       ["pvp_build","Gotów do ustawki","Zapisz pierwszy kompletny build."],["pvp_simulation","Próba generalna","Uruchom pierwszą symulację."],
-      ...PVP_REWIR_NPCS.map(npc=>[`pvp_rewir_${npc.id}`,`Pogromca: ${npc.name}`,`W 1 000 walk osiągnij minimum 80% wygranych z NPC ${npc.name} (Rewiry, lvl ${npc.level}).`]),
+      ...PVP_REWIR_NPCS.map(npc=>[`pvp_rewir_${npc.id}`,`Pogromca: ${npc.name}`,`W 1 000 walk osiągnij minimum 80% wygranych z NPC ${npc.name} (Rewir ${npc.rewirOrder}).`]),
       ["pvp_hp_2000","Dwa tysiące powodów","Zapisz build z minimum 2 000 HP."],["pvp_attack_1000","Tysiąc argumentów","Zapisz build z minimum 1 000 ATK."],["pvp_defense_1000","Mur z meliny","Zapisz build z minimum 1 000 DEF."],["pvp_public_build","Pokaż, co masz","Udostępnij publiczny build."],["pvp_stat_50","Specjalizacja","Rozdaj 50 punktów w jednym atrybucie."],["pvp_tree_single","Jedna droga","Przy 50 punktach wybierz wszystkie perki A albo wszystkie B."],["pvp_level_50","Weteran ustawki","Zapisz build na poziomie co najmniej 50."],["pvp_public_fight","Ustawka z ulicy","Symuluj walkę z publicznym buildem innej osoby."],["pvp_public_win","Wygrana na dzielni","W 1 000 walk osiągnij 80% wygranych z publicznym buildem innej osoby."]
     ]},
     {id:"map",icon:"🗺️",medal:"assets/achievements/map-medal.png",title:"Mapa",items:[["map_open","Znam teren","Sprawdź mapę."]]},
@@ -15448,11 +15453,12 @@ function setupAdmin() {
         id:`rewir-${npc.id}`,
         gameNpc:true,
         rewirNpcId:npc.id,
-        name:`${npc.name} · Lvl ${npc.level}`,
+        name:`${npc.name} · Rewir ${npc.rewirOrder} · poz. bojowy ~${npc.combatLevel}`,
         authorNick:"MenelWars · Rewiry",
         ownerNick:"",
         public:false,
-        level:npc.level,
+        level:npc.combatLevel,
+        rewirOrder:npc.rewirOrder,
         iconUrl:npc.iconUrl,
         attributes:{
           strength:npc.strength,
@@ -15471,7 +15477,7 @@ function setupAdmin() {
           bonusesConfirmed:true
         },
         bonuses:[],
-        description:`Prawdziwy NPC z Rewirów. Dane gry: ${npc.attack} ATK · ${npc.defense} DEF · ${npc.hp} HP; STR ${npc.strength} · END ${npc.endurance} · AGI ${npc.agility} · VIT ${npc.vitality} · PRC ${npc.precision}. Wybory perków są mocnym oszacowaniem, ponieważ API ich nie podaje.`
+        description:`Prawdziwy NPC z Rewiru ${npc.rewirOrder}. Szacowany poziom bojowy ${npc.combatLevel} wynika z ${npc.strength+npc.endurance+npc.agility+npc.vitality+npc.precision} punktów atrybutów. Dane gry: ${npc.attack} ATK · ${npc.defense} DEF · ${npc.hp} HP; STR ${npc.strength} · END ${npc.endurance} · AGI ${npc.agility} · VIT ${npc.vitality} · PRC ${npc.precision}. Wybory perków są mocnym oszacowaniem, ponieważ API ich nie podaje.`
       }));
       pvpGeneratedPresetsCache=rewirPresets;
       return rewirPresets;
