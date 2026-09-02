@@ -8239,13 +8239,19 @@ function renderGangDemandChoicesGlobal(query) {
     item.name,item.subtitle,item.group
   ].some(value=>String(value||"").toLocaleLowerCase("pl").includes(needle))) : catalog).slice(0,40);
   box.hidden=!matches.length;
-  box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić.</div>':''}${matches.map(item=>`<button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIconGlobal(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group||"przedmiot")}</small></button>`).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
+  box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić.</div>':''}${matches.map(item=>`<div class="gang-demand-choice-row"><button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIconGlobal(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group||"przedmiot")}</small></button>${gangDemandAdminGlobal?`<button type="button" class="gang-demand-choice-block" data-gang-demand-block-item="${item.id}" title="Oznacz jako niewymienialny" aria-label="Oznacz ${escapeHtml(item.name)} jako niewymienialny">🚫</button>`:""}</div>`).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
   box.querySelectorAll("[data-gang-demand-item]").forEach(button=>button.addEventListener("click",()=>{
     const item=gangDemandItemGlobal(button.dataset.gangDemandItem);
     el("gang-demand-item-id").value=String(item.id);
     el("gang-demand-search").value=item.name;
     box.hidden=true; box.innerHTML="";
     renderGangDemandAdminToolsGlobal();
+  }));
+  box.querySelectorAll("[data-gang-demand-block-item]").forEach(button=>button.addEventListener("click",async event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    button.disabled=true;
+    await gangDemandSetTradableGlobal(Number(button.dataset.gangDemandBlockItem),true);
   }));
 }
 
@@ -8254,11 +8260,8 @@ function renderGangDemandAdminToolsGlobal() {
   if (!host) return;
   host.hidden=!gangDemandAdminGlobal;
   if (!gangDemandAdminGlobal) { host.innerHTML=""; return; }
-  const selectedId=Number(el("gang-demand-item-id")?.value)||0;
-  const selected=selectedId ? gangDemandItemGlobal(selectedId) : null;
   const blocked=[...gangDemandBlockedIdsGlobal].map(gangDemandItemGlobal).sort((a,b)=>a.name.localeCompare(b.name,"pl"));
-  host.innerHTML=`<button type="button" class="secondary-btn" data-gang-demand-block-selected${selected?"":" disabled"}>🚫 ${selected?`Oznacz „${escapeHtml(selected.name)}” jako niewymienialny`:"Najpierw wybierz przedmiot z listy"}</button><details><summary>🚫 Niewymienialne przedmioty: ${blocked.length}</summary><div class="gang-demand-blocked-list">${blocked.length?blocked.map(item=>`<button type="button" class="secondary-btn" data-gang-demand-unblock="${item.id}">↩️ ${escapeHtml(item.name)}</button>`).join(""):'<span class="muted">Lista jest jeszcze pusta.</span>'}</div></details>`;
-  host.querySelector("[data-gang-demand-block-selected]")?.addEventListener("click",()=>gangDemandSetTradableGlobal(selectedId,true));
+  host.innerHTML=`<div class="gang-demand-admin-hint"><b>🛡️ Narzędzia administratora</b><span>Kliknij czerwone 🚫 przy przedmiocie na liście, aby wyłączyć możliwość dodawania go do zapotrzebowania.</span></div><details><summary>🚫 Niewymienialne przedmioty: ${blocked.length}</summary><div class="gang-demand-blocked-list">${blocked.length?blocked.map(item=>`<button type="button" class="secondary-btn" data-gang-demand-unblock="${item.id}">↩️ ${escapeHtml(item.name)}</button>`).join(""):'<span class="muted">Lista jest jeszcze pusta.</span>'}</div></details>`;
   host.querySelectorAll("[data-gang-demand-unblock]").forEach(button=>button.addEventListener("click",()=>gangDemandSetTradableGlobal(Number(button.dataset.gangDemandUnblock),false)));
 }
 
