@@ -3925,12 +3925,13 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   font-size:.75rem;
 }
 
-.gang-demand-form{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:10px;align-items:end;position:relative;margin:12px 0}
+.gang-demand-form{display:grid;grid-template-columns:110px minmax(0,1fr);gap:10px;align-items:end;position:relative;margin:12px 0}
 .gang-demand-form label{display:grid;gap:4px;font-size:13px;color:#66523b}
 .gang-demand-form input{min-width:0}
 .gang-demand-form .gang-demand-search{grid-column:1/-1}
 .gang-demand-form button{justify-self:start}
 .gang-demand-results{grid-column:1/-1;max-height:255px;overflow:auto;border:1px solid #d7c19a;border-radius:10px;background:#fffdf8;box-shadow:0 5px 16px rgba(76,52,27,.12)}
+.gang-demand-list-hint{padding:8px 10px;color:#806d55;font-size:12px}
 .gang-demand-choice{display:flex;width:100%;align-items:center;gap:9px;padding:7px 9px;border:0;border-bottom:1px solid #eee1ca;background:transparent;text-align:left;color:#47341f}
 .gang-demand-choice:hover{background:#f6ead6}
 .gang-demand-choice img,.gang-demand-item-icon{width:34px;height:34px;object-fit:contain;flex:0 0 auto}

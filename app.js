@@ -8013,10 +8013,11 @@ async function setAdminSubmissionStatus(
     const box=el("gang-demand-results");
     if (!box) return;
     const needle=String(query || "").trim().toLocaleLowerCase("pl");
-    if (needle.length<2) { box.hidden=true; box.innerHTML=""; return; }
-    const matches=gangDemandCatalog().filter(item=>item.name.toLocaleLowerCase("pl").includes(needle)).slice(0,30);
+    const catalog=gangDemandCatalog().sort((a,b)=>a.name.localeCompare(b.name,"pl"));
+    // Lista jest dostępna już po kliknięciu pola; wpisywanie tylko ją zawęża.
+    const matches=(needle ? catalog.filter(item=>item.name.toLocaleLowerCase("pl").includes(needle)) : catalog).slice(0,40);
     box.hidden=!matches.length;
-    box.innerHTML=matches.map(item=>`<button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIcon(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group || "przedmiot")}</small></button>`).join("");
+    box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić.</div>':''}${matches.map(item=>`<button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIcon(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group || "przedmiot")}</small></button>`).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
     box.querySelectorAll("[data-gang-demand-item]").forEach(button=>button.addEventListener("click",()=>{
       const item=gangDemandItem(button.dataset.gangDemandItem);
       el("gang-demand-item-id").value=String(item.id);
@@ -8085,6 +8086,7 @@ async function setAdminSubmissionStatus(
       el("gang-demand-item-id").value="";
       renderGangDemandChoices(search.value);
     });
+    search?.addEventListener("focus",()=>renderGangDemandChoices(search.value));
     form?.addEventListener("submit",async event=>{
       event.preventDefault();
       const status=el("gang-demand-status");
@@ -16672,7 +16674,9 @@ function setupAdmin() {
       gangTrackIndecisiveEasterEgg(target);
       const list=el("gang-demand-list");
       if (!gangDemandCache && list) {
-        list.innerHTML='<div class="empty">⏳ Pobieram aktywne zapotrzebowanie…</div>';
+        // Nie zostawiamy niekończącego się loadera. Odczyt w tle nadpisze
+        // ten stan prawdziwą listą lub czytelnym błędem.
+        renderGangDemand({entries:[]});
       }
       loadGangDemand({force:forceRefresh}).catch(()=>{});
       validateGangSessionInBackground();
