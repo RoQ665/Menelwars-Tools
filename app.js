@@ -11288,6 +11288,13 @@ function setupAdmin() {
   function buildApplyImportedBonuses(stats,source,options={}) {
     const entries = Array.isArray(source && source.bonuses) ? source.bonuses : [];
     const skipProfileFlat = options.skipProfileFlat !== false;
+    const profile = buildProfileStats(source || {});
+    const usesCombatStart = Boolean(
+      profile.provided &&
+      profile.provided.combatAttack &&
+      profile.provided.combatDefense &&
+      profile.provided.combatHp
+    );
 
     entries.forEach(entry => {
       const key = String(entry && entry.key || "");
@@ -11297,8 +11304,19 @@ function setupAdmin() {
         return;
       }
 
-      // Atak i Obrona wpisane z menu Postaci już zawierają zwykłe płaskie
-      // bonusy z EQ, peta, EQ peta, skilli i Gangu. Nie doliczamy ich drugi raz.
+      // Trzy liczby z ekranu „Statystyki startowe w walce” zawierają już
+      // wszystkie płaskie i procentowe bonusy ATK / DEF / HP (set, akcesoria,
+      // gang itd.). Pozostawiamy wpis w podglądzie importu, ale nigdy nie
+      // dokładamy go drugi raz do mechaniki walki.
+      if (
+        usesCombatStart &&
+        ["attackFlat","attackPct","defenseFlat","defensePct","maxHpFlat","maxHpPct"].includes(key)
+      ) {
+        return;
+      }
+
+      // Zgodność ze starymi, zapisanymi buildami, które korzystają jeszcze
+      // z pola profilu Postaci zamiast trzech statystyk startowych z walki.
       if (
         skipProfileFlat &&
         (key === "attackFlat" || key === "defenseFlat")
@@ -11838,7 +11856,10 @@ function setupAdmin() {
 
     const groupsHtml = groups.map(group => {
       const finalRow =
-        group.finalKind
+        // ATK / DEF / HP wpisane z ekranu gry są już wartościami startowymi
+        // w walce. Nie pokazujemy ich drugi raz jako „po przeliczeniu”, bo
+        // sugerowałoby to dodatkowe (i niepotrzebne) wyliczenie przez Tool.
+        group.finalKind && !usesCombatStart
           ? (() => {
               const value =
                 finalPrimary[group.finalKind];
@@ -13553,7 +13574,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.49" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.50" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
