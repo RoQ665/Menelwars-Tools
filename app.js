@@ -8265,6 +8265,22 @@ function renderGangDemandAdminToolsGlobal() {
   host.querySelectorAll("[data-gang-demand-unblock]").forEach(button=>button.addEventListener("click",()=>gangDemandSetTradableGlobal(Number(button.dataset.gangDemandUnblock),false)));
 }
 
+function syncGangDemandAdminFromAccountGlobal(token) {
+  if (gangDemandAdminGlobal || !token) return;
+  playerAccountStatus({force:false,strict:false})
+    .then(account=>{
+      if (
+        !account ||
+        !account.admin ||
+        playerAccountSessionToken()!==token
+      ) return;
+      gangDemandAdminGlobal=true;
+      renderGangDemandAdminToolsGlobal();
+      renderGangDemandChoicesGlobal(el("gang-demand-search")?.value||"");
+    })
+    .catch(()=>{});
+}
+
 function renderGangDemandGlobal(payload) {
   const box=el("gang-demand-list");
   if (!box) return;
@@ -8281,8 +8297,17 @@ function renderGangDemandGlobal(payload) {
 async function loadGangDemandGlobal(options={}) {
   if (gangDemandLoadInFlightGlobal) return gangDemandLoadInFlightGlobal;
   if (gangDemandCacheGlobal && !options.force) {
+    gangDemandAdminGlobal=Boolean(
+      gangDemandAdminGlobal ||
+      (
+        cachedAccountStatus &&
+        cachedAccountStatusToken===playerAccountSessionToken() &&
+        cachedAccountStatus.admin
+      )
+    );
     renderGangDemandGlobal(gangDemandCacheGlobal);
     renderGangDemandAdminToolsGlobal();
+    syncGangDemandAdminFromAccountGlobal(playerAccountSessionToken());
     return gangDemandCacheGlobal;
   }
   gangDemandLoadInFlightGlobal=(async()=>{
@@ -8309,6 +8334,7 @@ async function loadGangDemandGlobal(options={}) {
       );
       renderGangDemandGlobal(payload);
       renderGangDemandAdminToolsGlobal();
+      syncGangDemandAdminFromAccountGlobal(token);
       return payload;
     } catch(err) {
       if (box) box.innerHTML=`<div class="empty">❌ Nie udało się pobrać zapotrzebowania.<br><small>${escapeHtml(err&&err.message ? err.message : "Sprawdź połączenie.")}</small></div>`;
