@@ -8040,12 +8040,21 @@ async function setAdminSubmissionStatus(
     if (gangDemandLoadInFlight) return gangDemandLoadInFlight;
     gangDemandLoadInFlight=(async()=>{
       const token=playerAccountSessionToken();
-      if (!token) return null;
-      const payload=await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""});
-      if (!payload || !payload.ok) throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
-      gangDemandCache=payload;
-      renderGangDemand(payload);
-      return payload;
+      const box=el("gang-demand-list");
+      if (!token) {
+        if (box) box.innerHTML='<div class="empty">🔒 Zaloguj się, aby zobaczyć zapotrzebowanie ekipy.</div>';
+        return null;
+      }
+      try {
+        const payload=await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""});
+        if (!payload || !payload.ok) throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
+        gangDemandCache=payload;
+        renderGangDemand(payload);
+        return payload;
+      } catch (err) {
+        if (box) box.innerHTML=`<div class="empty">❌ Nie udało się pobrać zapotrzebowania.<br><small>${escapeHtml(err && err.message ? err.message : "Sprawdź połączenie lub wdrożenie backendu.")}</small></div>`;
+        return null;
+      }
     })();
     try { return await gangDemandLoadInFlight; }
     finally { gangDemandLoadInFlight=null; }
@@ -16029,7 +16038,9 @@ function setupAdmin() {
       defenseModel,
       attackKScale:0.8,
       defenseK:pvpClamp(Number(el("pvp-sim-defense-k")?.value)||300,50,5000),
-      counterMult:pvpClamp(Number(el("pvp-sim-counter-mult")?.value)||1,0,2)
+      // Potwierdzone przez logi gry: kontratak ma 75% zwykłych obrażeń;
+      // nadal może krytować, co obsługuje pvpStrike().
+      counterMult:0.75
     };
     const runs=[10,100,1000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):1000;
     const mode=String(el("pvp-sim-mode")?.value||"both");
@@ -16044,7 +16055,7 @@ function setupAdmin() {
         : params.defenseModel === "attack"
           ? "DEF używa K = 0,80 × końcowy ATK atakującego (ofensywny model eksperymentalny)"
           : `DEF używa ręcznie ustawionego stałego K=${params.defenseK}`;
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, counter ×${params.counterMult}. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom, ${defenseAssumption}; bleed ma osobny wzór, kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
