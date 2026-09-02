@@ -3968,45 +3968,6 @@ function mapRenderRouteResult() {
 
   let accountViewRenderInFlight = null;
 
-  // Prawdziwi przeciwnicy z Rewirów. Pole level z API oznacza kolejność
-  // Rewiru, nie poziom profilu używany przez wzory walki. Poziom bojowy
-  // odtwarzamy z punktów atrybutów dokładnie tak jak u gracza.
-  // ATK / DEF / HP są wartościami
-  // startowymi walki zwróconymi przez grę, a atrybuty zasilają wyłącznie
-  // znane mechaniki PvP (celność, unik, krytyki itd.). Bossowie nie dostają
-  // wymyślonych przedmiotów ani perków, których API Rewirów nie podaje.
-  const PVP_REWIR_NPCS = [
-    [1,"Menel Igor",1,25,30,100,0,0,0,0,0,"https://images.menelgame.online/items/boss_344a_1771870037947.png"],
-    [2,"Mietek magister",2,45,45,150,1,1,1,1,1,"https://images.menelgame.online/items/boss_d47e_1771870062900.png"],
-    [3,"Żul Artur",3,80,90,150,5,5,5,5,5,"https://images.menelgame.online/items/boss_cf07_1772717384557.png"],
-    [4,"Zdzichu złota rączka",4,130,130,160,10,10,10,10,10,"https://images.menelgame.online/items/boss_89f6_1771870114982.png"],
-    [5,"Pijus Dawid",5,170,170,160,15,15,15,15,15,"https://images.menelgame.online/items/boss_f5a7_1771870134450.png"],
-    [6,"Młody lump Sławek",6,210,210,270,20,20,20,20,20,"https://images.menelgame.online/items/boss_c7d4_1771870164658.png"],
-    [7,"Cyber Piotrek",7,290,290,330,20,35,10,10,40,"https://images.menelgame.online/items/boss_b198_1771870186368.png"],
-    [8,"Marek „Amant”",8,350,350,420,25,10,50,10,25,"https://images.menelgame.online/items/boss_70bb_1771870201076.png"],
-    [9,"Andrzej",9,390,390,900,25,35,30,20,35,"https://images.menelgame.online/items/boss_0ff2_1771870221170.png"],
-    [10,"Krzysztof Jarzyna",10,450,450,1200,35,30,20,35,20,"https://images.menelgame.online/items/boss_4855_1771870236927.png"],
-    [13,"Geralt z Rumii",11,500,520,1250,38,42,38,32,36,"https://images.menelgame.online/items/boss_de42_1782121660293.png"],
-    [12,"Damian Wąsik",12,545,350,950,34,20,58,18,44,"https://images.menelgame.online/items/boss_85f4_1782124587891.png"],
-    [15,"Kamil Zdun",13,470,460,1350,42,32,42,28,42,"https://images.menelgame.online/items/boss_ebe3_1782124604248.png"],
-    [17,"Nagła Śmierć",14,606,490,1478,55,33,39,27,53,"https://images.menelgame.online/items/boss_2fbd_1782124620243.png"],
-    [18,"Pan Paweł",15,568,607,1597,41,43,47,35,43,"https://images.menelgame.online/items/boss_415f_1782124628742.png"],
-    [16,"Mateusz Rowerzysta",16,579,652,1718,43,51,35,45,45,"https://images.menelgame.online/items/boss_ec09_1782124637807.png"],
-    [11,"Adrian Puchacki",17,578,651,1703,45,53,35,47,47,"https://images.menelgame.online/items/boss_14f5_1782124649921.png"],
-    [14,"Janusz Tracz",18,572,584,1597,47,41,41,35,49,"https://images.menelgame.online/items/boss_120d_1782124664464.png"],
-    [19,"Silnoręki",19,589,612,1663,45,47,41,39,51,"https://images.menelgame.online/items/boss_056f_1782124673120.png"],
-    [20,"Sułtan Meneli",20,574,589,1557,46,45,44,41,49,"https://images.menelgame.online/items/boss_f2ec_1782124687153.png"],
-    [30,"Rzezimieszek Heniek",21,730,690,2230,50,43,41,40,46,"https://images.menelgame.online/items/boss-26-rzezimieszek-heniek-120.png"],
-    [21,"Baron Blokowiska",22,760,715,2400,52,44,42,42,48,"https://images.menelgame.online/items/boss-21-baron-blokowiska-120.png"],
-    [29,"Portier Stefan",23,785,825,2650,49,51,39,47,45,"https://images.menelgame.online/items/boss-27-portier-stefan-120.png"],
-    [28,"Ochroniarz Mirek \"Byk\"",24,755,900,2800,48,56,38,52,44,"https://images.menelgame.online/items/boss-22-ochroniarz-mirek-byk-120.png"],
-    [25,"Cwaniak Zenek",25,845,867,2900,47,47,52,45,50,"https://images.menelgame.online/items/boss-28-cwaniak-zenek-120.png"]
-  ].map(([id,name,level,attack,defense,hp,strength,endurance,agility,vitality,precision,iconUrl])=>({
-    id,name,rewirOrder:level,
-    combatLevel:Math.max(1,Math.ceil((strength+endurance+agility+vitality+precision)/2)),
-    attack,defense,hp,strength,endurance,agility,vitality,precision,iconUrl
-  }));
-
   const ACHIEVEMENT_CATEGORIES = [
     {id:"distillery",icon:"🥃",medal:"assets/achievements/distillery-medal.png",title:"Destylarnia",items:[
       ["distillery_reserve","Rezerwacja stolika","Zarezerwuj recepturę."],["distillery_result","Wynik spod lady","Wyślij poprawny wynik receptury."],["distillery_accepted","Receptura uznana","Twój wynik zostanie zaakceptowany."],["distillery_import","Księgowy z Excela","Użyj importu wyników z gry."]
@@ -4015,9 +3976,7 @@ function mapRenderRouteResult() {
       ["garden_plant_onion","Pierwsza cebulka","Posadź cebulę."],["garden_plant_potato","Ziemniak na próbę","Posadź młode ziemniaki."],["garden_harvest_onion","Cebulowy plon","Zbierz cebulę po co najmniej 40 h."],["garden_harvest_potato","Kartoflany plon","Zbierz ziemniaki po co najmniej 40 h."],["garden_check","Czujne oko","Odpowiedz Tak albo Nie na pytanie o etap."],["garden_checks_three","Dziennik ogrodnika","Zostaw trzy odpowiedzi Tak/Nie w jednej uprawie."]
     ]},
     {id:"pvp",icon:"⚔️",medal:"assets/achievements/pvp-medal.png",title:"PvP",items:[
-      ["pvp_build","Gotów do ustawki","Zapisz pierwszy kompletny build."],["pvp_simulation","Próba generalna","Uruchom pierwszą symulację."],
-      ...PVP_REWIR_NPCS.map(npc=>[`pvp_rewir_${npc.id}`,`Pogromca: ${npc.name}`,`W 1 000 walk osiągnij minimum 80% wygranych z NPC ${npc.name} (Rewir ${npc.rewirOrder}).`]),
-      ["pvp_hp_2000","Dwa tysiące powodów","Zapisz build z minimum 2 000 HP."],["pvp_attack_1000","Tysiąc argumentów","Zapisz build z minimum 1 000 ATK."],["pvp_defense_1000","Mur z meliny","Zapisz build z minimum 1 000 DEF."],["pvp_public_build","Pokaż, co masz","Udostępnij publiczny build."],["pvp_stat_50","Specjalizacja","Rozdaj 50 punktów w jednym atrybucie."],["pvp_tree_single","Jedna droga","Przy 50 punktach wybierz wszystkie perki A albo wszystkie B."],["pvp_level_50","Weteran ustawki","Zapisz build na poziomie co najmniej 50."],["pvp_public_fight","Ustawka z ulicy","Symuluj walkę z publicznym buildem innej osoby."],["pvp_public_win","Wygrana na dzielni","W 1 000 walk osiągnij 80% wygranych z publicznym buildem innej osoby."]
+      ["pvp_build","Gotów do ustawki","Zapisz pierwszy kompletny build."],["pvp_simulation","Próba generalna","Uruchom pierwszą symulację."],["pvp_ai_first","Bolek poszedł spać","W 1 000 walk osiągnij minimum 80% wygranych z pierwszym AI."],["pvp_ai_district","Dzielnica oczyszczona","Osiągnij minimum 80% wygranych z kompletem trzech AI na jednym poziomie."],["pvp_ai_50","Poziom wyżej","Osiągnij minimum 80% wygranych z AI lvl 50."],["pvp_ai_60","Stary wyjadacz","Osiągnij minimum 80% wygranych z AI lvl 60."],["pvp_ai_all","Król melin","Osiągnij minimum 80% wygranych z wszystkimi 27 AI."],["pvp_underdog","Dawid kontra Goliat","Osiągnij minimum 80% wygranych z AI co najmniej 5 poziomów wyżej."],["pvp_hp_2000","Dwa tysiące powodów","Zapisz build z minimum 2 000 HP."],["pvp_attack_1000","Tysiąc argumentów","Zapisz build z minimum 1 000 ATK."],["pvp_defense_1000","Mur z meliny","Zapisz build z minimum 1 000 DEF."],["pvp_public_build","Pokaż, co masz","Udostępnij publiczny build."],["pvp_stat_50","Specjalizacja","Rozdaj 50 punktów w jednym atrybucie."],["pvp_tree_single","Jedna droga","Przy 50 punktach wybierz wszystkie perki A albo wszystkie B."],["pvp_level_50","Weteran ustawki","Zapisz build na poziomie co najmniej 50."],["pvp_public_fight","Ustawka z ulicy","Symuluj walkę z publicznym buildem innej osoby."],["pvp_public_win","Wygrana na dzielni","W 1 000 walk osiągnij 80% wygranych z publicznym buildem innej osoby."]
     ]},
     {id:"map",icon:"🗺️",medal:"assets/achievements/map-medal.png",title:"Mapa",items:[["map_open","Znam teren","Sprawdź mapę."]]},
     {id:"gang",icon:"🏢",medal:"assets/achievements/gang-medal.png",title:"Gang",items:[
@@ -4027,6 +3986,7 @@ function mapRenderRouteResult() {
 
   const EASTER_EGG_CATEGORY = {
     id:"easter-eggs",icon:"🥚",medal:"assets/achievements/easter-egg-medal.png",title:"Easter eggi",items:[
+      ["easter_bolek_mirror","Bolek w lustrze","Zapisz build nazwany Bolek Bimberek i uruchom nim 1 000 walk przeciw Bolekowi Bimberkowi."],
       ["easter_indecisive_president","Niezdecydowany prezes","Po wejściu do Gangu przejdź trzy razy: Spółka → Wpłaty."],
       ["easter_all_districts","Mieszkaniec wszystkich dzielnic","W jednej otwartej sesji Mapy wskaż „Jestem tutaj” w każdej dzielnicy."],
       ["easter_forgetful_watering","Zapominalski podlewacz","W ciągu 30 sekund ustaw suwak podlewania kolejno: 1%, 100%, 1%, 100%. Wartości pomiędzy nie przeszkadzają."]
@@ -11847,9 +11807,7 @@ function setupAdmin() {
 
     // Poziom wynika bezpośrednio z liczby rozdanych punktów. Dokładne
     // ATK/DEF/HP pobieramy z ekranu startowego walki, bez rozbijania HP.
-    const characterLevel = source && source.gameNpc
-      ? Math.max(1,Number(source.level)||1)
-      : requiredLevel;
+    const characterLevel = requiredLevel;
 
     const stats = buildNewStatBag();
     const extras = {
@@ -15306,10 +15264,9 @@ function setupAdmin() {
 
     const profile = buildProfileStats(source);
     const attrs = source.attributes || {};
-    const isGameNpc = Boolean(source.gameNpc);
     BUILD_ATTR_ORDER.forEach(attrKey=>{
       const value = Number(attrs[attrKey]);
-      if (!Number.isInteger(value) || value < 0 || (!isGameNpc && value > 50)) {
+      if (!Number.isInteger(value) || value < 0 || value > 50) {
         missing.push(`atrybut ${BUILD_ATTRS[attrKey].name}`);
       }
     });
@@ -15318,7 +15275,7 @@ function setupAdmin() {
       (sum,attrKey) => sum + (Number.isFinite(Number(attrs[attrKey])) ? Number(attrs[attrKey]) : 0),
       0
     );
-    if (!isGameNpc) BUILD_ATTR_ORDER.forEach(attrKey=>{
+    BUILD_ATTR_ORDER.forEach(attrKey=>{
       const value = Math.max(0,Math.min(50,Number(attrs[attrKey])||0));
       const tiers = Math.min(10,Math.floor(value/5));
       const perks = source.perks && source.perks[attrKey] ? source.perks[attrKey] : {};
@@ -15337,7 +15294,7 @@ function setupAdmin() {
     Object.keys(profileLabels).forEach(keyName=>{
       if (!profile.provided || !profile.provided[keyName]) missing.push(profileLabels[keyName]);
     });
-    if (!isGameNpc && !profile.bonusesConfirmed) missing.push("potwierdzenie pełnych bonusów PvP itemów/setu/akcesoriów/gangu");
+    if (!profile.bonusesConfirmed) missing.push("potwierdzenie pełnych bonusów PvP itemów/setu/akcesoriów/gangu");
 
     try {
       const calculated = buildCalculateStats(source);
@@ -15430,42 +15387,6 @@ function setupAdmin() {
 
   function pvpGeneratedPresets() {
     if (pvpGeneratedPresetsCache) return pvpGeneratedPresetsCache;
-    {
-      const rewirPresets=PVP_REWIR_NPCS.map(npc=>({
-        id:`rewir-${npc.id}`,
-        gameNpc:true,
-        rewirNpcId:npc.id,
-        name:`${npc.name} · Rewir ${npc.rewirOrder} · poz. bojowy ~${npc.combatLevel}`,
-        authorNick:"MenelWars · Rewiry",
-        ownerNick:"",
-        public:false,
-        level:npc.combatLevel,
-        rewirOrder:npc.rewirOrder,
-        iconUrl:npc.iconUrl,
-        attributes:{
-          strength:npc.strength,
-          endurance:npc.endurance,
-          agility:npc.agility,
-          vitality:npc.vitality,
-          precision:npc.precision
-        },
-        // API Rewirów nie podaje wyborów A/B. Nie dopisujemy ich na ślepo;
-        // atrybuty nadal zasilają wszystkie podstawowe mechaniki PvP.
-        perks:{strength:{},endurance:{},agility:{},vitality:{},precision:{}},
-        profile:{
-          attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
-          combatAttack:npc.attack,
-          combatDefense:npc.defense,
-          combatHp:npc.hp,
-          provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
-          bonusesConfirmed:true
-        },
-        bonuses:[],
-        description:`Prawdziwy NPC z Rewiru ${npc.rewirOrder}. Szacowany poziom bojowy ${npc.combatLevel} wynika z ${npc.strength+npc.endurance+npc.agility+npc.vitality+npc.precision} punktów atrybutów. Dane gry: ${npc.attack} ATK · ${npc.defense} DEF · ${npc.hp} HP; STR ${npc.strength} · END ${npc.endurance} · AGI ${npc.agility} · VIT ${npc.vitality} · PRC ${npc.precision}. API nie podaje wyborów perków, dlatego nie są dodawane.`
-      }));
-      pvpGeneratedPresetsCache=rewirPresets;
-      return rewirPresets;
-    }
     const archetypes = [
       {
         id:"offense",role:"napastnik",weights:[3.8,1.5,1.4,1.7,3.6],choices:"ABBA",
@@ -15535,7 +15456,7 @@ function setupAdmin() {
     const all = [{key:"current",label:"✏️ Aktualny edytor",source:current,group:"current"}];
     buildMyItems.forEach(item=>all.push({key:`mine:${item.id}`,label:`🔒 ${item.name}`,source:item,group:"mine"}));
     buildPublicItems.forEach(item=>all.push({key:`public:${item.id}`,label:`🌍 ${item.name} · ${item.authorNick||"Anonim"}`,source:item,group:"public"}));
-    pvpGeneratedPresets().forEach(item=>all.push({key:`preset:${item.id}`,label:`🤖 ${item.name} · Rewiry`,source:item,group:"preset"}));
+    pvpGeneratedPresets().forEach(item=>all.push({key:`preset:${item.id}`,label:`🤖 ${item.name} · treningowy`,source:item,group:"preset"}));
     return all;
   }
 
@@ -16215,7 +16136,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom. DEF używa stałego modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP. NPC z Rewirów używają prawdziwych statystyk i atrybutów z gry; API nie podaje ich wyborów perków, dlatego nie są one dodawane.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom. DEF używa stałego modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
@@ -16223,6 +16144,13 @@ function setupAdmin() {
         achievementIds.push("pvp_public_fight");
         if (runs===1000 && agg.winsA/runs>=0.8) achievementIds.push("pvp_public_win");
       }
+      const fightsMirrorBolek=
+        leftItem.group==="mine" &&
+        normalizedPlayerNick(leftItem.source.name)===normalizedPlayerNick("Bolek Bimberek") &&
+        rightItem.group==="preset" &&
+        rightItem.source.id==="preset-30-offense" &&
+        runs===1000;
+      if (fightsMirrorBolek) achievementIds.push("easter_bolek_mirror");
       achievementTrack(achievementIds);
       // Przeciwnik AI jest zaliczany dopiero na wiarygodnej próbie 1 000 walk.
       // „Pokonaj” oznacza przewagę w symulacji, nie pojedynczy szczęśliwy rzut.
