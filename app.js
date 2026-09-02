@@ -3958,7 +3958,7 @@ function mapRenderRouteResult() {
       ["garden_plant_onion","Pierwsza cebulka","Posadź cebulę."],["garden_plant_potato","Ziemniak na próbę","Posadź młode ziemniaki."],["garden_harvest_onion","Cebulowy plon","Zbierz cebulę po co najmniej 40 h."],["garden_harvest_potato","Kartoflany plon","Zbierz ziemniaki po co najmniej 40 h."],["garden_check","Czujne oko","Odpowiedz Tak albo Nie na pytanie o etap."],["garden_checks_three","Dziennik ogrodnika","Zostaw trzy odpowiedzi Tak/Nie w jednej uprawie."]
     ]},
     {id:"pvp",icon:"⚔️",medal:"assets/achievements/pvp-medal.png",title:"PvP",items:[
-      ["pvp_build","Gotów do ustawki","Zapisz pierwszy kompletny build."],["pvp_simulation","Próba generalna","Uruchom pierwszą symulację."],["pvp_ai_first","Bolek poszedł spać","Pokonaj pierwszego przeciwnika AI."],["pvp_ai_district","Dzielnica oczyszczona","Pokonaj komplet trzech AI na jednym poziomie."],["pvp_ai_50","Poziom wyżej","Pokonaj AI lvl 50."],["pvp_ai_60","Stary wyjadacz","Pokonaj AI lvl 60."],["pvp_ai_all","Król melin","Pokonaj wszystkie 27 AI."],["pvp_underdog","Dawid kontra Goliat","Pokonaj AI co najmniej 5 poziomów wyżej."],["pvp_hp_2000","Dwa tysiące powodów","Zapisz build z minimum 2 000 HP."],["pvp_attack_1000","Tysiąc argumentów","Zapisz build z minimum 1 000 ATK."],["pvp_defense_1000","Mur z meliny","Zapisz build z minimum 1 000 DEF."],["pvp_public_build","Pokaż, co masz","Udostępnij publiczny build."],["pvp_stat_50","Specjalizacja","Rozdaj 50 punktów w jednym atrybucie."],["pvp_tree_single","Jedna droga","Przy 50 punktach wybierz wszystkie perki A albo wszystkie B."],["pvp_level_50","Weteran ustawki","Zapisz build na poziomie co najmniej 50."],["pvp_public_fight","Ustawka z ulicy","Symuluj walkę z publicznym buildem innej osoby."],["pvp_public_win","Wygrana na dzielni","W 1 000 walk osiągnij 80% wygranych z publicznym buildem innej osoby."]
+      ["pvp_build","Gotów do ustawki","Zapisz pierwszy kompletny build."],["pvp_simulation","Próba generalna","Uruchom pierwszą symulację."],["pvp_ai_first","Bolek poszedł spać","W 1 000 walk osiągnij minimum 80% wygranych z pierwszym AI."],["pvp_ai_district","Dzielnica oczyszczona","Osiągnij minimum 80% wygranych z kompletem trzech AI na jednym poziomie."],["pvp_ai_50","Poziom wyżej","Osiągnij minimum 80% wygranych z AI lvl 50."],["pvp_ai_60","Stary wyjadacz","Osiągnij minimum 80% wygranych z AI lvl 60."],["pvp_ai_all","Król melin","Osiągnij minimum 80% wygranych z wszystkimi 27 AI."],["pvp_underdog","Dawid kontra Goliat","Osiągnij minimum 80% wygranych z AI co najmniej 5 poziomów wyżej."],["pvp_hp_2000","Dwa tysiące powodów","Zapisz build z minimum 2 000 HP."],["pvp_attack_1000","Tysiąc argumentów","Zapisz build z minimum 1 000 ATK."],["pvp_defense_1000","Mur z meliny","Zapisz build z minimum 1 000 DEF."],["pvp_public_build","Pokaż, co masz","Udostępnij publiczny build."],["pvp_stat_50","Specjalizacja","Rozdaj 50 punktów w jednym atrybucie."],["pvp_tree_single","Jedna droga","Przy 50 punktach wybierz wszystkie perki A albo wszystkie B."],["pvp_level_50","Weteran ustawki","Zapisz build na poziomie co najmniej 50."],["pvp_public_fight","Ustawka z ulicy","Symuluj walkę z publicznym buildem innej osoby."],["pvp_public_win","Wygrana na dzielni","W 1 000 walk osiągnij 80% wygranych z publicznym buildem innej osoby."]
     ]},
     {id:"map",icon:"🗺️",medal:"assets/achievements/map-medal.png",title:"Mapa",items:[["map_open","Znam teren","Sprawdź mapę."]]},
     {id:"gang",icon:"🏢",medal:"assets/achievements/gang-medal.png",title:"Gang",items:[
@@ -13645,7 +13645,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.58" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.59" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -15890,7 +15890,7 @@ function setupAdmin() {
       achievementTrack(achievementIds);
       // Przeciwnik AI jest zaliczany dopiero na wiarygodnej próbie 1 000 walk.
       // „Pokonaj” oznacza przewagę w symulacji, nie pojedynczy szczęśliwy rzut.
-      if (rightItem.group==="preset" && runs===1000 && agg.winsA/runs>0.5) {
+      if (rightItem.group==="preset" && runs===1000 && agg.winsA/runs>=0.8) {
         achievementTrackAiWin(rightItem.source.id,buildRequiredLevel());
       }
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
