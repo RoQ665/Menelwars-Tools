@@ -13534,6 +13534,13 @@ function setupAdmin() {
     ) || null;
   }
 
+  function gardenNeedsModelCheck(item,summary,now=Date.now()) {
+    if (!item || !gardenUsesAutoModel(item)) return false;
+    const frame=gardenAutoFrame(item,now);
+    // Etap 1 jest potwierdzany posadzeniem, a etap 10 potwierdza sam zbiór.
+    return frame>0 && frame<9 && !gardenCheckForFrame(summary,frame);
+  }
+
   function gardenCheckStats(item,summary) {
     const checks=(summary && summary.checks || []).slice().sort((a,b)=>Number(a.observedAt)-Number(b.observedAt));
     const yes=checks.filter(event=>event.answer==="YES");
@@ -13574,7 +13581,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.51" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.52" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
@@ -14173,12 +14180,14 @@ function setupAdmin() {
       const frame = active ? gardenDisplayFrame(active,summary) : null;
       const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite",active.plant) : "";
       const frameBadge = "";
+      const needsCheck=active && gardenNeedsModelCheck(active,summary);
 
       return `
         <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">
           <span class="garden-plot-visual">
             ${sprite}
             ${frameBadge}
+            ${needsCheck?'<span class="build-setup-attention garden-plot-attention" aria-label="Czeka pytanie Tak lub Nie">!</span>':""}
             ${stats}
           </span>
           <span class="garden-plot-name">Grządka ${plot}</span>
