@@ -16880,7 +16880,11 @@ function setupAdmin() {
           new Promise(resolve=>setTimeout(()=>resolve("pending"),3000))
         ]);
         if (earlyResult === "pending") {
-          updateHomeAccountState(null);
+          const homeAccountState=el("home-account-state");
+          if (homeAccountState) {
+            homeAccountState.className="submit-info";
+            homeAccountState.textContent="⏳ Weryfikuję sesję w tle — możesz już korzystać z Toola.";
+          }
           statusPromise.then(updateHomeAccountState).catch(()=>updateHomeAccountState(null));
           return;
         }
