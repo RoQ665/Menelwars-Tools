@@ -3966,11 +3966,11 @@ function mapRenderRouteResult() {
     ]}
   ];
 
-  function achievementsHtml(unlocked={}) {
+  function achievementsHtml(unlocked={},expandedCategories=new Set()) {
     const total=ACHIEVEMENT_CATEGORIES.reduce((sum,category)=>sum+category.items.length,0);
     const count=Object.keys(unlocked || {}).filter(id=>ACHIEVEMENT_CATEGORIES.some(category=>category.items.some(item=>item[0]===id))).length;
     const percent=total ? Math.round(count/total*100) : 0;
-    return `<section class="achievements-card"><div class="achievements-head"><div><strong>🏆 Osiągnięcia</strong><small>${count} odblokowane · ${total-count} pozostałe · ${total} łącznie</small></div><b>${percent}%</b></div><div class="achievements-progress"><i style="width:${percent}%"></i></div>${ACHIEVEMENT_CATEGORIES.map(category=>{const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;return `<details class="achievement-category"><summary><span>${category.icon} ${category.title}</span><small>${complete} / ${category.items.length}</small></summary><div class="achievement-grid">${category.items.map(([id,title,description])=>{const done=Boolean(unlocked && unlocked[id]);return `<span class="achievement-badge ${done?"done":"locked"}" tabindex="0" title="${escapeHtml(description)}"><b>${category.icon}</b><span>${escapeHtml(title)}</span><small>${escapeHtml(description)}</small></span>`;}).join("")}</div></details>`;}).join("")}</section>`;
+    return `<section class="achievements-card"><div class="achievements-head"><div><strong>🏆 Osiągnięcia</strong><small>${count} odblokowane · ${total-count} pozostałe · ${total} łącznie</small></div><b>${percent}%</b></div><div class="achievements-progress"><i style="width:${percent}%"></i></div>${ACHIEVEMENT_CATEGORIES.map(category=>{const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;return `<details class="achievement-category" data-achievement-category="${category.id}"${expandedCategories.has(category.id)?" open":""}><summary><span>${category.icon} ${category.title}</span><small>${complete} / ${category.items.length}</small></summary><div class="achievement-grid">${category.items.map(([id,title,description])=>{const done=Boolean(unlocked && unlocked[id]);return `<span class="achievement-badge ${done?"done":"locked"}" tabindex="0" title="${escapeHtml(description)}"><b>${category.icon}</b><span>${escapeHtml(title)}</span><small>${escapeHtml(description)}</small></span>`;}).join("")}</div></details>`;}).join("")}</section>`;
   }
 
   function adminPanelIsOpen() {
@@ -3992,6 +3992,14 @@ function mapRenderRouteResult() {
     const status = el("account-status");
     const adminHost = el("account-admin-host");
     if (!box) return;
+
+    // Odświeżenie statusu po focusie nie może zwijać kategorii, które
+    // użytkownik właśnie przeglądał.
+    const expandedAchievementCategories=new Set(
+      Array.from(box.querySelectorAll(".achievement-category[open]"))
+        .map(item=>String(item.dataset.achievementCategory||""))
+        .filter(Boolean)
+    );
 
     // Jeśli status nie jest jeszcze w cache, pokaż od razu jasny stan ładowania
     // zamiast pozostawiać użytkownika z wrażeniem zawieszenia.
@@ -4181,7 +4189,7 @@ function mapRenderRouteResult() {
           <button id="account-change-save" class="primary-btn" type="button">✅ Zapisz nowe hasło</button>
         </div>
       </div>
-      ${achievementsHtml(account.achievements || {})}
+      ${achievementsHtml(account.achievements || {},expandedAchievementCategories)}
     `;
 
     if (account.admin) {
@@ -13626,7 +13634,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.55" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.56" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
