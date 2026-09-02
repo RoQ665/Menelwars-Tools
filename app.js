@@ -15650,7 +15650,7 @@ function setupAdmin() {
     return actual;
   }
 
-  function pvpDamageFormula(attacker,defender,round,params,isCrit,isFirst) {
+  function pvpDamageFormula(attacker,defender,round,params,isCrit,isFirst,options={}) {
     const hpPct=100*attacker.hp/attacker.maxHp;
     const condA=pvpConditionalEffects(attacker.calculated,hpPct);
     const condD=pvpConditionalEffects(defender.calculated,100*defender.hp/defender.maxHp);
@@ -15660,21 +15660,20 @@ function setupAdmin() {
       // Pierwsze uderzenie nie otrzymuje więc jeszcze premii; od T2 jest
       // jedna warstwa +2% za każdy zakończony wcześniej atak/obrót.
       .reduce((sum,x)=>sum+(Number(x.amount)||0)*Math.max(0,round-1),0);
-    // Poziom 1 potwierdza małą, ukrytą bazę +5 obrażeń. Testujemy osobną
-    // warstwę poziomu profilu: +0,5 ATK i +1,65 DEF za zdobyty poziom.
+    // Dokładne ATK/DEF pochodzą z ekranu „Statystyki startowe w walce”.
+    // Testy na tym samym poziomie i przeciwniku wykluczyły dokładanie do nich
+    // osobnych warstw +0,5 ATK oraz +1,65 DEF za poziom profilu.
     const attackerLevel=Math.max(1,Number(attacker.calculated?.characterLevel)||1);
-    const defenderLevel=Math.max(1,Number(defender.calculated?.characterLevel)||1);
-    const earnedAttackerLevels=Math.max(0,attackerLevel-1);
-    const earnedDefenderLevels=Math.max(0,defenderLevel-1);
     // Zwykłe premie do ATK (w tym momentum) tworzą podstawową wartość ataku.
     // Premia warunkowa low HP jest osobnym, późniejszym etapem tego samego
     // efektu — nie sumujemy jej z normalnymi premiami procentowymi.
-    const normalAttack=(attacker.primary.attack+earnedAttackerLevels*0.5)*(1+dynamicPct/100)+5;
+    // Dla samego progu gra sumuje premie ATK: Dojczu przy bazie ~700,
+    // momentum +12% i low HP +8% zadawał minimum 126, czyli
+    // 700 × (1 + 12% + 8%) × 15%, a nie 127 z osobnego mnożenia warstw.
+    const attackForMinimum=attacker.primary.attack*(1+(dynamicPct+condA.attackPct)/100);
+    const normalAttack=attacker.primary.attack*(1+dynamicPct/100)+5;
     const attack=normalAttack*(1+condA.attackPct/100);
-    // Ukryty DEF za zdobyte poziomy traktujemy jak zwykłą obronę, więc
-    // przebicie pancerza zmniejsza również tę część.
-    const defenseBeforePen=defender.primary.defense+earnedDefenderLevels*1.65;
-    const effectiveDefense=Math.max(0,defenseBeforePen*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
+    const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
     // Jedyny aktywny model DEF: K rośnie z poziomem atakującego.
     // Został dobrany do obserwacji z walk na niskich poziomach i RoQ vs Bulax.
     const defenseK=20+5.6*(attackerLevel-1);
@@ -15692,7 +15691,14 @@ function setupAdmin() {
     damage*=escalation;
     if (isCrit) damage*=1+(Number(attacker.stats.critDmg)||0)/100;
     if (isFirst) damage*=1+(Number(attacker.stats.firstStrike)||0)/100;
-    return Math.max(1,Math.round(damage));
+    // Logi z kontrolowanych walk 361/418 ATK potwierdzają próg równy 15%
+    // bieżącego ATK po momentum i bonusach low HP, ale przed eskalacją oraz
+    // bez ukrytego +5. Kontra ma w grze osobny, niedawno obniżony próg, więc
+    // nie stosujemy do niej tego minimum bez kolejnego pomiaru.
+    const minimumDamage=options.applyMinimum===false
+      ? 1
+      : Math.max(1,Math.round(attackForMinimum*0.15));
+    return Math.max(minimumDamage,Math.round(damage));
   }
 
   // Determinystyczna tabela kalibracyjna: pełne HP i bez First Strike.
@@ -15719,8 +15725,8 @@ function setupAdmin() {
         rightBaseCritDamage:pvpDamageFormula(right,left,round,params,true,false),
         leftCritDamage:pvpDamageFormula(left,right,round,params,true,round===1),
         rightCritDamage:pvpDamageFormula(right,left,round,params,true,round===1),
-        leftCounterDamage:Math.max(1,Math.round(leftBaseDamage*(Number(params.counterMult)||1))),
-        rightCounterDamage:Math.max(1,Math.round(rightBaseDamage*(Number(params.counterMult)||1)))
+        leftCounterDamage:Math.max(1,Math.round(pvpDamageFormula(left,right,round,params,false,false,{applyMinimum:false})*(Number(params.counterMult)||1))),
+        rightCounterDamage:Math.max(1,Math.round(pvpDamageFormula(right,left,round,params,false,false,{applyMinimum:false})*(Number(params.counterMult)||1)))
       };
     });
   }
@@ -15811,7 +15817,7 @@ function setupAdmin() {
       attacker.metrics.crit++;
       attacker.metrics.eventTurns.crit.push(round);
     }
-    let damage=pvpDamageFormula(attacker,defender,round,params,crit,isFirst);
+    let damage=pvpDamageFormula(attacker,defender,round,params,crit,isFirst,{applyMinimum:!options.isCounter});
     if (Number.isFinite(options.damageMultiplier)) damage=Math.max(1,Math.round(damage*options.damageMultiplier));
     const actual=Math.min(defender.hp,damage);
     defender.hp-=actual;
@@ -16192,7 +16198,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia: ATK + 0,5 × zdobyty poziom profilu (przed premiami) + ukryte 5, DEF profilu + 1,65 × zdobyty poziom profilu przed armor pen; HP zawiera już +5 × poziom. DEF używa stałego modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
