@@ -3951,17 +3951,17 @@ function mapRenderRouteResult() {
   let accountViewRenderInFlight = null;
 
   const ACHIEVEMENT_CATEGORIES = [
-    {id:"distillery",icon:"🥃",title:"Destylarnia",items:[
+    {id:"distillery",icon:"🥃",medal:"assets/achievements/distillery-medal.png",title:"Destylarnia",items:[
       ["distillery_reserve","Rezerwacja stolika","Zarezerwuj recepturę."],["distillery_result","Wynik spod lady","Wyślij poprawny wynik receptury."],["distillery_accepted","Receptura uznana","Twój wynik zostanie zaakceptowany."],["distillery_import","Księgowy z Excela","Użyj importu wyników z gry."]
     ]},
-    {id:"garden",icon:"🌱",title:"Ogród",items:[
+    {id:"garden",icon:"🌱",medal:"assets/achievements/garden-medal.png",title:"Ogród",items:[
       ["garden_plant_onion","Pierwsza cebulka","Posadź cebulę."],["garden_plant_potato","Ziemniak na próbę","Posadź młode ziemniaki."],["garden_harvest_onion","Cebulowy plon","Zbierz cebulę po co najmniej 40 h."],["garden_harvest_potato","Kartoflany plon","Zbierz ziemniaki po co najmniej 40 h."],["garden_check","Czujne oko","Odpowiedz Tak albo Nie na pytanie o etap."],["garden_checks_three","Dziennik ogrodnika","Zostaw trzy odpowiedzi Tak/Nie w jednej uprawie."]
     ]},
-    {id:"pvp",icon:"⚔️",title:"PvP",items:[
+    {id:"pvp",icon:"⚔️",medal:"assets/achievements/pvp-medal.png",title:"PvP",items:[
       ["pvp_build","Gotów do ustawki","Zapisz pierwszy kompletny build."],["pvp_simulation","Próba generalna","Uruchom pierwszą symulację."],["pvp_ai_first","Bolek poszedł spać","Pokonaj pierwszego przeciwnika AI."],["pvp_ai_district","Dzielnica oczyszczona","Pokonaj komplet trzech AI na jednym poziomie."],["pvp_ai_50","Poziom wyżej","Pokonaj AI lvl 50."],["pvp_ai_60","Stary wyjadacz","Pokonaj AI lvl 60."],["pvp_ai_all","Król melin","Pokonaj wszystkie 27 AI."],["pvp_underdog","Dawid kontra Goliat","Pokonaj AI co najmniej 5 poziomów wyżej."],["pvp_hp_2000","Dwa tysiące powodów","Zapisz build z minimum 2 000 HP."],["pvp_attack_1000","Tysiąc argumentów","Zapisz build z minimum 1 000 ATK."],["pvp_defense_1000","Mur z meliny","Zapisz build z minimum 1 000 DEF."],["pvp_public_build","Pokaż, co masz","Udostępnij publiczny build."],["pvp_stat_50","Specjalizacja","Rozdaj 50 punktów w jednym atrybucie."],["pvp_tree_single","Jedna droga","Przy 50 punktach wybierz wszystkie perki A albo wszystkie B."],["pvp_level_50","Weteran ustawki","Zapisz build na poziomie co najmniej 50."],["pvp_public_fight","Ustawka z ulicy","Symuluj walkę z publicznym buildem innej osoby."],["pvp_public_win","Wygrana na dzielni","W 1 000 walk osiągnij 80% wygranych z publicznym buildem innej osoby."]
     ]},
-    {id:"map",icon:"🗺️",title:"Mapa",items:[["map_open","Znam teren","Sprawdź mapę."]]},
-    {id:"gang",icon:"🏢",title:"Gang",items:[
+    {id:"map",icon:"🗺️",medal:"assets/achievements/map-medal.png",title:"Mapa",items:[["map_open","Znam teren","Sprawdź mapę."]]},
+    {id:"gang",icon:"🏢",medal:"assets/achievements/gang-medal.png",title:"Gang",items:[
       ["gang_overpay_10k","Nadpłata 10k","Osiągnij 10 000 nadpłaty."],["gang_overpay_50k","Nadpłata 50k","Osiągnij 50 000 nadpłaty."],["gang_overpay_100k","Nadpłata 100k","Osiągnij 100 000 nadpłaty."],["gang_overpay_250k","Nadpłata 250k","Osiągnij 250 000 nadpłaty."],["gang_overpay_500k","Nadpłata 500k","Osiągnij 500 000 nadpłaty."],["gang_overpay_1m","Nadpłata 1 mln","Osiągnij 1 000 000 nadpłaty."],["gang_top3","Podium wpłat","Znajdź się w TOP 3 wpłat."],["gang_employed","Etat w melinie","Bądź zatrudniony w Spółce."],["gang_salary_10k","Pensja 10k","Osiągnij należną pensję 10 000 zł."],["gang_salary_50k","Pensja 50k","Osiągnij należną pensję 50 000 zł."],["gang_salary_100k","Pensja 100k","Osiągnij należną pensję 100 000 zł."],["gang_salary_fund","Pensja dla ekipy","Przekaż wypłatę do Funduszu."],["gang_fund_10k","Fundusz 10k","Przekaż 10 000 pensji do Funduszu."],["gang_fund_50k","Fundusz 50k","Przekaż 50 000 pensji do Funduszu."],["gang_fund_100k","Fundusz 100k","Przekaż 100 000 pensji do Funduszu."],["gang_fund_250k","Fundusz 250k","Przekaż 250 000 pensji do Funduszu."],["gang_fund_500k","Fundusz 500k","Przekaż 500 000 pensji do Funduszu."],["gang_fund_1m","Fundusz 1 mln","Przekaż 1 000 000 pensji do Funduszu."],["gang_login","Swój wśród swoich","Zaloguj się do strefy Gangu."],["gang_vote","Głos ulicy","Oddaj głos w ankiecie."],["gang_goal","Plan ekipy","Sprawdź cele Gangu."],["gang_announcements","Wieści z meliny","Przeczytaj ogłoszenia."]
     ]}
   ];
@@ -3970,7 +3970,16 @@ function mapRenderRouteResult() {
     const total=ACHIEVEMENT_CATEGORIES.reduce((sum,category)=>sum+category.items.length,0);
     const count=Object.keys(unlocked || {}).filter(id=>ACHIEVEMENT_CATEGORIES.some(category=>category.items.some(item=>item[0]===id))).length;
     const percent=total ? Math.round(count/total*100) : 0;
-    return `<section class="achievements-card"><div class="achievements-head"><div><strong>🏆 Osiągnięcia</strong><small>${count} odblokowane · ${total-count} pozostałe · ${total} łącznie</small></div><b>${percent}%</b></div><div class="achievements-progress"><i style="width:${percent}%"></i></div>${ACHIEVEMENT_CATEGORIES.map(category=>{const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;return `<details class="achievement-category" data-achievement-category="${category.id}"${expandedCategories.has(category.id)?" open":""}><summary><span>${category.icon} ${category.title}</span><small>${complete} / ${category.items.length}</small></summary><div class="achievement-grid">${category.items.map(([id,title,description])=>{const done=Boolean(unlocked && unlocked[id]);return `<span class="achievement-badge ${done?"done":"locked"}" tabindex="0" title="${escapeHtml(description)}"><b>${category.icon}</b><span>${escapeHtml(title)}</span><small>${escapeHtml(description)}</small></span>`;}).join("")}</div></details>`;}).join("")}</section>`;
+    return `<section class="achievements-card"><div class="achievements-head"><div><strong>🏆 Osiągnięcia</strong><small>${count} odblokowane · ${total-count} pozostałe · ${total} łącznie</small></div><b>${percent}%</b></div><div class="achievements-progress"><i style="width:${percent}%"></i></div>${ACHIEVEMENT_CATEGORIES.map(category=>{const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;return `<details class="achievement-category" data-achievement-category="${category.id}"${expandedCategories.has(category.id)?" open":""}><summary><span>${category.icon} ${category.title}</span><small>${complete} / ${category.items.length}</small></summary><div class="achievement-grid">${category.items.map(([id,title,description])=>{const done=Boolean(unlocked && unlocked[id]);return `<span class="achievement-badge ${done?"done":"locked"}" tabindex="0" title="${escapeHtml(description)}"><b><img src="${category.medal}" alt="" aria-hidden="true"></b><span>${escapeHtml(title)}</span><small>${escapeHtml(description)}</small></span>`;}).join("")}</div></details>`;}).join("")}</section>`;
+  }
+
+  function achievementCategoryMedals(unlocked={}) {
+    return ACHIEVEMENT_CATEGORIES.map(category=>{
+      const complete=category.items.filter(item=>unlocked && unlocked[item[0]]).length;
+      const percent=category.items.length ? complete/category.items.length*100 : 0;
+      const tier=percent>=75 ? "gold" : percent>=50 ? "silver" : percent>=25 ? "bronze" : "";
+      return Object.assign({},category,{complete,percent,tier,mastered:percent===100});
+    }).filter(category=>category.tier);
   }
 
   function adminPanelIsOpen() {
@@ -4166,9 +4175,11 @@ function mapRenderRouteResult() {
     // Konto staje się źródłem tożsamości dla obecnych funkcji.
     setPlayerIdentityToken && setPlayerIdentityToken(playerAccountSessionToken());
 
+    const profileMedals=achievementCategoryMedals(account.achievements || {});
+
     box.innerHTML = `
       <div class="account-card logged">
-        <b>👤 ${escapeHtml(account.nick)}</b>
+        <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${profileMedals.length?`<div class="account-achievement-medals">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}${category.mastered?" mastered":""}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}</div>
         <div style="margin-top:5px">✅ Zalogowany${account.admin ? " · 🛠 Administrator" : ""}</div>
         <div style="margin-top:7px"><span class="account-session-stat">📱 Aktywne sesje: ${Number(account.sessionCount)||0}</span></div>
         <div class="account-actions">
@@ -13634,7 +13645,7 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
-    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.56" : "onion-growth-atlas.png?v=21.09";
+    return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.57" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
