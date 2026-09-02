@@ -8046,7 +8046,13 @@ async function setAdminSubmissionStatus(
         return null;
       }
       try {
-        const payload=await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""});
+        // Zapotrzebowanie nie może zatrzymywać całej zakładki Gangu. Jeśli
+        // backend nie ma jeszcze tej akcji albo odpowiada zbyt wolno,
+        // kończymy oczekiwanie szybko i pokazujemy czytelny komunikat.
+        const payload=await Promise.race([
+          jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false}),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error("Serwer nie odpowiedział w 8 sekund. Sprawdź wdrożenie backendu akcji gangDemand.")),8000))
+        ]);
         if (!payload || !payload.ok) throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
         gangDemandCache=payload;
         renderGangDemand(payload);
@@ -16871,6 +16877,11 @@ function setupAdmin() {
 
     try {
       if (playerAccountSessionToken()) {
+        const homeAccountState=el("home-account-state");
+        if (homeAccountState) {
+          homeAccountState.className="submit-info";
+          homeAccountState.textContent="⏳ Weryfikuję zapisaną sesję w tle — możesz już korzystać z Toola.";
+        }
         // Ekran startowy nie może czekać na dwie długie próby JSONP.
         // Weryfikacja biegnie dalej w tle, ale po 3 s pokazujemy uczciwy
         // komunikat zamiast pozostawić "Sprawdzam konto..." bez końca.
