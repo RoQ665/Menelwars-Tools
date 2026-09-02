@@ -8205,6 +8205,94 @@ async function setAdminSubmissionStatus(
   }
 }
 
+// Zapotrzebowanie Gangu musi być w głównym zakresie aplikacji. Wcześniejsza
+// wersja została omyłkowo wklejona do obsługi zatwierdzania receptur, przez
+// co przy starcie setupGangDemand nie istniało i zatrzymywało cały app.js.
+let gangDemandLoadInFlightGlobal = null;
+let gangDemandCacheGlobal = null;
+
+function gangDemandCatalogGlobal() {
+  const raw=Array.isArray(window.MENELWARS_GAME_ITEMS) ? window.MENELWARS_GAME_ITEMS : [];
+  return raw.map(item=>({id:Number(item[0]),name:String(item[1]||""),iconUrl:String(item[2]||""),group:String(item[3]||""),subtitle:String(item[4]||"")})).filter(item=>Number.isFinite(item.id)&&item.name);
+}
+
+function gangDemandItemGlobal(itemId) {
+  return gangDemandCatalogGlobal().find(item=>item.id===Number(itemId)) || {id:Number(itemId)||0,name:`Przedmiot #${itemId}`,iconUrl:"",group:"",subtitle:""};
+}
+
+function gangDemandIconGlobal(item) {
+  return item.iconUrl ? `<img class="gang-demand-item-icon" src="${escapeHtml(item.iconUrl)}" alt="" loading="lazy">` : `<span class="gang-demand-item-icon" aria-hidden="true">📦</span>`;
+}
+
+function renderGangDemandChoicesGlobal(query) {
+  const box=el("gang-demand-results");
+  if (!box) return;
+  const needle=String(query||"").trim().toLocaleLowerCase("pl");
+  const catalog=gangDemandCatalogGlobal().sort((a,b)=>a.name.localeCompare(b.name,"pl"));
+  const matches=(needle ? catalog.filter(item=>item.name.toLocaleLowerCase("pl").includes(needle)) : catalog).slice(0,40);
+  box.hidden=!matches.length;
+  box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić.</div>':''}${matches.map(item=>`<button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIconGlobal(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group||"przedmiot")}</small></button>`).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
+  box.querySelectorAll("[data-gang-demand-item]").forEach(button=>button.addEventListener("click",()=>{
+    const item=gangDemandItemGlobal(button.dataset.gangDemandItem);
+    el("gang-demand-item-id").value=String(item.id);
+    el("gang-demand-search").value=item.name;
+    box.hidden=true; box.innerHTML="";
+  }));
+}
+
+function renderGangDemandGlobal(payload) {
+  const box=el("gang-demand-list");
+  if (!box) return;
+  const entries=Array.isArray(payload&&payload.entries) ? payload.entries : [];
+  box.innerHTML=entries.length ? entries.map(entry=>{
+    const item=gangDemandItemGlobal(entry.itemId);
+    const action=entry.canClose ? `<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete?"🗑 Usuń":"✅ Załatwione"}</button>` : "";
+    return `<article class="gang-demand-card">${gangDemandIconGlobal(item)}<div class="gang-demand-card-main"><strong>${escapeHtml(item.name)} × ${Math.max(1,Number(entry.amount)||1)}</strong><span class="gang-demand-card-meta">${escapeHtml(entry.nick||"Członek Gangu")} · ${escapeHtml(gangAnnouncementDate(entry.createdAt))}</span>${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}</div>${action}</article>`;
+  }).join("") : '<div class="empty">📦 Brak aktywnego zapotrzebowania. Dodaj pierwszy przedmiot, którego szukasz.</div>';
+  box.querySelectorAll("[data-gang-demand-close]").forEach(button=>button.addEventListener("click",()=>gangDemandCloseGlobal(button.dataset.gangDemandClose,button.textContent.includes("Usuń"))));
+}
+
+async function loadGangDemandGlobal(options={}) {
+  if (gangDemandLoadInFlightGlobal) return gangDemandLoadInFlightGlobal;
+  gangDemandLoadInFlightGlobal=(async()=>{
+    const token=playerAccountSessionToken(),box=el("gang-demand-list");
+    if (!token) { if (box) box.innerHTML='<div class="empty">🔒 Zaloguj się, aby zobaczyć zapotrzebowanie ekipy.</div>'; return null; }
+    try {
+      const payload=await Promise.race([
+        jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false}),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error("Serwer nie odpowiedział w 8 sekund.")),8000))
+      ]);
+      if (!payload||!payload.ok) throw new Error(payload&&payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
+      gangDemandCacheGlobal=payload; renderGangDemandGlobal(payload); return payload;
+    } catch(err) {
+      if (box) box.innerHTML=`<div class="empty">❌ Nie udało się pobrać zapotrzebowania.<br><small>${escapeHtml(err&&err.message ? err.message : "Sprawdź połączenie.")}</small></div>`;
+      return null;
+    }
+  })();
+  try { return await gangDemandLoadInFlightGlobal; } finally { gangDemandLoadInFlightGlobal=null; }
+}
+
+async function gangDemandCloseGlobal(id,isDelete) {
+  const status=el("gang-demand-status");
+  if (status) status.textContent="⏳ Zapisuję zmianę…";
+  try { await playerAccountPostAction("gangDemandClose",{sessionToken:playerAccountSessionToken(),id,delete:Boolean(isDelete)}); if (status) status.textContent="✅ Wpis usunięty z aktywnego zapotrzebowania."; await loadGangDemandGlobal({force:true}); }
+  catch(err) { if (status) status.textContent="❌ "+(err.message||"Nie udało się zmienić wpisu."); }
+}
+
+function setupGangDemand() {
+  const form=el("gang-demand-form"),search=el("gang-demand-search");
+  search?.addEventListener("input",()=>{ el("gang-demand-item-id").value=""; renderGangDemandChoicesGlobal(search.value); });
+  search?.addEventListener("focus",()=>renderGangDemandChoicesGlobal(search.value));
+  form?.addEventListener("submit",async event=>{
+    event.preventDefault();
+    const status=el("gang-demand-status"),itemId=Number(el("gang-demand-item-id").value),selected=gangDemandItemGlobal(itemId);
+    if (!itemId||selected.id!==itemId||el("gang-demand-search").value!==selected.name) { if (status) status.textContent="⚠️ Wybierz przedmiot z listy."; return; }
+    if (status) status.textContent="⏳ Dodaję zapotrzebowanie…";
+    try { await playerAccountPostAction("gangDemandAdd",{sessionToken:playerAccountSessionToken(),itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value}); form.reset(); el("gang-demand-amount").value="1"; if (status) status.textContent="✅ Zapotrzebowanie dodane dla całej ekipy."; await loadGangDemandGlobal({force:true}); }
+    catch(err) { if (status) status.textContent="❌ "+(err.message||"Nie udało się dodać wpisu."); }
+  });
+}
+
 let adminSubmissionsCache = null;
 let adminSubmissionsCacheAt = 0;
 let adminSubmissionsCacheToken = "";
@@ -16673,12 +16761,12 @@ function setupAdmin() {
       showToolView("demand-view","gang");
       gangTrackIndecisiveEasterEgg(target);
       const list=el("gang-demand-list");
-      if (!gangDemandCache && list) {
+      if (!gangDemandCacheGlobal && list) {
         // Nie zostawiamy niekończącego się loadera. Odczyt w tle nadpisze
         // ten stan prawdziwą listą lub czytelnym błędem.
-        renderGangDemand({entries:[]});
+        renderGangDemandGlobal({entries:[]});
       }
-      loadGangDemand({force:forceRefresh}).catch(()=>{});
+      loadGangDemandGlobal({force:forceRefresh}).catch(()=>{});
       validateGangSessionInBackground();
       return;
     }
@@ -16771,7 +16859,7 @@ function setupAdmin() {
     }
 
     if (target === "demand-view") {
-      requests.push(loadGangDemand({force:forceRefresh}));
+      requests.push(loadGangDemandGlobal({force:forceRefresh}));
     }
 
     const gangLoadKey = isPaymentsOrCompany ? "payments-company" : target;
@@ -17042,7 +17130,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
 
     if (viewId === "demand-view") {
-      await loadGangDemand({force:true});
+      await loadGangDemandGlobal({force:true});
       return;
     }
 
