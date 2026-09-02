@@ -8219,7 +8219,10 @@ function gangDemandCatalogAllGlobal() {
 }
 
 function gangDemandCatalogGlobal() {
-  return gangDemandCatalogAllGlobal().filter(item=>!gangDemandBlockedIdsGlobal.has(item.id));
+  const catalog=gangDemandCatalogAllGlobal();
+  return gangDemandAdminGlobal
+    ? catalog
+    : catalog.filter(item=>!gangDemandBlockedIdsGlobal.has(item.id));
 }
 
 function gangDemandItemGlobal(itemId) {
@@ -8234,12 +8237,24 @@ function renderGangDemandChoicesGlobal(query) {
   const box=el("gang-demand-results");
   if (!box) return;
   const needle=String(query||"").trim().toLocaleLowerCase("pl");
-  const catalog=gangDemandCatalogGlobal().sort((a,b)=>a.name.localeCompare(b.name,"pl"));
+  const catalog=gangDemandCatalogGlobal().sort((a,b)=>
+    Number(gangDemandBlockedIdsGlobal.has(a.id))-
+      Number(gangDemandBlockedIdsGlobal.has(b.id)) ||
+    a.name.localeCompare(b.name,"pl")
+  );
   const matches=(needle ? catalog.filter(item=>[
     item.name,item.subtitle,item.group
   ].some(value=>String(value||"").toLocaleLowerCase("pl").includes(needle))) : catalog).slice(0,40);
   box.hidden=!matches.length;
-  box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić.</div>':''}${matches.map(item=>`<div class="gang-demand-choice-row"><button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIconGlobal(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group||"przedmiot")}</small></button>${gangDemandAdminGlobal?`<button type="button" class="gang-demand-choice-block" data-gang-demand-block-item="${item.id}" title="Oznacz jako niewymienialny" aria-label="Oznacz ${escapeHtml(item.name)} jako niewymienialny">🚫</button>`:""}</div>`).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
+  box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić. Admin widzi wykluczone przedmioty na dole listy.</div>':''}${matches.map(item=>{
+    const isBlocked=gangDemandBlockedIdsGlobal.has(item.id);
+    const adminAction=gangDemandAdminGlobal
+      ? isBlocked
+        ? `<button type="button" class="gang-demand-choice-block is-restore" data-gang-demand-unblock-item="${item.id}" title="Przywróć do wyboru" aria-label="Przywróć ${escapeHtml(item.name)} do wyboru">↩️</button>`
+        : `<button type="button" class="gang-demand-choice-block" data-gang-demand-block-item="${item.id}" title="Oznacz jako niewymienialny" aria-label="Oznacz ${escapeHtml(item.name)} jako niewymienialny">🚫</button>`
+      : "";
+    return `<div class="gang-demand-choice-row${isBlocked?" is-blocked":""}"><button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}"${isBlocked?' disabled aria-disabled="true"':''}>${gangDemandIconGlobal(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}${isBlocked?'<small>🚫 niewymienialny</small>':""}</span><small>${escapeHtml(item.group||"przedmiot")}</small></button>${adminAction}</div>`;
+  }).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
   box.querySelectorAll("[data-gang-demand-item]").forEach(button=>button.addEventListener("click",()=>{
     const item=gangDemandItemGlobal(button.dataset.gangDemandItem);
     el("gang-demand-item-id").value=String(item.id);
@@ -8252,6 +8267,12 @@ function renderGangDemandChoicesGlobal(query) {
     event.stopPropagation();
     button.disabled=true;
     await gangDemandSetTradableGlobal(Number(button.dataset.gangDemandBlockItem),true);
+  }));
+  box.querySelectorAll("[data-gang-demand-unblock-item]").forEach(button=>button.addEventListener("click",async event=>{
+    event.preventDefault();
+    event.stopPropagation();
+    button.disabled=true;
+    await gangDemandSetTradableGlobal(Number(button.dataset.gangDemandUnblockItem),false);
   }));
 }
 
@@ -8357,17 +8378,23 @@ async function gangDemandSetTradableGlobal(itemId,blocked) {
   if (status) status.textContent=blocked ? `⏳ Oznaczam „${item.name}” jako niewymienialny…` : `⏳ Przywracam „${item.name}” do wyboru…`;
   try {
     await playerAccountPostAction("gangDemandSetTradable",{sessionToken:playerAccountSessionToken(),itemId,blocked:Boolean(blocked)});
+    const confirmedPayload=await loadGangDemandGlobal({force:true});
+    if (!confirmedPayload || !Array.isArray(confirmedPayload.blockedItemIds)) {
+      throw new Error("Backend nie obsługuje jeszcze trwałej blacklisty. Wgraj jego najnowszą wersję.");
+    }
+    const saved=gangDemandBlockedIdsGlobal.has(Number(itemId));
+    if (saved!==Boolean(blocked)) {
+      throw new Error("Serwer nie potwierdził zapisu. Przedmiot nie został zmieniony.");
+    }
     if (blocked) {
-      gangDemandBlockedIdsGlobal.add(Number(itemId));
       if (Number(el("gang-demand-item-id")?.value)===Number(itemId)) {
         el("gang-demand-item-id").value="";
         el("gang-demand-search").value="";
       }
-    } else gangDemandBlockedIdsGlobal.delete(Number(itemId));
+    }
     renderGangDemandChoicesGlobal(el("gang-demand-search")?.value||"");
     renderGangDemandAdminToolsGlobal();
     if (status) status.textContent=blocked ? `✅ „${item.name}” nie będzie już dostępny na liście.` : `✅ „${item.name}” ponownie jest dostępny na liście.`;
-    loadGangDemandGlobal({force:true}).catch(()=>{});
   } catch(err) {
     if (status) status.textContent="❌ "+(err.message||"Nie udało się zmienić przedmiotu.");
   }
