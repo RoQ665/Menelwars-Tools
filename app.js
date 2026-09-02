@@ -3809,6 +3809,14 @@ function mapRenderRouteResult() {
     cachedAccountStatusAt = 0;
     cachedAccountStatusToken = "";
     accountStatusInFlight = null;
+
+    // Uprawnienia do moderacji zapotrzebowania są przypisane do konkretnego
+    // konta. Po zmianie sesji nie wolno zachować roli poprzedniego użytkownika.
+    if (typeof gangDemandAdminGlobal !== "undefined") {
+      gangDemandAdminGlobal = false;
+      gangDemandCacheGlobal = null;
+      gangDemandBlockedIdsGlobal = new Set();
+    }
   }
 
   async function playerAccountPostAction(action,data={}) {
@@ -4224,7 +4232,7 @@ function mapRenderRouteResult() {
       <div class="account-card logged">
         <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${overallMedal?`<span class="account-overall-medal ${overallMedal.tier}" title="Postęp ogólny: ${overallMedal.complete} / ${overallMedal.total} (${Math.round(overallMedal.percent)}%)"><img src="${overallMedal.medal}" alt="Medal ogólnego postępu"></span>`:""}</div>
         ${profileMedals.length?`<div class="account-achievement-medals" aria-label="Medale kategorii">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}
-        <div style="margin-top:5px">✅ Zalogowany${account.admin ? " · 🛠 Administrator" : ""}</div>
+        <div style="margin-top:5px">✅ Zalogowany${account.admin ? " · 🛠 Administrator" : account.officer ? " · 🎖 Oficer" : ""}</div>
         <div style="margin-top:7px"><span class="account-session-stat">📱 Aktywne sesje: ${Number(account.sessionCount)||0}</span></div>
         <div class="account-actions">
           <button id="account-change-open" type="button">🔑 Zmień hasło</button>
@@ -4643,7 +4651,7 @@ async function loadAccountAdminPermissions(
         <div class="admin-player-permissions-head">
           <b>🛠 Uprawnienia graczy</b>
           <span class="muted">
-            Dostęp do Panelu Admina i aktywne sesje kont.
+            Role Admina i Oficera oraz aktywne sesje kont.
           </span>
         </div>
 
@@ -4666,6 +4674,12 @@ async function loadAccountAdminPermissions(
                     data-account-admin-toggle="${escapeHtml(player.nick)}"
                     data-enabled="${player.admin ? 1 : 0}">
                     ${player.admin ? "✅ Admin" : "Nadaj Admin"}
+                  </button>
+
+                  <button
+                    data-account-officer-toggle="${escapeHtml(player.nick)}"
+                    data-enabled="${player.officer ? 1 : 0}">
+                    ${player.officer ? "✅ Oficer" : "Nadaj Oficera"}
                   </button>
 
                   <button
@@ -4726,6 +4740,38 @@ async function loadAccountAdminPermissions(
               await loadAccountAdminPermissions({
                 force:true
               });
+              } finally {
+                criticalOperationFinish();
+              }
+            };
+        });
+
+      holder
+        .querySelectorAll(
+          "[data-account-officer-toggle]"
+        )
+        .forEach(button => {
+          button.onclick =
+            async () => {
+              criticalOperationStart(
+                "🎖 Zmieniam uprawnienia Oficera…",
+                "Zapisuję zmianę niższej rangi gracza."
+              );
+
+              try {
+                await confirmedAdminMutationPost(
+                  "accountAdminSetOfficer",
+                  {
+                    action:"accountAdminSetOfficer",
+                    sessionToken:playerAccountSessionToken(),
+                    nick:button.dataset.accountOfficerToggle,
+                    enabled:button.dataset.enabled !== "1"
+                  },
+                  {token:playerAccountSessionToken()}
+                );
+
+                accountAdminPlayersCacheAt = 0;
+                await loadAccountAdminPermissions({force:true});
               } finally {
                 criticalOperationFinish();
               }
@@ -8282,7 +8328,7 @@ function renderGangDemandAdminToolsGlobal() {
   host.hidden=!gangDemandAdminGlobal;
   if (!gangDemandAdminGlobal) { host.innerHTML=""; return; }
   const blocked=[...gangDemandBlockedIdsGlobal].map(gangDemandItemGlobal).sort((a,b)=>a.name.localeCompare(b.name,"pl"));
-  host.innerHTML=`<div class="gang-demand-admin-hint"><b>🛡️ Narzędzia administratora</b><span>Kliknij czerwone 🚫 przy przedmiocie na liście, aby wyłączyć możliwość dodawania go do zapotrzebowania.</span></div><details><summary>🚫 Niewymienialne przedmioty: ${blocked.length}</summary><div class="gang-demand-blocked-list">${blocked.length?blocked.map(item=>`<button type="button" class="secondary-btn" data-gang-demand-unblock="${item.id}">↩️ ${escapeHtml(item.name)}</button>`).join(""):'<span class="muted">Lista jest jeszcze pusta.</span>'}</div></details>`;
+  host.innerHTML=`<div class="gang-demand-admin-hint"><b>🛡️ Narzędzia Admina i Oficera</b><span>Kliknij czerwone 🚫 przy przedmiocie na liście, aby wyłączyć możliwość dodawania go do zapotrzebowania.</span></div><details><summary>🚫 Niewymienialne przedmioty: ${blocked.length}</summary><div class="gang-demand-blocked-list">${blocked.length?blocked.map(item=>`<button type="button" class="secondary-btn" data-gang-demand-unblock="${item.id}">↩️ ${escapeHtml(item.name)}</button>`).join(""):'<span class="muted">Lista jest jeszcze pusta.</span>'}</div></details>`;
   host.querySelectorAll("[data-gang-demand-unblock]").forEach(button=>button.addEventListener("click",()=>gangDemandSetTradableGlobal(Number(button.dataset.gangDemandUnblock),false)));
 }
 
@@ -8299,7 +8345,7 @@ function syncGangDemandAdminFromAccountGlobal(token) {
     .then(account=>{
       if (
         !account ||
-        !account.admin ||
+        (!account.admin && !account.officer) ||
         playerAccountSessionToken()!==token
       ) return;
       gangDemandAdminGlobal=true;
@@ -8330,7 +8376,7 @@ async function loadGangDemandGlobal(options={}) {
       (
         cachedAccountStatus &&
         cachedAccountStatusToken===playerAccountSessionToken() &&
-        cachedAccountStatus.admin
+        (cachedAccountStatus.admin || cachedAccountStatus.officer)
       )
     );
     renderGangDemandGlobal(gangDemandCacheGlobal);
@@ -8353,11 +8399,13 @@ async function loadGangDemandGlobal(options={}) {
       // Dzięki temu starsza odpowiedź/cache endpointu zapotrzebowania nie ukrywa
       // narzędzi administratora, jeśli samo Konto już poprawnie rozpoznało Admina.
       gangDemandAdminGlobal=Boolean(
+        payload.canManageItems ||
         payload.admin ||
+        payload.officer ||
         (
           cachedAccountStatus &&
           cachedAccountStatusToken===token &&
-          cachedAccountStatus.admin
+          (cachedAccountStatus.admin || cachedAccountStatus.officer)
         )
       );
       renderGangDemandGlobal(payload);
