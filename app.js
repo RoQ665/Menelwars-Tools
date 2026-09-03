@@ -3928,6 +3928,49 @@ function mapRenderRouteResult() {
     }
   }
 
+  let cloudflareAchievementCache=null;
+  let cloudflareAchievementCacheAt=0;
+  let cloudflareAchievementCacheToken="";
+  let cloudflareAchievementSyncInFlight=null;
+
+  async function cloudflareAchievementsForAccount(account,options={}) {
+    if (!cloudflareAchievementsEnabled() || !account) return account&&account.achievements||{};
+    const legacySessionToken=playerAccountSessionToken();
+    const sessionEpoch=playerAccountSessionEpoch;
+    const cacheFresh=
+      cloudflareAchievementCache &&
+      cloudflareAchievementCacheToken===legacySessionToken &&
+      Date.now()-cloudflareAchievementCacheAt<5*60*1000;
+    if (!options.force && cacheFresh) {
+      account.achievements=cloudflareAchievementCache;
+      return cloudflareAchievementCache;
+    }
+    if (cloudflareAchievementSyncInFlight) return cloudflareAchievementSyncInFlight;
+    const request=(async()=>{
+      const token=await cloudflareEnsureSession();
+      const result=await cloudflareApi("/achievements/legacy-sync",{
+        method:"POST",
+        token,
+        body:{legacySessionToken,requestId:makeRecipeNonce()}
+      });
+      if (!playerAccountSessionIsCurrent(legacySessionToken,sessionEpoch)) return {};
+      const unlocked=result&&result.unlocked||{};
+      cloudflareAchievementCache=unlocked;
+      cloudflareAchievementCacheAt=Date.now();
+      cloudflareAchievementCacheToken=legacySessionToken;
+      account.achievements=unlocked;
+      if (cachedAccountStatus && cachedAccountStatusToken===legacySessionToken) {
+        cachedAccountStatus.achievements=unlocked;
+      }
+      return unlocked;
+    })();
+    cloudflareAchievementSyncInFlight=request;
+    try { return await request; }
+    finally {
+      if (cloudflareAchievementSyncInFlight===request) cloudflareAchievementSyncInFlight=null;
+    }
+  }
+
   // Każda odpowiedź asynchroniczna pamięta numer sesji, dla której została
   // uruchomiona. Po wylogowaniu lub zalogowaniu na inne konto spóźniona
   // odpowiedź nie może już zmienić ekranu ani wyczyścić nowej sesji.
@@ -3966,6 +4009,10 @@ function mapRenderRouteResult() {
     cachedAccountStatusAt = 0;
     cachedAccountStatusToken = "";
     accountStatusInFlight = null;
+    cloudflareAchievementCache = null;
+    cloudflareAchievementCacheAt = 0;
+    cloudflareAchievementCacheToken = "";
+    cloudflareAchievementSyncInFlight = null;
 
     // Uprawnienia do moderacji zapotrzebowania są przypisane do konkretnego
     // konta. Po zmianie sesji nie wolno zachować roli poprzedniego użytkownika.
@@ -4444,6 +4491,15 @@ function mapRenderRouteResult() {
       return;
     }
 
+    let achievementSyncError=null;
+    if (cloudflareAchievementsEnabled()) {
+      try {
+        await cloudflareAchievementsForAccount(account,{force:forceRefresh});
+      } catch(err) {
+        achievementSyncError=err;
+      }
+    }
+
     // Konto staje się źródłem tożsamości dla obecnych funkcji.
     setPlayerIdentityToken && setPlayerIdentityToken(playerAccountSessionToken());
 
@@ -4477,6 +4533,11 @@ function mapRenderRouteResult() {
       ${achievementsHtml(account.achievements || {},expandedAchievementCategories)}
     `;
 
+    if (achievementSyncError) {
+      status.textContent=`⚠️ Nie udało się odświeżyć osiągnięć z Cloudflare: ${achievementSyncError.message||"błąd połączenia"}. Pokazuję ostatnie dostępne dane.`;
+    } else if (new URLSearchParams(location.search).get("migrationBackend")==="achievements") {
+      status.textContent="✅ Osiągnięcia zostały odczytane z Cloudflare.";
+    }
     testCloudflareAchievements(account,status).catch(()=>{});
 
     if (account.admin) {
@@ -14432,9 +14493,22 @@ function setupAdmin() {
     if (!wanted.length) return {ok:true,unlocked};
     wanted.forEach(id=>achievementTrackCompleted.add(`${sessionToken}:${id}`));
     try {
-      const result=await playerAccountPostAction("achievementTrack",{sessionToken,ids:wanted});
+      const result=cloudflareAchievementsEnabled()
+        ? await cloudflareApi("/achievements/track",{
+            method:"POST",
+            token:await cloudflareEnsureSession(),
+            body:{ids:wanted,requestId:makeRecipeNonce()}
+          })
+        : await playerAccountPostAction("achievementTrack",{sessionToken,ids:wanted});
       if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch)) return null;
-      if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
+      if (result.unlocked) {
+        if (cachedAccountStatus) cachedAccountStatus.achievements=result.unlocked;
+        if (cloudflareAchievementsEnabled()) {
+          cloudflareAchievementCache=result.unlocked;
+          cloudflareAchievementCacheAt=Date.now();
+          cloudflareAchievementCacheToken=sessionToken;
+        }
+      }
       return result;
     } catch (err) {
       wanted.forEach(id=>achievementTrackCompleted.delete(`${sessionToken}:${id}`));
@@ -14443,7 +14517,7 @@ function setupAdmin() {
     }
   }
 
-  async function achievementTrackAiWin(presetId,ownLevel) {
+  async function achievementTrackAiWin(presetId,ownLevel,runs,wins) {
     const sessionToken=playerAccountSessionToken();
     const sessionEpoch=playerAccountSessionEpoch;
     if (!sessionToken) return null;
@@ -14453,13 +14527,23 @@ function setupAdmin() {
     if (achievementAiWinCompleted.has(completionKey)) return null;
     achievementAiWinCompleted.add(completionKey);
     try {
-      const result=await playerAccountPostAction("achievementAiWin",{
-        sessionToken,
-        presetId,
-        ownLevel
-      });
+      const payload={sessionToken,presetId,ownLevel,runs,wins};
+      const result=cloudflareAchievementsEnabled()
+        ? await cloudflareApi("/achievements/ai-win",{
+            method:"POST",
+            token:await cloudflareEnsureSession(),
+            body:{presetId,ownLevel,runs,wins,requestId:makeRecipeNonce()}
+          })
+        : await playerAccountPostAction("achievementAiWin",payload);
       if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch)) return null;
-      if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
+      if (result.unlocked) {
+        if (cachedAccountStatus) cachedAccountStatus.achievements=result.unlocked;
+        if (cloudflareAchievementsEnabled()) {
+          cloudflareAchievementCache=result.unlocked;
+          cloudflareAchievementCacheAt=Date.now();
+          cloudflareAchievementCacheToken=sessionToken;
+        }
+      }
       return result;
     } catch (err) {
       achievementAiWinCompleted.delete(completionKey);
@@ -16856,7 +16940,7 @@ function setupAdmin() {
       // Przeciwnik AI jest zaliczany dopiero na wiarygodnej próbie 1 000 walk.
       // „Pokonaj” oznacza przewagę w symulacji, nie pojedynczy szczęśliwy rzut.
       if (rightItem.group==="preset" && runs===1000 && agg.winsA/runs>=0.8) {
-        achievementTrackAiWin(rightItem.source.id,buildRequiredLevel());
+        achievementTrackAiWin(rightItem.source.id,buildRequiredLevel(),runs,agg.winsA);
       }
       if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
