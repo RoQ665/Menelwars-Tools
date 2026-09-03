@@ -14371,6 +14371,13 @@ function setupAdmin() {
     const check=canAskForCheck ? gardenCheckForFrame(summary,frame) : null;
     const sprite=gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant);
     const stats=gardenCheckStats(own,summary);
+    const modelRemaining=Math.max(0,GARDEN_AUTO_MODEL_HOURS*60*60*1000-(Date.now()-Number(own.startedAt||0)));
+    const stageRemaining=Math.max(0,(frame+1)*GARDEN_AUTO_STAGE_MS-(Date.now()-Number(own.startedAt||0)));
+    const timingText=frame===9
+      ? modelRemaining>0
+        ? `Model 52 h · modelowy czas wzrostu za ${gardenFormatDuration(modelRemaining)}.`
+        : "Modelowy czas 52 h już minął · etap 10 pozostaje do faktycznego zbioru w grze."
+      : `Model 52 h · kolejny etap za ${gardenFormatDuration(stageRemaining)}.`;
     const report=frame===0
       ? `<div class="garden-phase-note">🌱 Etap 1 został potwierdzony przez posadzenie. Pierwsze pytanie pojawi się przy etapie 2.</div>`
       : frame===9
@@ -14378,7 +14385,7 @@ function setupAdmin() {
       : check
         ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
         : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div></div>`;
-    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">Model 52 h · kolejny etap za ${escapeHtml(gardenFormatDuration(Math.max(0,(frame+1)*GARDEN_AUTO_STAGE_MS-(Date.now()-Number(own.startedAt||0)))))}.</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku. Tak/Nie zapisujemy z czasem serwera.</div>`;
+    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku. Tak/Nie zapisujemy z czasem serwera.</div>`;
     tools.querySelectorAll("[data-garden-check]").forEach(button=>button.addEventListener("click",()=>{
       gardenRecordModelCheck(frame,String(button.dataset.gardenCheck||""));
     }));
