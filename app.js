@@ -15437,6 +15437,23 @@ function setupAdmin() {
     const missing = [];
     if (!source || typeof source !== "object") return {ok:false,missing:["build"]};
 
+    // Przeciwnik odtworzony z pełnego logu walki nie potrzebuje sztucznego
+    // drzewka perków. Log zawiera jego końcowe ATK/DEF/HP oraz wszystkie
+    // efektywne statystyki PvP używane przez symulator.
+    if (source.exactCombat && typeof source.exactCombat === "object") {
+      const exact=source.exactCombat;
+      const primary=exact.primary || {};
+      const stats=exact.stats || {};
+      if (!Number.isInteger(Number(exact.level)) || Number(exact.level)<1) missing.push("poziom bojowy NPC");
+      if (![primary.attack,primary.defense,primary.hp].every(value=>Number.isFinite(Number(value)) && Number(value)>0)) {
+        missing.push("ATK / DEF / HP NPC z logu walki");
+      }
+      if (![stats.accuracy,stats.initiative,stats.critChance,stats.damageReduction].every(value=>Number.isFinite(Number(value)))) {
+        missing.push("pełne statystyki PvP NPC z logu walki");
+      }
+      return {ok:missing.length===0,missing};
+    }
+
     const profile = buildProfileStats(source);
     const attrs = source.attributes || {};
     BUILD_ATTR_ORDER.forEach(attrKey=>{
@@ -15622,6 +15639,40 @@ function setupAdmin() {
         });
       });
     });
+
+    // Nagła Śmierć została odtworzona bez zgadywania perków. Wszystkie
+    // wartości poniżej pochodzą z pełnego logu prawdziwej walki z 3.09.2026.
+    out.push({
+      id:"rewir-17-nagla-smierc",
+      name:"Nagła Śmierć · Lvl 14 · Rewiry",
+      authorNick:"MenelWars · Rewiry",
+      ownerNick:"",
+      public:false,
+      level:14,
+      attributes:{strength:0,endurance:0,agility:0,vitality:0,precision:0},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:847,combatDefense:661,combatHp:2060,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:14,
+        primary:{attack:847,defense:661,hp:2060},
+        stats:{
+          accuracy:126.5,initiative:18.9,firstStrike:13.3,
+          critChance:51.2,critDmg:94.5,execute:10,lifesteal:8,
+          armorPen:33.5,stun:21.2,bleed:54.8,bleedDamage:40,
+          evasion:15.7,doubleStrike:19.5,counter:11.7,
+          healingReduction:31.2,damageReduction:18,
+          critResist:17.2,stunResist:17.2,bleedResist:13.5,
+          hpRegen:4.1
+        }
+      },
+      description:"Dokładny przeciwnik z Rewirów odtworzony z logu walki: 847 ATK · 661 DEF · 2060 HP. Statystyki efektów i odporności pochodzą bezpośrednio z gry."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
@@ -15742,10 +15793,28 @@ function setupAdmin() {
   }
 
   function pvpPrepareFighter(source,label) {
-    const calculated=buildCalculateStats(source);
-    const primary=buildFinalPrimaryStats(calculated);
+    const baseCalculated=buildCalculateStats(source);
+    const exact=source && source.exactCombat && typeof source.exactCombat === "object"
+      ? source.exactCombat
+      : null;
+    const exactLevel=exact ? Math.max(1,Number(exact.level)||1) : null;
+    const calculated=exact
+      ? Object.assign({},baseCalculated,{
+          stats:Object.assign(buildNewStatBag(),exact.stats||{}),
+          extras:{conditional:[],dynamic:[],special:[]},
+          characterLevel:exactLevel
+        })
+      : baseCalculated;
+    const primary=exact
+      ? {
+          attack:buildStatNumber(exact.primary?.attack),
+          defense:buildStatNumber(exact.primary?.defense),
+          hp:buildStatNumber(exact.primary?.hp)
+        }
+      : buildFinalPrimaryStats(calculated);
     return {
       source,label,calculated,stats:calculated.stats,primary,
+      combatLevel:exactLevel || Math.max(1,Number(calculated.characterLevel)||1),
       maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
       bleeding:null,stunned:false,firstAttack:true,
       procMeters:{crit:0,double:0,counter:0,stun:0,bleed:0,evasion:0},
@@ -15782,7 +15851,6 @@ function setupAdmin() {
     // Dokładne ATK/DEF pochodzą z ekranu „Statystyki startowe w walce”.
     // Testy na tym samym poziomie i przeciwniku wykluczyły dokładanie do nich
     // osobnych warstw +0,5 ATK oraz +1,65 DEF za poziom profilu.
-    const attackerLevel=Math.max(1,Number(attacker.calculated?.characterLevel)||1);
     // Zwykłe premie do ATK (w tym momentum) tworzą podstawową wartość ataku.
     // Premia warunkowa low HP jest osobnym, późniejszym etapem tego samego
     // efektu — nie sumujemy jej z normalnymi premiami procentowymi.
@@ -15793,9 +15861,12 @@ function setupAdmin() {
     const normalAttack=attacker.primary.attack*(1+dynamicPct/100)+5;
     const attack=normalAttack*(1+condA.attackPct/100);
     const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
-    // Jedyny aktywny model DEF: K rośnie z poziomem atakującego.
-    // Został dobrany do obserwacji z walk na niskich poziomach i RoQ vs Bulax.
-    const defenseK=20+5.6*(attackerLevel-1);
+    // Pełny log RoQ (lvl 53) kontra Nagła Śmierć (lvl 14) pokazał, że K
+    // zależy od poziomu BRONIĄCEGO, nie atakującego. Kalibracja obu kierunków
+    // tej samej walki daje K ~= 175 + 4,9 × (poziom obrońcy - 1) i odtwarza
+    // kolejne zwykłe ciosy z dokładnością około jednego punktu obrażeń.
+    const defenderLevel=Math.max(1,Number(defender.combatLevel)||Number(defender.calculated?.characterLevel)||1);
+    const defenseK=175+4.9*(defenderLevel-1);
     const defenseFactor=defenseK/(effectiveDefense+defenseK);
     // Pasywny unik jest częścią zwykłej redukcji obrażeń. Zwykły DR i unik/3,5
     // sumują się przed wspólnym limitem 60%. Warunkowy DR low HP jest osobnym,
@@ -15844,8 +15915,8 @@ function setupAdmin() {
         rightBaseCritDamage:pvpDamageFormula(right,left,round,params,true,false),
         leftCritDamage:pvpDamageFormula(left,right,round,params,true,round===1),
         rightCritDamage:pvpDamageFormula(right,left,round,params,true,round===1),
-        leftCounterDamage:Math.max(1,Math.round(pvpDamageFormula(left,right,round,params,false,false,{applyMinimum:false})*(Number(params.counterMult)||1))),
-        rightCounterDamage:Math.max(1,Math.round(pvpDamageFormula(right,left,round,params,false,false,{applyMinimum:false})*(Number(params.counterMult)||1)))
+        leftCounterDamage:Math.max(1,Math.floor(pvpDamageFormula(left,right,round,params,false,false,{applyMinimum:false})*(Number(params.counterMult)||1))),
+        rightCounterDamage:Math.max(1,Math.floor(pvpDamageFormula(right,left,round,params,false,false,{applyMinimum:false})*(Number(params.counterMult)||1)))
       };
     });
   }
@@ -15937,7 +16008,8 @@ function setupAdmin() {
       attacker.metrics.eventTurns.crit.push(round);
     }
     let damage=pvpDamageFormula(attacker,defender,round,params,crit,isFirst,{applyMinimum:!options.isCounter});
-    if (Number.isFinite(options.damageMultiplier)) damage=Math.max(1,Math.round(damage*options.damageMultiplier));
+    // Log gry: 170 obrażeń zwykłego ciosu daje kontrę 127 (= floor(75%)).
+    if (Number.isFinite(options.damageMultiplier)) damage=Math.max(1,Math.floor(damage*options.damageMultiplier));
     const actual=Math.min(defender.hp,damage);
     defender.hp-=actual;
     attacker.metrics.damage+=actual;
@@ -16317,7 +16389,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu atakującego: K = 20 + 5,6 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75% i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
