@@ -3223,6 +3223,40 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 }
 .pvp-sim-grid label{display:grid;gap:4px}
 .pvp-sim-grid label>span{font-size:11px;font-weight:800;color:#685640}
+.pvp-boss-consumables{
+  margin:0 0 10px;
+  padding:10px;
+  border:1px solid #d3a86b;
+  border-radius:10px;
+  background:#fff5df;
+}
+.pvp-boss-consumables[hidden]{display:none!important}
+.pvp-boss-consumables legend{padding:0 6px;font-size:12px;font-weight:900;color:#744b1f}
+.pvp-boss-consumables-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.pvp-boss-consumables-grid label{
+  display:flex;
+  gap:7px;
+  align-items:center;
+  padding:8px;
+  border:1px solid #ddc8a7;
+  border-radius:8px;
+  background:#fffdf8;
+  cursor:pointer;
+}
+.pvp-boss-consumables-grid input{flex:none;margin:0}
+.pvp-boss-consumables-grid span{display:grid;gap:2px;font-size:11px}
+.pvp-boss-consumables-grid small{color:#75634d}
+.pvp-boss-consumables>p{margin:8px 0 0;font-size:10px;line-height:1.35;color:#735c3e}
+.pvp-boss-consumables-result{
+  margin:0 0 9px;
+  padding:9px 10px;
+  border:1px solid #d3a86b;
+  border-radius:9px;
+  background:#fff5df;
+  color:#684318;
+  font-size:11px;
+  line-height:1.4;
+}
 .pvp-sim-advanced{margin:9px 0}
 .pvp-sim-results{margin-top:10px}
 .pvp-sim-summary-grid{
@@ -3362,6 +3396,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   .garden-race-row{grid-template-columns:1fr}
   .garden-race-label{justify-self:start}
   .pvp-sim-grid{grid-template-columns:1fr}
+  .pvp-boss-consumables-grid{grid-template-columns:1fr}
   .pvp-sim-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .map-route-controls{grid-template-columns:1fr}
   .map-mode-switch{display:grid;grid-template-columns:1fr 1fr}

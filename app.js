@@ -15846,6 +15846,7 @@ function setupAdmin() {
           hpRegen:4.1
         }
       },
+      boss:true,
       description:"Dokładny przeciwnik z Rewirów odtworzony z logu walki: 847 ATK · 661 DEF · 2060 HP. Statystyki efektów i odporności pochodzą bezpośrednio z gry."
     });
     pvpGeneratedPresetsCache = out;
@@ -15882,6 +15883,52 @@ function setupAdmin() {
 
   function pvpResolveSource(key) {
     return pvpSimulationSources().find(item=>item.key===key) || null;
+  }
+
+  const PVP_BOSS_CONSUMABLES = [
+    {id:"pvp-boss-krokodyl",name:"Krokodyl",stat:"hp",amount:60,label:"+60 maks. HP"},
+    {id:"pvp-boss-mocarz",name:"Mocarz",stat:"defense",amount:80,label:"+80 DEF"},
+    {id:"pvp-boss-tajfun",name:"Tajfun",stat:"attack",amount:20,label:"+20 ATK"}
+  ];
+
+  function pvpIsBossSource(item) {
+    return Boolean(item && item.group==="preset" && item.source && item.source.boss===true);
+  }
+
+  function pvpUpdateBossConsumables() {
+    const host=el("pvp-boss-consumables");
+    if (!host) return;
+    const rightItem=pvpResolveSource(el("pvp-sim-right")?.value||"");
+    const enabled=pvpIsBossSource(rightItem);
+    host.hidden=!enabled;
+    PVP_BOSS_CONSUMABLES.forEach(item=>{
+      const input=el(item.id);
+      if (input) input.disabled=!enabled;
+    });
+  }
+
+  function pvpSelectedBossConsumables(rightItem) {
+    if (!pvpIsBossSource(rightItem)) return [];
+    return PVP_BOSS_CONSUMABLES.filter(item=>Boolean(el(item.id)?.checked));
+  }
+
+  function pvpApplyBossConsumables(source,consumables) {
+    if (!consumables.length) return source;
+    const profile=Object.assign({},source?.profile||{});
+    consumables.forEach(item=>{
+      if (item.stat==="attack") profile.combatAttack=buildStatNumber(Number(profile.combatAttack)||0)+item.amount;
+      if (item.stat==="defense") profile.combatDefense=buildStatNumber(Number(profile.combatDefense)||0)+item.amount;
+      if (item.stat==="hp") profile.combatHp=buildStatNumber(Number(profile.combatHp)||0)+item.amount;
+    });
+    return Object.assign({},source,{profile});
+  }
+
+  function pvpBossConsumablesResultHtml(rightItem,consumables) {
+    if (!pvpIsBossSource(rightItem)) return "";
+    const summary=consumables.length
+      ? consumables.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · ")
+      : "bez dopalaczy";
+    return `<div class="pvp-boss-consumables-result">🧪 Walka z bossem: ${summary}</div>`;
   }
 
   function pvpUpdateReadiness() {
@@ -16562,13 +16609,15 @@ function setupAdmin() {
     };
     const runs=[10,100,1000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):1000;
     const mode=String(el("pvp-sim-mode")?.value||"both");
+    const bossConsumables=pvpSelectedBossConsumables(rightItem);
+    const leftSource=pvpApplyBossConsumables(leftItem.source,bossConsumables);
     button.disabled=true; if (readinessHost) readinessHost.textContent=`⏳ Symuluję ${runs.toLocaleString("pl-PL")} walk...`;
     try {
       // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
-      const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
-      const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki, ale każdy jego tick może zostać odparty zgodnie z odpornością na krwawienie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      const agg=await pvpMonteCarlo(leftSource,rightItem.source,runs,params,"B");
+      const perRoundDamage=pvpNormalDamageByRound(leftSource,rightItem.source,params);
+      host.innerHTML=`${pvpBossConsumablesResultHtml(rightItem,bossConsumables)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki, ale każdy jego tick może zostać odparty zgodnie z odpornością na krwawienie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
@@ -16617,7 +16666,11 @@ function setupAdmin() {
 
   function setupPvpLab() {
     pvpPopulateSelectors();
-    ["pvp-sim-left","pvp-sim-right"].forEach(id=>el(id)?.addEventListener("change",pvpUpdateReadiness));
+    ["pvp-sim-left","pvp-sim-right"].forEach(id=>el(id)?.addEventListener("change",()=>{
+      pvpUpdateReadiness();
+      pvpUpdateBossConsumables();
+    }));
+    pvpUpdateBossConsumables();
     el("pvp-sim-run")?.addEventListener("click",pvpRunSimulation);
     el("pvp-log-analyze")?.addEventListener("click",pvpAnalyzeLog);
   }
