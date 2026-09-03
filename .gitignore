@@ -1,0 +1,8 @@
+# Prywatny backend Apps Script nigdy nie trafia do publicznego repozytorium.
+Code-gs-prywatny-*.txt
+
+# Lokalne paczki i materiały robocze.
+Menelwars-Tools-v*.zip
+.video-analysis/
+.video-tools/
+.video-tools2/

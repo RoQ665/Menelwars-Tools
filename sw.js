@@ -1,16 +1,16 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v21.88";
+const CACHE = "menelwars-tools-v21.90";
 // Jednorazowa naprawa bardzo starych instalacji PWA, które nie pokazały
 // banera aktualizacji i nadal serwują app.js v21.58.
 const FORCE_LEGACY_RECOVERY = false;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=21.88",
+  "./styles.css?v=21.90",
   "./data.js?v=21.05",
-  "./app.js?v=21.88",
-  "./item-catalog.js?v=21.88",
+  "./app.js?v=21.90",
+  "./item-catalog.js?v=21.90",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
@@ -96,6 +96,18 @@ async function networkFirst(request) {
   }
 }
 
+async function cacheFirst(request) {
+  const cached = await caches.match(request,{ignoreSearch:false});
+  if (cached) return cached;
+
+  const response = await fetch(request,{cache:"no-store"});
+  if (response && response.ok) {
+    const cache = await caches.open(CACHE);
+    await cache.put(request,response.clone());
+  }
+  return response;
+}
+
 self.addEventListener("fetch",event => {
   const request = event.request;
   if (request.method !== "GET") return;
@@ -103,5 +115,12 @@ self.addEventListener("fetch",event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  event.respondWith(networkFirst(request));
+  // Dokument zawsze sprawdzamy w sieci, żeby szybko wykryć nowe numery
+  // wersji. Pliki statyczne mają numer wersji w URL, więc mogą startować
+  // natychmiast z cache bez oczekiwania na GitHub Pages.
+  event.respondWith(
+    request.mode === "navigate"
+      ? networkFirst(request)
+      : cacheFirst(request)
+  );
 });

@@ -1107,7 +1107,7 @@ function mapRenderRouteResult() {
       let result = null;
       for (let attempt=0; attempt<20; attempt++) {
         if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve,350));
+          await new Promise(resolve => setTimeout(resolve,650));
         }
 
         try {
@@ -2332,7 +2332,7 @@ function mapRenderRouteResult() {
 
       for (let attempt=0; attempt<20; attempt++) {
         if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve,350));
+          await new Promise(resolve => setTimeout(resolve,650));
         }
 
         try {
@@ -2699,7 +2699,7 @@ function mapRenderRouteResult() {
       let result = null;
 
       for (let attempt=0; attempt<20; attempt++) {
-        if (attempt > 0) await new Promise(resolve => setTimeout(resolve,350));
+        if (attempt > 0) await new Promise(resolve => setTimeout(resolve,650));
         result = await jsonp("recipeBatchImportResult",{nonce});
         if (result && !result.pending) break;
       }
@@ -2746,6 +2746,7 @@ function mapRenderRouteResult() {
 
   let approvedRecipesInFlight = null;
   let approvedRecipesRequestState = "idle";
+  let approvedRecipesFetchedAt = 0;
   let distilleryDataLoaded = false;
   let gardenDataLoaded = false;
   let mapModuleLoaded = false;
@@ -2799,7 +2800,7 @@ function mapRenderRouteResult() {
   let moduleAccessPolicyInFlight = null;
 
   const MODULE_ACCESS_POLICY_TTL_MS =
-    60 * 1000;
+    10 * 60 * 1000;
 
   async function fetchModuleAccessPolicy(
     options={}
@@ -3086,6 +3087,15 @@ function mapRenderRouteResult() {
       return approvedRecipesInFlight;
     }
 
+    if (
+      !options.force &&
+      distilleryDataLoaded &&
+      approvedRecipesRequestState === "ready" &&
+      Date.now() - approvedRecipesFetchedAt < 2 * 60 * 1000
+    ) {
+      return Promise.resolve(true);
+    }
+
     approvedRecipesRequestState = "loading";
 
     // Jeżeli użytkownik patrzy już na Destylarnię,
@@ -3226,6 +3236,7 @@ function mapRenderRouteResult() {
               );
 
               ok = true;
+              approvedRecipesFetchedAt = Date.now();
             }
           } catch (err) {
             console.warn(
@@ -3581,34 +3592,7 @@ function mapRenderRouteResult() {
   }
 
   const JSONP_SAFE_RETRY_ACTIONS = new Set([
-    "reserveRecipeResult",
-    "reservedSubmitResult",
-    "recipeBatchImportResult",
-    "moduleAccessPolicy",
-    "playerAccountActionResult",
-    "playerAccountStatus",
-    "accountAdminPlayers",
-    "playerIdentityStatus",
-    "playerIdentityActionResult",
-    "companySalaryActionResult",
-    "gangPolls",
-    "gangGoal",
-    "gangAnnouncements",
-    "payments",
-    "gangLoginResult",
-    "adminMutationResult",
-    "adminDashboardStatus",
-    "adminGangTools",
-    "adminBuilds",
-    "adminTest",
-    "adminSubmissions",
-    "adminPaymentsStatus",
-    "adminImportPaymentsResult",
-    "buildActionResult",
-    "builds",
-    "gardenActionResult",
-    "gardenData",
-    "gangMenuStatus"
+    "moduleAccessPolicy"
   ]);
 
   function jsonpShouldRetry(action) {
@@ -3839,7 +3823,7 @@ function mapRenderRouteResult() {
 
     let result = null;
     for (let i=0;i<20;i++) {
-      if (i > 0) await new Promise(resolve => setTimeout(resolve,350));
+      if (i > 0) await new Promise(resolve => setTimeout(resolve,650));
       try {
         result = await jsonp("playerAccountActionResult",{nonce});
       } catch (err) {
@@ -3885,13 +3869,13 @@ function mapRenderRouteResult() {
       );
     const cachedAccountFresh =
       hasCachedAccount &&
-      Date.now() - cachedAccountStatusAt < 60000;
+      Date.now() - cachedAccountStatusAt < 5 * 60 * 1000;
 
     if (!force && cachedAccountFresh) {
       return cachedAccountStatus;
     }
 
-    // v21.00.3 — po wygaśnięciu 60 s nie blokujemy nawigacji.
+    // Po wygaśnięciu cache nie blokujemy nawigacji.
     // Zwracamy ostatni poprawny status i odnawiamy go w tle.
     if (!force && hasCachedAccount) {
       if (!accountStatusInFlight) {
@@ -4984,7 +4968,7 @@ async function loadAccountAdminPermissions(
     ) {
       if (attempt > 0) {
         await new Promise(
-          resolve => setTimeout(resolve,350)
+          resolve => setTimeout(resolve,650)
         );
       }
 
@@ -5068,7 +5052,7 @@ async function loadAccountAdminPermissions(
     ) {
       if (attempt > 0) {
         await new Promise(
-          resolve => setTimeout(resolve,350)
+          resolve => setTimeout(resolve,650)
         );
       }
 
@@ -5872,8 +5856,18 @@ const goal = payload && payload.goal;
 
   let gangGoalInFlight = null;
   let gangAnnouncementsInFlight = null;
+  let gangGoalCache = null;
+  let gangGoalCacheAt = 0;
+  let gangAnnouncementsCache = null;
+  let gangAnnouncementsCacheAt = 0;
+  const GANG_CONTENT_TTL_MS = 2 * 60 * 1000;
 
-  async function loadGangGoal() {
+  async function loadGangGoal(options={}) {
+    if (!options.force && gangGoalCache && Date.now()-gangGoalCacheAt<GANG_CONTENT_TTL_MS) {
+      renderGangGoal(gangGoalCache);
+      achievementTrack(["gang_goal"]);
+      return gangGoalCache;
+    }
     if (gangGoalInFlight) return gangGoalInFlight;
 
     gangGoalInFlight = (async () => {
@@ -5884,6 +5878,8 @@ const goal = payload && payload.goal;
       if (!payload || !payload.ok) {
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać celu.");
       }
+      gangGoalCache=payload;
+      gangGoalCacheAt=Date.now();
       renderGangGoal(payload);
       achievementTrack(["gang_goal"]);
       return payload;
@@ -5893,7 +5889,12 @@ const goal = payload && payload.goal;
     finally { gangGoalInFlight = null; }
   }
 
-  async function loadGangAnnouncements() {
+  async function loadGangAnnouncements(options={}) {
+    if (!options.force && gangAnnouncementsCache && Date.now()-gangAnnouncementsCacheAt<GANG_CONTENT_TTL_MS) {
+      renderGangAnnouncements(gangAnnouncementsCache);
+      achievementTrack(["gang_announcements"]);
+      return gangAnnouncementsCache;
+    }
     if (gangAnnouncementsInFlight) return gangAnnouncementsInFlight;
 
     gangAnnouncementsInFlight = (async () => {
@@ -5904,6 +5905,8 @@ const goal = payload && payload.goal;
       if (!payload || !payload.ok) {
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać ogłoszeń.");
       }
+      gangAnnouncementsCache=payload;
+      gangAnnouncementsCacheAt=Date.now();
       renderGangAnnouncements(payload);
       achievementTrack(["gang_announcements"]);
       return payload;
@@ -6206,7 +6209,7 @@ const goal = payload && payload.goal;
 let adminPaymentsSnapshot = null;
 let latestGangPayload = null;
 let latestGangPayloadAt = 0;
-const GANG_PAYLOAD_TTL_MS = 5 * 1000;
+const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
 let gangSessionValidationAt = 0;
 
 
@@ -6280,6 +6283,7 @@ function invalidateAppCache(scope) {
 
       case "builds":
         buildListsLoaded = false;
+        buildListsFetchedAt = 0;
 
         if (
           typeof adminSectionLoadedAt !== "undefined"
@@ -6292,10 +6296,12 @@ function invalidateAppCache(scope) {
 
       case "distillery":
         distilleryDataLoaded = false;
+        approvedRecipesFetchedAt = 0;
         break;
 
       case "garden":
         gardenDataLoaded = false;
+        gardenDataFetchedAt = 0;
         break;
 
       case "account":
@@ -6333,8 +6339,11 @@ function invalidateAppCache(scope) {
         latestGangPayloadAt = 0;
         adminWarmLoadedAt = 0;
         distilleryDataLoaded = false;
+        approvedRecipesFetchedAt = 0;
         gardenDataLoaded = false;
+        gardenDataFetchedAt = 0;
         buildListsLoaded = false;
+        buildListsFetchedAt = 0;
 
         if (
           typeof adminSectionLoadedAt !== "undefined"
@@ -6544,7 +6553,7 @@ async function waitForAdminMutationResult(
     Math.max(4,Number(options.attempts) || 28);
 
   const intervalMs =
-    Math.max(150,Number(options.intervalMs) || 400);
+    Math.max(300,Number(options.intervalMs) || 650);
 
   let lastTransportError = null;
 
@@ -8039,120 +8048,6 @@ async function setAdminSubmissionStatus(
     card.remove();
   }
 
-  let gangDemandLoadInFlight = null;
-  let gangDemandCache = null;
-
-  function gangDemandCatalog() {
-    const raw=Array.isArray(window.MENELWARS_GAME_ITEMS) ? window.MENELWARS_GAME_ITEMS : [];
-    return raw.map(item=>({id:Number(item[0]),name:String(item[1] || ""),iconUrl:String(item[2] || ""),group:String(item[3] || ""),subtitle:String(item[4] || "")})).filter(item=>Number.isFinite(item.id) && item.name);
-  }
-
-  function gangDemandItem(itemId) {
-    return gangDemandCatalog().find(item=>item.id===Number(itemId)) || {id:Number(itemId)||0,name:`Przedmiot #${itemId}`,iconUrl:"",group:"",subtitle:""};
-  }
-
-  function gangDemandIcon(item) {
-    return item.iconUrl ? `<img class="gang-demand-item-icon" src="${escapeHtml(item.iconUrl)}" alt="" loading="lazy">` : `<span class="gang-demand-item-icon" aria-hidden="true">📦</span>`;
-  }
-
-  function renderGangDemandChoices(query) {
-    const box=el("gang-demand-results");
-    if (!box) return;
-    const needle=String(query || "").trim().toLocaleLowerCase("pl");
-    const catalog=gangDemandCatalog().sort((a,b)=>a.name.localeCompare(b.name,"pl"));
-    // Lista jest dostępna już po kliknięciu pola; wpisywanie tylko ją zawęża.
-    const matches=(needle ? catalog.filter(item=>item.name.toLocaleLowerCase("pl").includes(needle)) : catalog).slice(0,40);
-    box.hidden=!matches.length;
-    box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić.</div>':''}${matches.map(item=>`<button type="button" class="gang-demand-choice" data-gang-demand-item="${item.id}">${gangDemandIcon(item)}<span><b>${escapeHtml(item.name)}</b>${item.subtitle?`<small>${escapeHtml(item.subtitle)}</small>`:""}</span><small>${escapeHtml(item.group || "przedmiot")}</small></button>`).join("")}` : '<div class="gang-demand-list-hint">Brak przedmiotów o takiej nazwie.</div>';
-    box.querySelectorAll("[data-gang-demand-item]").forEach(button=>button.addEventListener("click",()=>{
-      const item=gangDemandItem(button.dataset.gangDemandItem);
-      el("gang-demand-item-id").value=String(item.id);
-      el("gang-demand-search").value=item.name;
-      box.hidden=true;
-      box.innerHTML="";
-    }));
-  }
-
-  function renderGangDemand(payload) {
-    const box=el("gang-demand-list");
-    if (!box) return;
-    const entries=Array.isArray(payload && payload.entries) ? payload.entries : [];
-    box.innerHTML=entries.length ? entries.map(entry=>{
-      const item=gangDemandItem(entry.itemId);
-      const action=entry.canClose ? `<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete ? "🗑 Usuń" : "✅ Załatwione"}</button>` : "";
-      return `<article class="gang-demand-card">${gangDemandIcon(item)}<div class="gang-demand-card-main"><strong>${escapeHtml(item.name)} × ${Math.max(1,Number(entry.amount)||1)}</strong><span class="gang-demand-card-meta">${escapeHtml(entry.nick || "Członek Gangu")} · ${escapeHtml(gangAnnouncementDate(entry.createdAt))}</span>${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}</div>${action}</article>`;
-    }).join("") : `<div class="empty">📦 Brak aktywnego zapotrzebowania. Dodaj pierwszy przedmiot, którego szukasz.</div>`;
-    box.querySelectorAll("[data-gang-demand-close]").forEach(button=>button.addEventListener("click",()=>gangDemandClose(button.dataset.gangDemandClose,button.textContent.includes("Usuń"))));
-  }
-
-  async function loadGangDemand(options={}) {
-    if (gangDemandLoadInFlight) return gangDemandLoadInFlight;
-    gangDemandLoadInFlight=(async()=>{
-      const token=playerAccountSessionToken();
-      const box=el("gang-demand-list");
-      if (!token) {
-        if (box) box.innerHTML='<div class="empty">🔒 Zaloguj się, aby zobaczyć zapotrzebowanie ekipy.</div>';
-        return null;
-      }
-      try {
-        // Zapotrzebowanie nie może zatrzymywać całej zakładki Gangu. Jeśli
-        // backend nie ma jeszcze tej akcji albo odpowiada zbyt wolno,
-        // kończymy oczekiwanie szybko i pokazujemy czytelny komunikat.
-        const payload=await Promise.race([
-          jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false}),
-          new Promise((_,reject)=>setTimeout(()=>reject(new Error("Serwer nie odpowiedział w 8 sekund. Sprawdź wdrożenie backendu akcji gangDemand.")),8000))
-        ]);
-        if (!payload || !payload.ok) throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
-        gangDemandCache=payload;
-        renderGangDemand(payload);
-        return payload;
-      } catch (err) {
-        if (box) box.innerHTML=`<div class="empty">❌ Nie udało się pobrać zapotrzebowania.<br><small>${escapeHtml(err && err.message ? err.message : "Sprawdź połączenie lub wdrożenie backendu.")}</small></div>`;
-        return null;
-      }
-    })();
-    try { return await gangDemandLoadInFlight; }
-    finally { gangDemandLoadInFlight=null; }
-  }
-
-  async function gangDemandClose(id,isDelete) {
-    const status=el("gang-demand-status");
-    if (status) status.textContent="⏳ Zapisuję zmianę…";
-    try {
-      await playerAccountPostAction("gangDemandClose",{sessionToken:playerAccountSessionToken(),id,delete:Boolean(isDelete)});
-      if (status) status.textContent="✅ Wpis został usunięty z aktywnego zapotrzebowania.";
-      await loadGangDemand({force:true});
-    } catch (err) { if (status) status.textContent="❌ "+(err.message || "Nie udało się zmienić wpisu."); }
-  }
-
-  function setupGangDemand() {
-    const form=el("gang-demand-form");
-    const search=el("gang-demand-search");
-    search?.addEventListener("input",()=>{
-      el("gang-demand-item-id").value="";
-      renderGangDemandChoices(search.value);
-    });
-    search?.addEventListener("focus",()=>renderGangDemandChoices(search.value));
-    form?.addEventListener("submit",async event=>{
-      event.preventDefault();
-      const status=el("gang-demand-status");
-      const itemId=Number(el("gang-demand-item-id").value);
-      const selected=gangDemandItem(itemId);
-      if (!itemId || selected.id!==itemId || el("gang-demand-search").value!==selected.name) {
-        if (status) status.textContent="⚠️ Wybierz przedmiot z podpowiedzi.";
-        return;
-      }
-      if (status) status.textContent="⏳ Dodaję zapotrzebowanie…";
-      try {
-        await playerAccountPostAction("gangDemandAdd",{sessionToken:playerAccountSessionToken(),itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value});
-        form.reset();
-        el("gang-demand-amount").value="1";
-        if (status) status.textContent="✅ Zapotrzebowanie dodane dla całej ekipy.";
-        await loadGangDemand({force:true});
-      } catch (err) { if (status) status.textContent="❌ "+(err.message || "Nie udało się dodać wpisu."); }
-    });
-  }
-
   criticalOperationStart(
     loadingText,
     "Zgłoszenie znika teraz, a potwierdzenie serwera trwa w tle."
@@ -8258,10 +8153,22 @@ let gangDemandLoadInFlightGlobal = null;
 let gangDemandCacheGlobal = null;
 let gangDemandBlockedIdsGlobal = new Set();
 let gangDemandAdminGlobal = false;
+let gangDemandCatalogCacheGlobal = null;
+let gangDemandSearchFrameGlobal = 0;
 
 function gangDemandCatalogAllGlobal() {
+  if (gangDemandCatalogCacheGlobal) return gangDemandCatalogCacheGlobal;
   const raw=Array.isArray(window.MENELWARS_GAME_ITEMS) ? window.MENELWARS_GAME_ITEMS : [];
-  return raw.map(item=>({id:Number(item[0]),name:String(item[1]||""),iconUrl:String(item[2]||""),group:String(item[3]||""),subtitle:String(item[4]||"")})).filter(item=>Number.isFinite(item.id)&&item.name);
+  gangDemandCatalogCacheGlobal=raw.map(item=>({
+    id:Number(item[0]),
+    name:String(item[1]||""),
+    iconUrl:String(item[2]||""),
+    group:String(item[3]||""),
+    subtitle:String(item[4]||""),
+    searchText:[item[1],item[3],item[4]].map(value=>String(value||"").toLocaleLowerCase("pl")).join("\n")
+  })).filter(item=>Number.isFinite(item.id)&&item.name)
+    .sort((a,b)=>a.name.localeCompare(b.name,"pl"));
+  return gangDemandCatalogCacheGlobal;
 }
 
 function gangDemandCatalogGlobal() {
@@ -8283,14 +8190,12 @@ function renderGangDemandChoicesGlobal(query) {
   const box=el("gang-demand-results");
   if (!box) return;
   const needle=String(query||"").trim().toLocaleLowerCase("pl");
-  const catalog=gangDemandCatalogGlobal().sort((a,b)=>
+  const catalog=gangDemandCatalogGlobal().slice().sort((a,b)=>
     Number(gangDemandBlockedIdsGlobal.has(a.id))-
       Number(gangDemandBlockedIdsGlobal.has(b.id)) ||
     a.name.localeCompare(b.name,"pl")
   );
-  const matches=(needle ? catalog.filter(item=>[
-    item.name,item.subtitle,item.group
-  ].some(value=>String(value||"").toLocaleLowerCase("pl").includes(needle))) : catalog).slice(0,40);
+  const matches=(needle ? catalog.filter(item=>item.searchText.includes(needle)) : catalog).slice(0,40);
   box.hidden=!matches.length;
   box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić. Admin widzi wykluczone przedmioty na dole listy.</div>':''}${matches.map(item=>{
     const isBlocked=gangDemandBlockedIdsGlobal.has(item.id);
@@ -8388,10 +8293,7 @@ async function loadGangDemandGlobal(options={}) {
     const token=playerAccountSessionToken(),box=el("gang-demand-list");
     if (!token) { if (box) box.innerHTML='<div class="empty">🔒 Zaloguj się, aby zobaczyć zapotrzebowanie ekipy.</div>'; return null; }
     try {
-      const payload=await Promise.race([
-        jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false}),
-        new Promise((_,reject)=>setTimeout(()=>reject(new Error("Serwer nie odpowiedział w 8 sekund.")),8000))
-      ]);
+      const payload=await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false});
       if (!payload||!payload.ok) throw new Error(payload&&payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
       gangDemandCacheGlobal=payload;
       gangDemandBlockedIdsGlobal=new Set((Array.isArray(payload.blockedItemIds)?payload.blockedItemIds:[]).map(Number).filter(Number.isFinite));
@@ -8458,7 +8360,11 @@ async function gangDemandSetTradableGlobal(itemId,blocked) {
 
 function setupGangDemand() {
   const form=el("gang-demand-form"),search=el("gang-demand-search");
-  search?.addEventListener("input",()=>{ el("gang-demand-item-id").value=""; renderGangDemandChoicesGlobal(search.value); renderGangDemandAdminToolsGlobal(); });
+  search?.addEventListener("input",()=>{
+    el("gang-demand-item-id").value="";
+    cancelAnimationFrame(gangDemandSearchFrameGlobal);
+    gangDemandSearchFrameGlobal=requestAnimationFrame(()=>renderGangDemandChoicesGlobal(search.value));
+  });
   search?.addEventListener("focus",()=>renderGangDemandChoicesGlobal(search.value));
   form?.addEventListener("submit",async event=>{
     event.preventDefault();
@@ -9956,7 +9862,7 @@ async function importAdminPayments() {
     let payload = null;
 
     for (let i=0; i<24; i++) {
-      if (i > 0) await new Promise(resolve => setTimeout(resolve,500));
+      if (i > 0) await new Promise(resolve => setTimeout(resolve,700));
 
       payload = await jsonp(
         "adminImportPaymentsResult",
@@ -12656,6 +12562,9 @@ function setupAdmin() {
   let buildPublicItems = [];
   let buildMyItems = [];
   let buildListsLoaded = false;
+  let buildListsFetchedAt = 0;
+  let buildListsFetchInFlight = null;
+  const BUILD_LISTS_TTL_MS = 5 * 60 * 1000;
 
   function buildPointsUsed() {
     return BUILD_ATTR_ORDER.reduce(
@@ -13059,7 +12968,7 @@ function setupAdmin() {
 
     let result = null;
     for (let attempt=0; attempt<20; attempt++) {
-      if (attempt) await new Promise(resolve=>setTimeout(resolve,350));
+      if (attempt) await new Promise(resolve=>setTimeout(resolve,650));
       try {
         result = await jsonp("buildActionResult",{nonce:payload.nonce});
       } catch (err) {
@@ -13195,15 +13104,21 @@ function setupAdmin() {
   }
 
   async function fetchBuildLists(force=false) {
-    if (buildListsLoaded && !force) {
+    if (
+      buildListsLoaded &&
+      !force &&
+      Date.now() - buildListsFetchedAt < BUILD_LISTS_TTL_MS
+    ) {
       renderBuildLists();
-      return;
+      return true;
     }
 
-    const publicHost = el("build-public-list");
-    if (publicHost) publicHost.innerHTML = `<div class="empty">Ładowanie buildów...</div>`;
+    if (buildListsFetchInFlight) return buildListsFetchInFlight;
 
-    try {
+    const publicHost = el("build-public-list");
+    if (publicHost && !buildListsLoaded) publicHost.innerHTML = `<div class="empty">Ładowanie buildów...</div>`;
+
+    buildListsFetchInFlight=(async()=>{ try {
       const result = await jsonp("builds",{
         sessionToken:playerAccountSessionToken()
       });
@@ -13219,14 +13134,20 @@ function setupAdmin() {
         ? result.myBuilds.map(buildNormalizeServerItem)
         : [];
       buildListsLoaded = true;
+      buildListsFetchedAt = Date.now();
       renderBuildLists();
       renderBuildAccountState();
+      return true;
     } catch (err) {
       if (publicHost) {
         publicHost.innerHTML =
           `<div class="empty">❌ ${escapeHtml(err && err.message ? err.message : "Nie udało się pobrać buildów.")}</div>`;
       }
-    }
+      return false;
+    } finally {
+      buildListsFetchInFlight=null;
+    }})();
+    return buildListsFetchInFlight;
   }
 
 
@@ -13714,8 +13635,10 @@ function setupAdmin() {
   let gardenSelectedPlot = 1;
   let gardenResultsSelectedPlant = "";
   let gardenLiveRefreshInFlight = null;
+  let gardenDataFetchedAt = 0;
   let gardenLastRenderSignature = "";
   let gardenLastPlotStateSignature = "";
+  let gardenLastPhaseToolsSignature = "";
   let gardenPendingPhase = null;
   let gardenEasterWaterSequence = [];
   let gardenEasterWaterStartedAt = 0;
@@ -14114,7 +14037,7 @@ function setupAdmin() {
     }
     let result=null;
     for (let attempt=0;attempt<24;attempt++) {
-      if (attempt) await new Promise(resolve=>setTimeout(resolve,350));
+      if (attempt) await new Promise(resolve=>setTimeout(resolve,650));
       try {
         result=await jsonp("gardenActionResult",{nonce});
       } catch (err) {
@@ -14129,29 +14052,46 @@ function setupAdmin() {
     return result;
   }
 
+  const achievementTrackCompleted = new Set();
+  const achievementAiWinCompleted = new Set();
+
   async function achievementTrack(ids) {
-    if (!playerAccountSessionToken()) return null;
+    const sessionToken=playerAccountSessionToken();
+    if (!sessionToken) return null;
+    const unlocked=cachedAccountStatus && cachedAccountStatus.achievements || {};
+    const wanted=Array.from(new Set((Array.isArray(ids)?ids:[ids]).map(String).filter(Boolean)))
+      .filter(id=>!unlocked[id] && !achievementTrackCompleted.has(`${sessionToken}:${id}`));
+    if (!wanted.length) return {ok:true,unlocked};
+    wanted.forEach(id=>achievementTrackCompleted.add(`${sessionToken}:${id}`));
     try {
-      const result=await playerAccountPostAction("achievementTrack",{sessionToken:playerAccountSessionToken(),ids:Array.isArray(ids)?ids:[ids]});
+      const result=await playerAccountPostAction("achievementTrack",{sessionToken,ids:wanted});
       if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
       return result;
     } catch (err) {
+      wanted.forEach(id=>achievementTrackCompleted.delete(`${sessionToken}:${id}`));
       console.warn("[MenelWars Tools] Osiągnięcie nie zostało zapisane:",err);
       return null;
     }
   }
 
   async function achievementTrackAiWin(presetId,ownLevel) {
-    if (!playerAccountSessionToken()) return null;
+    const sessionToken=playerAccountSessionToken();
+    if (!sessionToken) return null;
+    const levelMatch=String(presetId||"").match(/^preset-(\d+)-/);
+    const isUnderdog=Boolean(levelMatch && Number(ownLevel||0)<=Number(levelMatch[1])-5);
+    const completionKey=`${sessionToken}:${presetId}:${isUnderdog?"underdog":"regular"}`;
+    if (achievementAiWinCompleted.has(completionKey)) return null;
+    achievementAiWinCompleted.add(completionKey);
     try {
       const result=await playerAccountPostAction("achievementAiWin",{
-        sessionToken:playerAccountSessionToken(),
+        sessionToken,
         presetId,
         ownLevel
       });
       if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
       return result;
     } catch (err) {
+      achievementAiWinCompleted.delete(completionKey);
       console.warn("[MenelWars Tools] Wygrana z AI nie została zapisana:",err);
       return null;
     }
@@ -14986,6 +14926,7 @@ function setupAdmin() {
       gardenRenderComboStatus();
     }
 
+    gardenLastPhaseToolsSignature = "";
     gardenRenderPhaseTools(own);
     gardenRenderRecommendation(own);
   }
@@ -15000,7 +14941,11 @@ function setupAdmin() {
       const frame=gardenAutoFrame(own);
       const stats=gardenCheckStats(own,gardenPhaseSummary(own));
       box.textContent=`⏱️ Rośnie już: ${gardenFormatDuration(age)} · model: etap ${gardenDisplayStage(frame)}/10 · raporty ${stats.yes.length} Tak / ${stats.no.length} Nie`;
-      gardenRenderPhaseTools(own);
+      const phaseSignature=`${own.id}:${frame}:${stats.yes.length}:${stats.no.length}:${gardenNeedsModelCheck(own,gardenPhaseSummary(own))?1:0}:${gardenPendingPhase?.eventId||""}`;
+      if (phaseSignature!==gardenLastPhaseToolsSignature) {
+        gardenLastPhaseToolsSignature=phaseSignature;
+        gardenRenderPhaseTools(own);
+      }
       const plotState=(gardenData.active || []).map(item=>{
         const summary=gardenPhaseSummary(item);
         return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}`;
@@ -15012,6 +14957,13 @@ function setupAdmin() {
   }
 
   async function gardenFetchData(options={}) {
+    if (
+      gardenDataLoaded &&
+      !options.force &&
+      Date.now() - gardenDataFetchedAt < 60 * 1000
+    ) {
+      return true;
+    }
     const payload = await jsonp("gardenData",{
       sessionToken:playerAccountSessionToken() || ""
     });
@@ -15039,6 +14991,7 @@ function setupAdmin() {
     const changed = nextSignature !== gardenLastRenderSignature;
     gardenData = nextGardenData;
     gardenDataLoaded = true;
+    gardenDataFetchedAt = Date.now();
     if (changed) {
       gardenLastRenderSignature = nextSignature;
       gardenRenderPlots();
@@ -15224,7 +15177,7 @@ function setupAdmin() {
     if (activeToolModule !== "garden") return false;
     if (gardenLiveRefreshInFlight) return gardenLiveRefreshInFlight;
 
-    gardenLiveRefreshInFlight = gardenFetchData({force:true})
+    gardenLiveRefreshInFlight = gardenFetchData({force:false})
       .catch(err => {
         console.warn("Ogród — odświeżenie na żywo:",err);
         return false;
@@ -15330,7 +15283,7 @@ function setupAdmin() {
       gardenRenderEditor();
 
       if (!moduleOpenInFlight.garden) {
-        moduleOpenInFlight.garden = gardenFetchData({force:true});
+        moduleOpenInFlight.garden = gardenFetchData({force:false});
         moduleOpenInFlight.garden
           .catch(err => {
             console.warn("Nie udało się odświeżyć Ogrodu w tle:",err);
@@ -15383,7 +15336,7 @@ function setupAdmin() {
       renderBuildLists();
 
       if (!moduleOpenInFlight.builds) {
-        moduleOpenInFlight.builds = fetchBuildLists(true);
+        moduleOpenInFlight.builds = fetchBuildLists(false);
         moduleOpenInFlight.builds
           .catch(err => {
             console.warn("Nie udało się odświeżyć Buildów w tle:",err);
@@ -15408,8 +15361,7 @@ function setupAdmin() {
 
         renderBuildAccountState();
 
-        // Przy świadomym wejściu do modułu nie używamy starej listy.
-        await fetchBuildLists(true);
+        await fetchBuildLists(false);
       })();
     }
 
@@ -16215,7 +16167,7 @@ function setupAdmin() {
 
       pvpAddCause(agg.causes,result.cause);
       pvpAddCause(agg.causesByWinner[result.winner]||agg.causesByWinner.tie,result.cause);
-      if (i && i%500===0) await new Promise(resolve=>setTimeout(resolve,0));
+      if (i && i%100===0) await new Promise(resolve=>setTimeout(resolve,0));
     }
 
     agg.rounds.sort((a,b)=>a-b);
@@ -16608,7 +16560,7 @@ function setupAdmin() {
 
         await openGangModule(
           button.dataset.gangMenuTarget,
-          {forceRefresh:true}
+          {forceRefresh:false}
         );
       });
     });
@@ -16774,6 +16726,9 @@ function setupAdmin() {
 
 
   let gangMenuStatusInFlight = null;
+  let gangMenuStatusCache = null;
+  let gangMenuStatusCacheAt = 0;
+  let gangMenuStatusCacheToken = "";
 
   function setGangOptionalButtonState(
     target,
@@ -16874,7 +16829,17 @@ function setupAdmin() {
   }
 
 
-  async function loadGangMenuStatus() {
+  async function loadGangMenuStatus(options={}) {
+    const currentToken=playerAccountSessionToken();
+    if (
+      !options.force &&
+      gangMenuStatusCache &&
+      gangMenuStatusCacheToken===currentToken &&
+      Date.now()-gangMenuStatusCacheAt<GANG_CONTENT_TTL_MS
+    ) {
+      applyGangMenuStatus(gangMenuStatusCache);
+      return gangMenuStatusCache;
+    }
     if (gangMenuStatusInFlight) {
       return gangMenuStatusInFlight;
     }
@@ -16909,6 +16874,9 @@ function setupAdmin() {
         }
 
         applyGangMenuStatus(payload);
+        gangMenuStatusCache=payload;
+        gangMenuStatusCacheAt=Date.now();
+        gangMenuStatusCacheToken=token;
         return payload;
 
       } catch (err) {
@@ -16974,7 +16942,7 @@ function setupAdmin() {
 
     // Zapotrzebowanie pobieramy od razu po wejściu do Gangu, równolegle ze
     // statusem menu. Późniejsze otwarcie kafelka pokazuje gotowy cache.
-    const demandPrefetch=loadGangDemandGlobal({force:true}).catch(()=>null);
+    const demandPrefetch=loadGangDemandGlobal({force:false}).catch(()=>null);
     const gangMenuStatus=await loadGangMenuStatus();
     demandPrefetch.catch(()=>{});
     if (gangMenuStatus) {
@@ -17163,7 +17131,7 @@ function setupAdmin() {
       if (moduleName === "distillery") {
         await openDistilleryModule(
           "optimizer-view",
-          {forceRefresh:true}
+          {forceRefresh:false}
         );
         return;
       }
@@ -17196,7 +17164,7 @@ function setupAdmin() {
         );
 
         await renderAccountView({
-          force:true
+          force:false
         });
 
         showToolView("account-view","account");
@@ -17214,11 +17182,11 @@ function setupAdmin() {
       const group=button.dataset.group;
 
       if (group === "gang") {
-        await openGangModule(viewId,{forceRefresh:true});
+        await openGangModule(viewId,{forceRefresh:false});
         return;
       }
 
-      await openDistilleryModule(viewId,{forceRefresh:true});
+      await openDistilleryModule(viewId,{forceRefresh:false});
     });
   });
 
@@ -17230,7 +17198,7 @@ function setupAdmin() {
     );
 
     await renderAccountView({
-      force:true
+      force:false
     });
 
     showToolView("account-view","account");
@@ -17304,8 +17272,10 @@ fetchModuleAccessPolicy().catch(()=>{});
   // ============================================================
 
   const APP_TICK_MS = 5 * 1000;
-  const DISTILLERY_LIVE_REFRESH_MS = 20 * 1000;
-  const ADMIN_ACCOUNT_BADGE_REFRESH_MS = 60 * 1000;
+  const GARDEN_LIVE_REFRESH_MS = 60 * 1000;
+  const DISTILLERY_LIVE_REFRESH_MS = 2 * 60 * 1000;
+  const ADMIN_ACCOUNT_BADGE_REFRESH_MS = 2 * 60 * 1000;
+  const ACTIVE_RETURN_REFRESH_MIN_MS = 30 * 1000;
 
   const appRefreshAt = {
     garden:0,
@@ -17348,7 +17318,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
 
     try {
-      await fetchApprovedRecipes({force:true});
+      await fetchApprovedRecipes({force:false});
     } catch (err) {
       console.warn(
         "[MenelWars Tools] Odświeżanie Destylarni w tle:",
@@ -17369,12 +17339,12 @@ fetchModuleAccessPolicy().catch(()=>{});
     const viewId = currentVisibleViewId();
 
     if (viewId === "payments-view" || viewId === "company-view") {
-      await loadPayments({background:true,force:true});
+      await loadPayments({background:true,force:false});
       return;
     }
 
     if (viewId === "polls-view") {
-      await loadGangPolls({force:true});
+      await loadGangPolls({force:false});
       return;
     }
 
@@ -17389,7 +17359,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
 
     if (viewId === "demand-view") {
-      await loadGangDemandGlobal({force:true});
+      await loadGangDemandGlobal({force:false});
       return;
     }
 
@@ -17402,7 +17372,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     if (document.visibilityState !== "visible") return;
 
     const now = Date.now();
-    if (now - activeModuleReturnRefreshAt < 750) {
+    if (now - activeModuleReturnRefreshAt < ACTIVE_RETURN_REFRESH_MIN_MS) {
       return activeModuleReturnRefreshInFlight;
     }
     activeModuleReturnRefreshAt = now;
@@ -17413,7 +17383,7 @@ fetchModuleAccessPolicy().catch(()=>{});
 
     activeModuleReturnRefreshInFlight = (async () => {
       try {
-        await fetchModuleAccessPolicy({force:true});
+        await fetchModuleAccessPolicy({force:false});
 
         if (activeToolModule === "garden") {
           appRefreshAt.garden = Date.now();
@@ -17430,7 +17400,7 @@ fetchModuleAccessPolicy().catch(()=>{});
         }
 
         if (activeToolModule === "builds") {
-          await fetchBuildLists(true);
+          await fetchBuildLists(false);
           renderBuildLists();
           return;
         }
@@ -17443,7 +17413,7 @@ fetchModuleAccessPolicy().catch(()=>{});
         if (activeToolModule === "account") {
           appRefreshAt.account = Date.now();
           if (!adminPanelIsOpen()) {
-            await renderAccountView({force:true});
+            await renderAccountView({force:false});
           }
           await refreshAdminBadgeOnAccount();
         }
@@ -17464,13 +17434,10 @@ fetchModuleAccessPolicy().catch(()=>{});
 
     if (activeToolModule === "garden") {
       gardenUpdateClock();
-      if (!gardenOwnExperimentForPlot(gardenSelectedPlot)) {
-        gardenRenderComboStatus();
-      }
-
-      if (now - appRefreshAt.garden >= APP_TICK_MS) {
+      if (now - appRefreshAt.garden >= GARDEN_LIVE_REFRESH_MS) {
         appRefreshAt.garden = now;
         await gardenLiveRefresh();
+        if (!gardenOwnExperimentForPlot(gardenSelectedPlot)) gardenRenderComboStatus();
       }
       return;
     }
