@@ -16,7 +16,7 @@
     achievements:true,
     builds:true,
     garden:true,
-    gangContent:false
+    gangContent:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
