@@ -12,7 +12,8 @@
   const BACKEND_URL = "https://script.google.com/macros/s/AKfycby8rjCO9HuRtQvQvFoF-OkjFhfnfcS1bTIag0V9LCSJykW6c8k5IZVH8K3pSVFH66ZBKQ/exec";
   const CLOUDFLARE_API_URL = "https://menelwars-tools-api.juniorbest1991.workers.dev/api/v1";
   const CLOUDFLARE_FEATURES = Object.freeze({
-    gangDemand:true
+    gangDemand:true,
+    achievements:false
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -3792,8 +3793,17 @@ function mapRenderRouteResult() {
     return localStorage.getItem(PLAYER_ACCOUNT_SESSION_KEY) || "";
   }
 
-  function cloudflareMigrationTestEnabled() {
+  function cloudflareGangDemandTestEnabled() {
     return new URLSearchParams(location.search).get("migrationTest") === "gang-demand";
+  }
+
+  function cloudflareAchievementTestEnabled() {
+    return new URLSearchParams(location.search).get("migrationTest") === "achievements";
+  }
+
+  function cloudflareAchievementsEnabled() {
+    return CLOUDFLARE_FEATURES.achievements ||
+      new URLSearchParams(location.search).get("migrationBackend") === "achievements";
   }
 
   function cloudflareGangDemandEnabled() {
@@ -3867,6 +3877,55 @@ function mapRenderRouteResult() {
     cloudflareSessionInFlight=request;
     try { return await request; }
     finally { if (cloudflareSessionInFlight===request) cloudflareSessionInFlight=null; }
+  }
+
+  function achievementComparisonEntries(unlocked={}) {
+    const result=[];
+    const knownIds=new Set(
+      [...ACHIEVEMENT_CATEGORIES,EASTER_EGG_CATEGORY]
+        .flatMap(category=>category.items.map(item=>item[0]))
+    );
+    Object.entries(unlocked||{}).forEach(([id,value])=>{
+      if (knownIds.has(id) && Number.isFinite(Number(value)) && Number(value)>0) {
+        result.push([id,Number(value)]);
+      }
+    });
+    const aiWins=unlocked && unlocked.pvpAiWins && typeof unlocked.pvpAiWins==="object"
+      ? unlocked.pvpAiWins : {};
+    Object.entries(aiWins).forEach(([presetId,value])=>{
+      if (
+        /^preset-(30|35|40|45|50|55|60|65|70)-(offense|bruiser|skirmish)$/.test(presetId) &&
+        Number.isFinite(Number(value)) && Number(value)>0
+      ) result.push([`pvpAiWins.${presetId}`,Number(value)]);
+    });
+    return result.sort((left,right)=>left[0].localeCompare(right[0]));
+  }
+
+  async function testCloudflareAchievements(account,status) {
+    if (!cloudflareAchievementTestEnabled() || !account || !status) return;
+    status.textContent="🧪 Synchronizuję i porównuję osiągnięcia na obu serwerach…";
+    try {
+      const token=await cloudflareEnsureSession();
+      await cloudflareApi("/achievements/legacy-sync",{
+        method:"POST",
+        token,
+        body:{
+          legacySessionToken:playerAccountSessionToken(),
+          requestId:makeRecipeNonce()
+        }
+      });
+      const cloudPayload=await cloudflareApi("/achievements",{token});
+      const legacyEntries=achievementComparisonEntries(account.achievements||{});
+      const cloudEntries=achievementComparisonEntries(cloudPayload.achievements||{});
+      const cloudMap=new Map(cloudEntries);
+      const missing=legacyEntries.filter(([id,timestamp])=>cloudMap.get(id)!==timestamp);
+      if (missing.length) {
+        throw new Error(`nie zgadza się ${missing.length} zapisów (${missing.slice(0,3).map(item=>item[0]).join(", ")}).`);
+      }
+      status.textContent=`✅ Test Cloudflare udany — zgodne ${legacyEntries.length} zapisów; nowy serwer ma łącznie ${cloudEntries.length}.`;
+    } catch(err) {
+      status.textContent=`❌ Test osiągnięć Cloudflare: ${err&&err.message ? err.message : "nie udało się porównać danych."}`;
+    }
   }
 
   // Każda odpowiedź asynchroniczna pamięta numer sesji, dla której została
@@ -4417,6 +4476,8 @@ function mapRenderRouteResult() {
       </div>
       ${achievementsHtml(account.achievements || {},expandedAchievementCategories)}
     `;
+
+    testCloudflareAchievements(account,status).catch(()=>{});
 
     if (account.admin) {
       // Badge panelu Admina ma być aktualny już na ekranie Konta,
@@ -8498,7 +8559,7 @@ function renderGangDemandGlobal(payload) {
 }
 
 async function testCloudflareGangDemandGlobal(appsPayload) {
-  if (!cloudflareMigrationTestEnabled()) return;
+  if (!cloudflareGangDemandTestEnabled()) return;
   const status=el("gang-demand-status");
   if (status) status.textContent="🧪 Porównuję dane ze starym i nowym serwerem…";
   try {
