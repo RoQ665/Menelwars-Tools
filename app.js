@@ -11,6 +11,9 @@
   // ============================================================
   const BACKEND_URL = "https://script.google.com/macros/s/AKfycby8rjCO9HuRtQvQvFoF-OkjFhfnfcS1bTIag0V9LCSJykW6c8k5IZVH8K3pSVFH66ZBKQ/exec";
   const CLOUDFLARE_API_URL = "https://menelwars-tools-api.juniorbest1991.workers.dev/api/v1";
+  const CLOUDFLARE_FEATURES = Object.freeze({
+    gangDemand:false
+  });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
   const REMOTE_KEY = "roq_tools_remote_approved_v1";
@@ -3793,6 +3796,11 @@ function mapRenderRouteResult() {
     return new URLSearchParams(location.search).get("migrationTest") === "gang-demand";
   }
 
+  function cloudflareGangDemandEnabled() {
+    return CLOUDFLARE_FEATURES.gangDemand ||
+      new URLSearchParams(location.search).get("migrationBackend") === "gang-demand";
+  }
+
   function cloudflareSessionToken() {
     return localStorage.getItem(CLOUDFLARE_SESSION_KEY) || "";
   }
@@ -3890,6 +3898,8 @@ function mapRenderRouteResult() {
 
     if (previousToken !== nextToken) {
       playerAccountSessionEpoch++;
+      const cloudToken=cloudflareSessionToken();
+      if (cloudToken) cloudflareApi("/auth/logout",{method:"POST",token:cloudToken}).catch(()=>{});
       setCloudflareSessionToken("");
     }
 
@@ -8527,7 +8537,9 @@ async function loadGangDemandGlobal(options={}) {
     const sessionEpoch=playerAccountSessionEpoch;
     if (!token) { if (box) box.innerHTML='<div class="empty">🔒 Zaloguj się, aby zobaczyć zapotrzebowanie ekipy.</div>'; return null; }
     try {
-      const payload=await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false});
+      const payload=cloudflareGangDemandEnabled()
+        ? await cloudflareApi("/gang/demands",{token:await cloudflareEnsureSession()})
+        : await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false});
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return null;
       if (!payload||!payload.ok) throw new Error(payload&&payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
       gangDemandCacheGlobal=payload;
@@ -8567,7 +8579,18 @@ async function loadGangDemandGlobal(options={}) {
 async function gangDemandCloseGlobal(id,isDelete) {
   const status=el("gang-demand-status");
   if (status) status.textContent="⏳ Zapisuję zmianę…";
-  try { await playerAccountPostAction("gangDemandClose",{sessionToken:playerAccountSessionToken(),id,delete:Boolean(isDelete)}); if (status) status.textContent="✅ Wpis usunięty z aktywnego zapotrzebowania."; await loadGangDemandGlobal({force:true}); }
+  try {
+    if (cloudflareGangDemandEnabled()) {
+      await cloudflareApi(`/gang/demands/${encodeURIComponent(id)}/close`,{
+        method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce(),delete:Boolean(isDelete)}
+      });
+    } else {
+      await playerAccountPostAction("gangDemandClose",{sessionToken:playerAccountSessionToken(),id,delete:Boolean(isDelete)});
+    }
+    if (status) status.textContent="✅ Wpis usunięty z aktywnego zapotrzebowania.";
+    gangDemandCacheGlobal=null;
+    await loadGangDemandGlobal({force:true});
+  }
   catch(err) { if (status) status.textContent="❌ "+(err.message||"Nie udało się zmienić wpisu."); }
 }
 
@@ -8576,7 +8599,14 @@ async function gangDemandSetTradableGlobal(itemId,blocked) {
   if (!gangDemandAdminGlobal || !itemId) return;
   if (status) status.textContent=blocked ? `⏳ Oznaczam „${item.name}” jako niewymienialny…` : `⏳ Przywracam „${item.name}” do wyboru…`;
   try {
-    await playerAccountPostAction("gangDemandSetTradable",{sessionToken:playerAccountSessionToken(),itemId,blocked:Boolean(blocked)});
+    if (cloudflareGangDemandEnabled()) {
+      await cloudflareApi(`/gang/demand-items/${itemId}/block`,{
+        method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce(),blocked:Boolean(blocked)}
+      });
+    } else {
+      await playerAccountPostAction("gangDemandSetTradable",{sessionToken:playerAccountSessionToken(),itemId,blocked:Boolean(blocked)});
+    }
+    gangDemandCacheGlobal=null;
     const confirmedPayload=await loadGangDemandGlobal({force:true});
     if (!confirmedPayload || !Array.isArray(confirmedPayload.blockedItemIds)) {
       throw new Error("Backend nie obsługuje jeszcze trwałej blacklisty. Wgraj jego najnowszą wersję.");
@@ -8612,7 +8642,22 @@ function setupGangDemand() {
     const status=el("gang-demand-status"),itemId=Number(el("gang-demand-item-id").value),selected=gangDemandItemGlobal(itemId);
     if (!itemId||selected.id!==itemId||el("gang-demand-search").value!==selected.name) { if (status) status.textContent="⚠️ Wybierz przedmiot z listy."; return; }
     if (status) status.textContent="⏳ Dodaję zapotrzebowanie…";
-    try { await playerAccountPostAction("gangDemandAdd",{sessionToken:playerAccountSessionToken(),itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value}); achievementTrack(["gang_demand"]); form.reset(); el("gang-demand-amount").value="1"; if (status) status.textContent="✅ Zapotrzebowanie dodane dla całej ekipy."; await loadGangDemandGlobal({force:true}); }
+    try {
+      const demandData={itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value};
+      if (cloudflareGangDemandEnabled()) {
+        await cloudflareApi("/gang/demands",{
+          method:"POST",token:await cloudflareEnsureSession(),body:{...demandData,requestId:makeRecipeNonce()}
+        });
+      } else {
+        await playerAccountPostAction("gangDemandAdd",{sessionToken:playerAccountSessionToken(),...demandData});
+      }
+      achievementTrack(["gang_demand"]);
+      form.reset();
+      el("gang-demand-amount").value="1";
+      gangDemandCacheGlobal=null;
+      if (status) status.textContent="✅ Zapotrzebowanie dodane dla całej ekipy.";
+      await loadGangDemandGlobal({force:true});
+    }
     catch(err) { if (status) status.textContent="❌ "+(err.message||"Nie udało się dodać wpisu."); }
   });
 }
