@@ -13,7 +13,8 @@
   const CLOUDFLARE_API_URL = "https://menelwars-tools-api.juniorbest1991.workers.dev/api/v1";
   const CLOUDFLARE_FEATURES = Object.freeze({
     gangDemand:true,
-    achievements:true
+    achievements:true,
+    builds:false
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -3801,6 +3802,10 @@ function mapRenderRouteResult() {
     return new URLSearchParams(location.search).get("migrationTest") === "achievements";
   }
 
+  function cloudflareBuildTestEnabled() {
+    return new URLSearchParams(location.search).get("migrationTest") === "builds";
+  }
+
   function cloudflareAchievementsEnabled() {
     return CLOUDFLARE_FEATURES.achievements ||
       new URLSearchParams(location.search).get("migrationBackend") === "achievements";
@@ -3809,6 +3814,11 @@ function mapRenderRouteResult() {
   function cloudflareGangDemandEnabled() {
     return CLOUDFLARE_FEATURES.gangDemand ||
       new URLSearchParams(location.search).get("migrationBackend") === "gang-demand";
+  }
+
+  function cloudflareBuildsEnabled() {
+    return CLOUDFLARE_FEATURES.builds ||
+      new URLSearchParams(location.search).get("migrationBackend") === "builds";
   }
 
   function cloudflareSessionToken() {
@@ -7702,16 +7712,17 @@ async function loadAdminBuilds() {
   const count = el("admin-builds-count");
   const status = el("admin-builds-status");
 
-  if (!token || !box) return;
+  if ((!token && !cloudflareBuildsEnabled()) || !box) return;
 
   if (status) status.textContent = "Pobieranie publicznych buildów...";
 
   try {
-    const payload =
-      await jsonp(
-        "adminBuilds",
-        {token}
-      );
+    const payload = cloudflareBuildsEnabled()
+      ? await cloudflareApi("/admin/builds",{token:await cloudflareEnsureSession()})
+      : await jsonp(
+          "adminBuilds",
+          {token}
+        );
 
     if (!payload || !payload.ok) {
       throw new Error(
@@ -7785,10 +7796,18 @@ async function loadAdminBuilds() {
           );
 
           try {
-            await adminPostAction(
-              "adminDeleteBuild",
-              {id}
-            );
+            if (cloudflareBuildsEnabled()) {
+              await cloudflareApi(`/admin/builds/${encodeURIComponent(id)}/delete`,{
+                method:"POST",
+                token:await cloudflareEnsureSession(),
+                body:{requestId:makeRecipeNonce()}
+              });
+            } else {
+              await adminPostAction(
+                "adminDeleteBuild",
+                {id}
+              );
+            }
 
             if (status) {
               status.textContent =
@@ -13377,6 +13396,22 @@ function setupAdmin() {
   async function buildPostAction(payload) {
     if (!backendConfigured()) throw new Error("Backend nie jest skonfigurowany.");
 
+    if (cloudflareBuildsEnabled()) {
+      const hasAccount=Boolean(playerAccountSessionToken());
+      const token=hasAccount ? await cloudflareEnsureSession() : "";
+      if (payload.action === "buildDelete") {
+        return cloudflareApi(`/builds/${encodeURIComponent(payload.id)}/delete`,{
+          method:"POST",
+          token,
+          body:{requestId:payload.nonce}
+        });
+      }
+      const body=Object.assign({},payload,{requestId:payload.nonce});
+      delete body.action;
+      delete body.sessionToken;
+      return cloudflareApi("/builds",{method:"POST",token,body});
+    }
+
     let sendError = null;
 
     try {
@@ -13525,6 +13560,63 @@ function setupAdmin() {
     };
   }
 
+  function buildStableValue(value) {
+    if (Array.isArray(value)) return value.map(buildStableValue);
+    if (value && typeof value === "object") {
+      return Object.keys(value).sort().reduce((result,key)=>{
+        result[key]=buildStableValue(value[key]);
+        return result;
+      },{});
+    }
+    return value;
+  }
+
+  function buildComparisonEntries(items) {
+    return (Array.isArray(items) ? items : []).map(buildNormalizeServerItem).map(item=>[
+      item.id,
+      JSON.stringify(buildStableValue({
+        name:item.name,
+        description:item.description,
+        authorNick:item.authorNick,
+        ownerNick:item.ownerNick,
+        public:item.public,
+        level:item.level,
+        attributes:item.attributes,
+        perks:item.perks,
+        profile:item.profile,
+        bonuses:item.bonuses,
+        statCaps:item.statCaps
+      }))
+    ]).sort((left,right)=>left[0].localeCompare(right[0]));
+  }
+
+  async function testCloudflareBuilds(legacyResult) {
+    if (!cloudflareBuildTestEnabled()) return;
+    const status=el("build-save-status");
+    if (status) status.textContent="🧪 Porównuję buildy na obu serwerach…";
+    try {
+      const hasAccount=Boolean(playerAccountSessionToken());
+      const token=hasAccount ? await cloudflareEnsureSession() : "";
+      const cloudResult=await cloudflareApi("/builds",{token});
+      const compareScope=(label,legacyItems,cloudItems)=>{
+        const legacyEntries=buildComparisonEntries(legacyItems);
+        const cloudEntries=buildComparisonEntries(cloudItems);
+        const cloudMap=new Map(cloudEntries);
+        const differences=legacyEntries.filter(([id,value])=>cloudMap.get(id)!==value);
+        const extra=cloudEntries.filter(([id])=>!new Map(legacyEntries).has(id));
+        if (differences.length || extra.length) {
+          throw new Error(`${label}: ${differences.length} brakujących lub różnych i ${extra.length} dodatkowych.`);
+        }
+        return legacyEntries.length;
+      };
+      const publicCount=compareScope("publiczne",legacyResult.publicBuilds,cloudResult.publicBuilds);
+      const mineCount=compareScope("moje",legacyResult.myBuilds,cloudResult.myBuilds);
+      if (status) status.textContent=`✅ Test Cloudflare: zgodne ${publicCount} publiczne i ${mineCount} własnych buildów.`;
+    } catch(err) {
+      if (status) status.textContent=`❌ Test buildów Cloudflare: ${err&&err.message ? err.message : "nie udało się porównać danych."}`;
+    }
+  }
+
   async function fetchBuildLists(force=false) {
     if (
       buildListsLoaded &&
@@ -13543,9 +13635,16 @@ function setupAdmin() {
     const token=playerAccountSessionToken();
     const sessionEpoch=playerAccountSessionEpoch;
     const requestPromise=(async()=>{ try {
-      const result = await jsonp("builds",{
-        sessionToken:token
-      });
+      let result;
+      if (cloudflareBuildsEnabled()) {
+        const cloudToken=token ? await cloudflareEnsureSession() : "";
+        result=await cloudflareApi("/builds",{token:cloudToken});
+      } else {
+        result = await jsonp("builds",{
+          sessionToken:token
+        });
+        await testCloudflareBuilds(result);
+      }
 
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return false;
 
