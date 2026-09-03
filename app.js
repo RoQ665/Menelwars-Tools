@@ -12,7 +12,7 @@
   const BACKEND_URL = "https://script.google.com/macros/s/AKfycby8rjCO9HuRtQvQvFoF-OkjFhfnfcS1bTIag0V9LCSJykW6c8k5IZVH8K3pSVFH66ZBKQ/exec";
   const CLOUDFLARE_API_URL = "https://menelwars-tools-api.juniorbest1991.workers.dev/api/v1";
   const CLOUDFLARE_FEATURES = Object.freeze({
-    gangDemand:false
+    gangDemand:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
