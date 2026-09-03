@@ -15,7 +15,8 @@
     gangDemand:true,
     achievements:true,
     builds:true,
-    garden:true
+    garden:true,
+    gangContent:false
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -3811,6 +3812,10 @@ function mapRenderRouteResult() {
     return new URLSearchParams(location.search).get("migrationTest") === "garden";
   }
 
+  function cloudflareGangContentTestEnabled() {
+    return new URLSearchParams(location.search).get("migrationTest") === "gang-content";
+  }
+
   function cloudflareAchievementsEnabled() {
     return CLOUDFLARE_FEATURES.achievements ||
       new URLSearchParams(location.search).get("migrationBackend") === "achievements";
@@ -3829,6 +3834,11 @@ function mapRenderRouteResult() {
   function cloudflareGardenEnabled() {
     return CLOUDFLARE_FEATURES.garden ||
       new URLSearchParams(location.search).get("migrationBackend") === "garden";
+  }
+
+  function cloudflareGangContentEnabled() {
+    return CLOUDFLARE_FEATURES.gangContent ||
+      new URLSearchParams(location.search).get("migrationBackend") === "gang-content";
   }
 
   function cloudflareSessionToken() {
@@ -5637,13 +5647,12 @@ async function loadAccountAdminPermissions(
     }
 
     const requestPromise = (async () => {
-        const payload = await jsonp(
-          "gangPolls",
-          {
-            sessionToken: token,
-            identityToken: token
-          }
-        );
+        const payload = cloudflareGangContentEnabled()
+          ? await cloudflareApi("/gang/polls",{token:await cloudflareEnsureSession()})
+          : await jsonp("gangPolls",{
+              sessionToken: token,
+              identityToken: token
+            });
 
         if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
           return null;
@@ -5816,19 +5825,17 @@ async function loadAccountAdminPermissions(
               }
 
               try {
-                await playerIdentityPostAction(
-                  "gangPollVote",
-                  {
-                    identityToken:
-                      playerAccountSessionToken(),
-                    pollId:
-                      button.dataset.pollId,
-                    optionIndex:
-                      Number(
-                        button.dataset.pollOption
-                      )
-                  }
-                );
+                const pollId=button.dataset.pollId;
+                const optionIndex=Number(button.dataset.pollOption);
+                if (cloudflareGangContentEnabled()) {
+                  await cloudflareApi(`/gang/polls/${encodeURIComponent(pollId)}/vote`,{
+                    method:"POST",token:await cloudflareEnsureSession(),body:{optionIndex,requestId:makeRecipeNonce()}
+                  });
+                } else {
+                  await playerIdentityPostAction("gangPollVote",{
+                    identityToken:playerAccountSessionToken(),pollId,optionIndex
+                  });
+                }
 
                 invalidateGangPollsCache();
                 await loadGangPolls({force:true});
@@ -6221,7 +6228,9 @@ const goal = payload && payload.goal;
       const token = gangToken();
       if (!token) return null;
 
-      const payload = await jsonp("gangGoal",{sessionToken:token});
+      const payload = cloudflareGangContentEnabled()
+        ? await cloudflareApi("/gang/goal",{token:await cloudflareEnsureSession()})
+        : await jsonp("gangGoal",{sessionToken:token});
       if (!payload || !payload.ok) {
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać celu.");
       }
@@ -6248,7 +6257,9 @@ const goal = payload && payload.goal;
       const token = gangToken();
       if (!token) return null;
 
-      const payload = await jsonp("gangAnnouncements",{sessionToken:token});
+      const payload = cloudflareGangContentEnabled()
+        ? await cloudflareApi("/gang/announcements",{token:await cloudflareEnsureSession()})
+        : await jsonp("gangAnnouncements",{sessionToken:token});
       if (!payload || !payload.ok) {
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać ogłoszeń.");
       }
@@ -7096,15 +7107,34 @@ async function adminPostAction(action, data={}) {
   );
 
   try {
-    const result = await confirmedAdminMutationPost(
-      action,
-      {
-        action,
-        token,
-        ...data
-      },
-      {token}
-    );
+    const gangContentRoutes={
+      adminSaveGoal:["/admin/gang-goal",data],
+      adminDeleteGoal:["/admin/gang-goal/delete",data],
+      adminAddAnnouncement:["/admin/announcements",data],
+      adminDeleteAnnouncement:[`/admin/announcements/${encodeURIComponent(data.id||"")}/delete`,data],
+      adminSetAnnouncementImportant:[`/admin/announcements/${encodeURIComponent(data.id||"")}/important`,data],
+      adminCreateGangPoll:["/admin/polls",data],
+      adminSetGangPollStatus:[`/admin/polls/${encodeURIComponent(data.pollId||"")}/status`,data],
+      adminDeleteGangPoll:[`/admin/polls/${encodeURIComponent(data.pollId||"")}/delete`,data]
+    };
+    const cloudRoute=gangContentRoutes[action];
+    const result = cloudflareGangContentEnabled() && cloudRoute
+      ? await cloudflareApi(cloudRoute[0],{
+          method:"POST",token:await cloudflareEnsureSession(),body:{...cloudRoute[1],requestId:makeRecipeNonce()}
+        })
+      : await confirmedAdminMutationPost(
+          action,
+          {action,token,...data},
+          {token}
+        );
+
+    if (cloudflareGangContentEnabled() && cloudRoute) {
+      gangGoalCache=null;
+      gangGoalCacheAt=0;
+      gangAnnouncementsCache=null;
+      gangAnnouncementsCacheAt=0;
+      invalidateGangPollsCache();
+    }
 
     // Dashboard jest odświeżany dopiero po potwierdzeniu requestId.
     // Jego chwilowy błąd nie unieważnia już potwierdzonego zapisu.
@@ -7563,7 +7593,14 @@ async function loadAdminGangTools() {
       );
     }
 
-    renderAdminGangTools(payload);
+    const gangContentPayload=cloudflareGangContentEnabled()
+      ? await cloudflareApi("/admin/gang-content",{token:await cloudflareEnsureSession()})
+      : null;
+    renderAdminGangTools(gangContentPayload ? {
+      ...payload,
+      goal:gangContentPayload.goal,
+      announcements:gangContentPayload.announcements
+    } : payload);
     loadAdminPolls();
 
     if (status) status.textContent = "";
