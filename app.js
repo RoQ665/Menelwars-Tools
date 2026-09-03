@@ -13,7 +13,7 @@
   const CLOUDFLARE_API_URL = "https://menelwars-tools-api.juniorbest1991.workers.dev/api/v1";
   const CLOUDFLARE_FEATURES = Object.freeze({
     gangDemand:true,
-    achievements:false
+    achievements:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
