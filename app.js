@@ -3137,6 +3137,12 @@ function mapRenderRouteResult() {
         window[callbackName] = () => {};
       };
 
+      const removeLateCallback = () => {
+        script.remove();
+        try { delete window[callbackName]; }
+        catch { leaveSafeNoopCallback(); }
+      };
+
       const cleanupCompleted = () => {
         clearTimeout(timeout);
 
@@ -3168,8 +3174,7 @@ function mapRenderRouteResult() {
 
             lateCleanupTimer =
               setTimeout(() => {
-                script.remove();
-                leaveSafeNoopCallback();
+                removeLateCallback();
               }, JSONP_LATE_GRACE_MS);
 
             resolve(false);
@@ -3186,7 +3191,7 @@ function mapRenderRouteResult() {
             }
 
             script.remove();
-            leaveSafeNoopCallback();
+            setTimeout(removeLateCallback,0);
             return;
           }
 
@@ -3260,7 +3265,7 @@ function mapRenderRouteResult() {
       script.onerror = () => {
         if (settled) {
           script.remove();
-          leaveSafeNoopCallback();
+          setTimeout(removeLateCallback,0);
           return;
         }
 
@@ -3480,6 +3485,12 @@ function mapRenderRouteResult() {
         window[callbackName] = () => {};
       };
 
+      const removeLateCallback = () => {
+        script.remove();
+        try { delete window[callbackName]; }
+        catch { leaveSafeNoopCallback(); }
+      };
+
       const cleanupCompleted = () => {
         clearTimeout(timeout);
 
@@ -3513,8 +3524,7 @@ function mapRenderRouteResult() {
           // Apps Script może odpowiedzieć już po naszym limicie.
           lateCleanupTimer =
             setTimeout(() => {
-              script.remove();
-              leaveSafeNoopCallback();
+              removeLateCallback();
             }, JSONP_LATE_GRACE_MS);
 
           reject(
@@ -3532,7 +3542,7 @@ function mapRenderRouteResult() {
           }
 
           script.remove();
-          leaveSafeNoopCallback();
+          setTimeout(removeLateCallback,0);
           return;
         }
 
@@ -3553,7 +3563,7 @@ function mapRenderRouteResult() {
       script.onerror = () => {
         if (settled) {
           script.remove();
-          leaveSafeNoopCallback();
+          setTimeout(removeLateCallback,0);
           return;
         }
 
@@ -3777,16 +3787,35 @@ function mapRenderRouteResult() {
     return localStorage.getItem(PLAYER_ACCOUNT_SESSION_KEY) || "";
   }
 
+  // Każda odpowiedź asynchroniczna pamięta numer sesji, dla której została
+  // uruchomiona. Po wylogowaniu lub zalogowaniu na inne konto spóźniona
+  // odpowiedź nie może już zmienić ekranu ani wyczyścić nowej sesji.
+  let playerAccountSessionEpoch = 0;
+
+  function playerAccountSessionIsCurrent(token,epoch) {
+    return (
+      playerAccountSessionEpoch === epoch &&
+      playerAccountSessionToken() === String(token || "")
+    );
+  }
+
   function setPlayerAccountSessionToken(token) {
+    const previousToken = playerAccountSessionToken();
+    const nextToken = String(token || "");
+
     if (token) {
       localStorage.setItem(
         PLAYER_ACCOUNT_SESSION_KEY,
-        token
+        nextToken
       );
     } else {
       localStorage.removeItem(
         PLAYER_ACCOUNT_SESSION_KEY
       );
+    }
+
+    if (previousToken !== nextToken) {
+      playerAccountSessionEpoch++;
     }
 
     cachedAccountStatus = null;
@@ -3800,6 +3829,41 @@ function mapRenderRouteResult() {
       gangDemandAdminGlobal = false;
       gangDemandCacheGlobal = null;
       gangDemandBlockedIdsGlobal = new Set();
+      gangDemandLoadInFlightGlobal = null;
+    }
+
+    // Te dane zawierają elementy zależne od zalogowanego gracza. Bez ich
+    // wyczyszczenia po zmianie konta przez kilka minut mogły być widoczne
+    // prywatne buildy, pensja lub uprawnienia poprzedniej osoby.
+    if (typeof latestGangPayload !== "undefined") {
+      latestGangPayload = null;
+      latestGangPayloadAt = 0;
+      paymentsLoadInFlight = null;
+    }
+    if (typeof buildListsLoaded !== "undefined") {
+      buildListsLoaded = false;
+      buildListsFetchedAt = 0;
+      buildPublicItems = [];
+      buildMyItems = [];
+      buildListsFetchInFlight = null;
+    }
+    if (typeof gangPollsCache !== "undefined") {
+      gangPollsCache = null;
+      gangPollsCacheAt = 0;
+      gangPollsCacheToken = "";
+      gangPollsLoadInFlight = null;
+    }
+    if (typeof gangMenuStatusCache !== "undefined") {
+      gangMenuStatusCache = null;
+      gangMenuStatusCacheAt = 0;
+      gangMenuStatusCacheToken = "";
+      gangMenuStatusInFlight = null;
+    }
+    if (typeof accountAdminPlayersCache !== "undefined") {
+      accountAdminPlayersCache = null;
+      accountAdminPlayersCacheAt = 0;
+      accountAdminPlayersCacheToken = "";
+      accountAdminPlayersInFlight = null;
     }
   }
 
@@ -3851,6 +3915,7 @@ function mapRenderRouteResult() {
 
   async function playerAccountStatus(options={}) {
     const token = playerAccountSessionToken();
+    const sessionEpoch = playerAccountSessionEpoch;
 
     if (!token) {
       cachedAccountStatus = null;
@@ -3879,12 +3944,16 @@ function mapRenderRouteResult() {
     // Zwracamy ostatni poprawny status i odnawiamy go w tle.
     if (!force && hasCachedAccount) {
       if (!accountStatusInFlight) {
-        accountStatusInFlight = (async () => {
+        const requestPromise = (async () => {
           try {
             const result = await jsonp(
               "playerAccountStatus",
               {sessionToken:token}
             );
+
+            if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
+              return null;
+            }
 
             if (!result || !result.ok || !result.authenticated) {
               cachedAccountStatus = null;
@@ -3904,9 +3973,12 @@ function mapRenderRouteResult() {
               ? cachedAccountStatus
               : null;
           } finally {
-            accountStatusInFlight = null;
+            if (accountStatusInFlight === requestPromise) {
+              accountStatusInFlight = null;
+            }
           }
         })();
+        accountStatusInFlight = requestPromise;
       }
       accountStatusInFlight.catch(() => {});
       return cachedAccountStatus;
@@ -3916,13 +3988,17 @@ function mapRenderRouteResult() {
       return accountStatusInFlight;
     }
 
-    accountStatusInFlight = (async () => {
+    const requestPromise = (async () => {
       try {
         const result =
           await jsonp(
             "playerAccountStatus",
             {sessionToken:token}
           );
+
+        if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
+          return null;
+        }
 
         if (
           !result ||
@@ -3951,11 +4027,15 @@ function mapRenderRouteResult() {
           ? cachedAccountStatus
           : null;
       } finally {
-        accountStatusInFlight = null;
+        if (accountStatusInFlight === requestPromise) {
+          accountStatusInFlight = null;
+        }
       }
     })();
 
-    return accountStatusInFlight;
+    accountStatusInFlight = requestPromise;
+
+    return requestPromise;
   }
 
   let accountViewRenderInFlight = null;
@@ -6015,9 +6095,10 @@ const goal = payload && payload.goal;
       }
     }
 
-    paymentsLoadInFlight = (async () => {
+    const requestPromise = (async () => {
 
     const token = gangToken();
+    const sessionEpoch = playerAccountSessionEpoch;
 
     if (!token) {
       showPaymentsLogin();
@@ -6048,6 +6129,10 @@ const goal = payload && payload.goal;
           "payments",
           {token}
         );
+
+      if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
+        return null;
+      }
 
       if (!payload || !payload.ok) {
 
@@ -6096,10 +6181,14 @@ const goal = payload && payload.goal;
   
     })();
 
+    paymentsLoadInFlight = requestPromise;
+
     try {
-      return await paymentsLoadInFlight;
+      return await requestPromise;
     } finally {
-      paymentsLoadInFlight = null;
+      if (paymentsLoadInFlight === requestPromise) {
+        paymentsLoadInFlight = null;
+      }
     }
   }
 
@@ -8289,11 +8378,13 @@ async function loadGangDemandGlobal(options={}) {
     syncGangDemandAdminFromAccountGlobal(playerAccountSessionToken());
     return gangDemandCacheGlobal;
   }
-  gangDemandLoadInFlightGlobal=(async()=>{
+  const requestPromise=(async()=>{
     const token=playerAccountSessionToken(),box=el("gang-demand-list");
+    const sessionEpoch=playerAccountSessionEpoch;
     if (!token) { if (box) box.innerHTML='<div class="empty">🔒 Zaloguj się, aby zobaczyć zapotrzebowanie ekipy.</div>'; return null; }
     try {
       const payload=await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false});
+      if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return null;
       if (!payload||!payload.ok) throw new Error(payload&&payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
       gangDemandCacheGlobal=payload;
       gangDemandBlockedIdsGlobal=new Set((Array.isArray(payload.blockedItemIds)?payload.blockedItemIds:[]).map(Number).filter(Number.isFinite));
@@ -8316,11 +8407,16 @@ async function loadGangDemandGlobal(options={}) {
       syncGangDemandAdminFromAccountGlobal(token);
       return payload;
     } catch(err) {
+      if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return null;
       if (box) box.innerHTML=`<div class="empty">❌ Nie udało się pobrać zapotrzebowania.<br><small>${escapeHtml(err&&err.message ? err.message : "Sprawdź połączenie.")}</small></div>`;
       return null;
     }
   })();
-  try { return await gangDemandLoadInFlightGlobal; } finally { gangDemandLoadInFlightGlobal=null; }
+  gangDemandLoadInFlightGlobal=requestPromise;
+  try { return await requestPromise; }
+  finally {
+    if (gangDemandLoadInFlightGlobal===requestPromise) gangDemandLoadInFlightGlobal=null;
+  }
 }
 
 async function gangDemandCloseGlobal(id,isDelete) {
@@ -13118,10 +13214,14 @@ function setupAdmin() {
     const publicHost = el("build-public-list");
     if (publicHost && !buildListsLoaded) publicHost.innerHTML = `<div class="empty">Ładowanie buildów...</div>`;
 
-    buildListsFetchInFlight=(async()=>{ try {
+    const token=playerAccountSessionToken();
+    const sessionEpoch=playerAccountSessionEpoch;
+    const requestPromise=(async()=>{ try {
       const result = await jsonp("builds",{
-        sessionToken:playerAccountSessionToken()
+        sessionToken:token
       });
+
+      if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return false;
 
       if (!result || !result.ok) {
         throw new Error(result && result.error ? result.error : "Nie udało się pobrać buildów.");
@@ -13145,9 +13245,12 @@ function setupAdmin() {
       }
       return false;
     } finally {
-      buildListsFetchInFlight=null;
+      if (buildListsFetchInFlight===requestPromise) {
+        buildListsFetchInFlight=null;
+      }
     }})();
-    return buildListsFetchInFlight;
+    buildListsFetchInFlight=requestPromise;
+    return requestPromise;
   }
 
 
@@ -13642,6 +13745,7 @@ function setupAdmin() {
   let gardenPendingPhase = null;
   let gardenEasterWaterSequence = [];
   let gardenEasterWaterStartedAt = 0;
+  let gardenControlRenderTimer = null;
   const GARDEN_AUTO_MODEL_VERSION = "AUTO52";
   const GARDEN_AUTO_MODEL_HOURS = 52;
   const GARDEN_AUTO_STAGE_MS = (GARDEN_AUTO_MODEL_HOURS * 60 * 60 * 1000) / 10;
@@ -13996,17 +14100,15 @@ function setupAdmin() {
     const stats=gardenCheckStats(item,summary);
     const duration=Math.max(0,Number(item && item.durationMs) || 0);
     const provenByDeadline=duration>0 && duration<=GARDEN_OPTIMAL_LIMIT_MS;
-    const provenSlow=Boolean(
-      stats.lastNonReadyYes &&
-      Number(stats.lastNonReadyYes.observedAt)-Number(item.startedAt||0)>GARDEN_OPTIMAL_LIMIT_MS
-    );
+    const modelMismatch=stats.no.length>0;
+    const lateMismatch=duration>GARDEN_OPTIMAL_LIMIT_MS && modelMismatch;
     const finalGap=stats.last
       ? Math.max(0,Number(item.finishedAt||0)-Number(stats.last.observedAt||0))
       : 0;
     let confidence="niska";
     if (stats.checks.length>=3 && stats.last && finalGap<=6*60*60*1000) confidence="wysoka";
     else if (stats.checks.length>=1) confidence="średnia";
-    return {summary,stats,duration,provenByDeadline,provenSlow,finalGap,confidence};
+    return {summary,stats,duration,provenByDeadline,modelMismatch,lateMismatch,finalGap,confidence};
   }
 
   function gardenDisplayStage(frame) {
@@ -14299,7 +14401,7 @@ function setupAdmin() {
       // Późny zbiór bez obserwacji nie dowodzi wolnego wzrostu — gracz mógł
       // po prostu odebrać gotową roślinę później. Takiego wyniku nie używamy
       // do uczenia suwaków, dopóki nie mamy dowodu, że roślina nie była READY.
-      if (!evidence.provenByDeadline && !evidence.provenSlow) return null;
+      if (!evidence.provenByDeadline) return null;
 
       const reportWeight=Math.min(0.28,evidence.stats.checks.length*0.08);
       const agreementWeight=evidence.stats.agreement==null
@@ -14308,7 +14410,7 @@ function setupAdmin() {
       const timeWeight=evidence.provenByDeadline ? 0.58 : 0.46;
       return {
         duration:evidence.duration,
-        source:evidence.provenSlow ? "AUTO_PROVEN_SLOW" : "AUTO_HARVEST",
+        source:"AUTO_HARVEST",
         weight:Math.max(0.25,Math.min(1,timeWeight+reportWeight+agreementWeight)),
         evidence
       };
@@ -14404,6 +14506,47 @@ function setupAdmin() {
     return Math.min(...rows.map(item=>gardenResearchDistance(candidate,item)));
   }
 
+  function gardenScheduleEditorRender() {
+    if (gardenControlRenderTimer) clearTimeout(gardenControlRenderTimer);
+    gardenControlRenderTimer=setTimeout(()=>{
+      gardenControlRenderTimer=null;
+      gardenRenderEditor();
+    },140);
+  }
+
+  function gardenFlushEditorRender() {
+    if (gardenControlRenderTimer) {
+      clearTimeout(gardenControlRenderTimer);
+      gardenControlRenderTimer=null;
+    }
+    gardenRenderEditor();
+  }
+
+  // Późny zbiór sam w sobie nie dowodzi wolnego wzrostu, ale odpowiedź
+  // „Nie” dowodzi, że automatyczny przebieg 52 h nie pasował do rośliny.
+  // Nie wymyślamy z tego sztucznego czasu — używamy tylko łagodnej kary,
+  // aby model nie proponował w kółko tego samego niedopasowanego obszaru.
+  function gardenModelMismatchPenalty(candidate) {
+    const rows=(gardenData.results||[])
+      .filter(item=>item&&item.plant===candidate.plant)
+      .map(item=>({item,evidence:gardenEvidenceForResult(item)}))
+      .filter(row=>row.evidence.lateMismatch);
+    if (!rows.length) return 0;
+
+    let weighted=0;
+    let totalWeight=0;
+    rows.forEach(row=>{
+      const distance=gardenResearchDistance(candidate,row.item);
+      const proximity=Math.exp(-0.5*Math.pow(distance/0.75,2));
+      const checks=Math.max(1,row.evidence.stats.checks.length);
+      const mismatchShare=row.evidence.stats.no.length/checks;
+      const evidenceWeight=Math.min(1,0.35+row.evidence.stats.no.length*0.2);
+      weighted+=proximity*mismatchShare*evidenceWeight;
+      totalWeight+=proximity;
+    });
+    return totalWeight>0 ? Math.max(0,Math.min(1,weighted/totalWeight)) : 0;
+  }
+
   function gardenKernelPrediction(candidate) {
     const rows=(gardenData.results||[])
       .filter(item=>item&&item.plant===candidate.plant)
@@ -14496,13 +14639,14 @@ function setupAdmin() {
       .map(candidate=>({
         candidate,
         prediction:gardenKernelPrediction(candidate),
-        novelty:gardenNearestResearchDistance(candidate)
+        novelty:gardenNearestResearchDistance(candidate),
+        mismatchPenalty:gardenModelMismatchPenalty(candidate)
       }));
     if (!candidates.length) return null;
 
     const predicted=candidates.filter(item=>item.prediction);
     if (!predicted.length) {
-      return candidates.sort((a,b)=>b.novelty-a.novelty)[0];
+      return candidates.sort((a,b)=>(b.novelty-0.5*b.mismatchPenalty)-(a.novelty-0.5*a.mismatchPenalty))[0];
     }
 
     const times=predicted.map(item=>item.prediction.predictedMs);
@@ -14519,7 +14663,7 @@ function setupAdmin() {
         : 0.5;
       const novelty=Math.min(1,item.novelty/1.4);
       const nearDuplicatePenalty=item.novelty<0.22 ? 0.55 : item.novelty<0.38 ? 0.20 : 0;
-      item.score=0.52*quality+0.30*uncertainty+0.18*novelty-nearDuplicatePenalty;
+      item.score=0.52*quality+0.30*uncertainty+0.18*novelty-nearDuplicatePenalty-0.28*item.mismatchPenalty;
     });
     predicted.sort((a,b)=>b.score-a.score || b.novelty-a.novelty);
     return predicted[0];
@@ -14649,7 +14793,8 @@ function setupAdmin() {
     gardenLastPlotStateSignature=(gardenData.active || [])
       .map(item=>{
         const summary=gardenPhaseSummary(item);
-        return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}`;
+        const growingMinute=Math.floor(Math.max(0,Date.now()-Number(item.startedAt||0))/60000);
+        return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}:${growingMinute}`;
       }).join("|");
 
     host.innerHTML = [1,2,3,4].map(plot => {
@@ -14848,8 +14993,8 @@ function setupAdmin() {
         const quality=`${evidence.stats.checks.length} raportów · pewność ${evidence.confidence}`;
         if (evidence.provenByDeadline) {
           lines.push(`<div class="garden-known">✅ Zbiór do 56 h: ${escapeHtml(gardenFormatDuration(evidence.duration))} · ${escapeHtml(quality)}${manualHint}</div>`);
-        } else if (evidence.provenSlow) {
-          lines.push(`<div class="garden-known">↔️ Potwierdzona wolniejsza uprawa: zbiór ${escapeHtml(gardenFormatDuration(evidence.duration))} · ${escapeHtml(quality)}</div>`);
+        } else if (evidence.lateMismatch) {
+          lines.push(`<div class="garden-known">↔️ Niezgodna z modelem 52 h: zbiór ${escapeHtml(gardenFormatDuration(evidence.duration))} · odpowiedzi Nie wpływają na omijanie tego obszaru, ale nie udają dokładnego czasu wzrostu.</div>`);
         } else {
           lines.push(`<div class="garden-known">🕒 Późny zbiór: ${escapeHtml(gardenFormatDuration(evidence.duration))} · READY mógł nastąpić wcześniej, więc wynik nie obniża rankingu.</div>`);
         }
@@ -14941,14 +15086,17 @@ function setupAdmin() {
       const frame=gardenAutoFrame(own);
       const stats=gardenCheckStats(own,gardenPhaseSummary(own));
       box.textContent=`⏱️ Rośnie już: ${gardenFormatDuration(age)} · model: etap ${gardenDisplayStage(frame)}/10 · raporty ${stats.yes.length} Tak / ${stats.no.length} Nie`;
-      const phaseSignature=`${own.id}:${frame}:${stats.yes.length}:${stats.no.length}:${gardenNeedsModelCheck(own,gardenPhaseSummary(own))?1:0}:${gardenPendingPhase?.eventId||""}`;
+      const nextStageRemaining=Math.max(0,(frame+1)*GARDEN_AUTO_STAGE_MS-age);
+      const phaseMinute=Math.floor(nextStageRemaining/60000);
+      const phaseSignature=`${own.id}:${frame}:${stats.yes.length}:${stats.no.length}:${gardenNeedsModelCheck(own,gardenPhaseSummary(own))?1:0}:${gardenPendingPhase?.eventId||""}:${phaseMinute}`;
       if (phaseSignature!==gardenLastPhaseToolsSignature) {
         gardenLastPhaseToolsSignature=phaseSignature;
         gardenRenderPhaseTools(own);
       }
       const plotState=(gardenData.active || []).map(item=>{
         const summary=gardenPhaseSummary(item);
-        return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}`;
+        const growingMinute=Math.floor(Math.max(0,Date.now()-Number(item.startedAt||0))/60000);
+        return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}:${growingMinute}`;
       }).join("|");
       if (plotState !== gardenLastPlotStateSignature) gardenRenderPlots();
     } else {
@@ -15199,11 +15347,11 @@ function setupAdmin() {
       range?.addEventListener("input",()=>{
         gardenSyncManualInput(kind,"range");
         if (kind === "water") gardenTrackWaterEasterEgg(range.value);
-        gardenRenderEditor();
+        gardenScheduleEditorRender();
       });
       range?.addEventListener("change",()=>{
         gardenSyncManualInput(kind,"range");
-        gardenRenderEditor();
+        gardenFlushEditorRender();
       });
 
       // Pole ręczne i suwak są synchronizowane natychmiast po każdym znaku.
@@ -16844,9 +16992,10 @@ function setupAdmin() {
       return gangMenuStatusInFlight;
     }
 
-    gangMenuStatusInFlight = (async () => {
+    const requestPromise = (async () => {
       const token =
         playerAccountSessionToken();
+      const sessionEpoch = playerAccountSessionEpoch;
 
       if (!token) {
         return null;
@@ -16858,6 +17007,10 @@ function setupAdmin() {
             "gangMenuStatus",
             {sessionToken:token}
           );
+
+        if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
+          return null;
+        }
 
         if (
           !payload ||
@@ -16880,6 +17033,9 @@ function setupAdmin() {
         return payload;
 
       } catch (err) {
+        if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
+          return null;
+        }
         console.warn(
           "[MenelWars Tools] Status menu Gangu:",
           err
@@ -16891,10 +17047,14 @@ function setupAdmin() {
       }
     })();
 
+    gangMenuStatusInFlight = requestPromise;
+
     try {
-      return await gangMenuStatusInFlight;
+      return await requestPromise;
     } finally {
-      gangMenuStatusInFlight = null;
+      if (gangMenuStatusInFlight === requestPromise) {
+        gangMenuStatusInFlight = null;
+      }
     }
   }
 
