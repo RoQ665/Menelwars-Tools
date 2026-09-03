@@ -14,7 +14,7 @@
   const CLOUDFLARE_FEATURES = Object.freeze({
     gangDemand:true,
     achievements:true,
-    builds:false
+    builds:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
