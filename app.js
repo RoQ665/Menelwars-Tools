@@ -10,6 +10,7 @@
   // Musi kończyć się na /exec
   // ============================================================
   const BACKEND_URL = "https://script.google.com/macros/s/AKfycby8rjCO9HuRtQvQvFoF-OkjFhfnfcS1bTIag0V9LCSJykW6c8k5IZVH8K3pSVFH66ZBKQ/exec";
+  const CLOUDFLARE_API_URL = "https://menelwars-tools-api.juniorbest1991.workers.dev/api/v1";
 
   const STORAGE_KEY = "roq_tools_premium_v1";
   const REMOTE_KEY = "roq_tools_remote_approved_v1";
@@ -18,6 +19,7 @@
   const COMPANY_SALARY_IDENTITY_KEY = "menelwars_company_salary_identity_v1";
   const PLAYER_IDENTITY_KEY = "menelwars_player_identity_v1";
   const PLAYER_ACCOUNT_SESSION_KEY = "menelwars_player_account_session_v1";
+  const CLOUDFLARE_SESSION_KEY = "menelwars_cloudflare_session_v1";
   const GANG_TOKEN_KEY = "menelwars_tools_gang_token_v1";
   const ADMIN_TOKEN_KEY = "menelwars_tools_admin_token_v1";
   const COMPANY_INCOME_KEY = "menelwars_tools_company_income_v1";
@@ -3787,6 +3789,78 @@ function mapRenderRouteResult() {
     return localStorage.getItem(PLAYER_ACCOUNT_SESSION_KEY) || "";
   }
 
+  function cloudflareMigrationTestEnabled() {
+    return new URLSearchParams(location.search).get("migrationTest") === "gang-demand";
+  }
+
+  function cloudflareSessionToken() {
+    return localStorage.getItem(CLOUDFLARE_SESSION_KEY) || "";
+  }
+
+  function setCloudflareSessionToken(token) {
+    const clean=String(token||"");
+    if (clean) localStorage.setItem(CLOUDFLARE_SESSION_KEY,clean);
+    else localStorage.removeItem(CLOUDFLARE_SESSION_KEY);
+  }
+
+  async function cloudflareApi(path,options={}) {
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),12000);
+    try {
+      const response=await fetch(`${CLOUDFLARE_API_URL}${path}`,{
+        method:options.method||"GET",
+        headers:{
+          Accept:"application/json",
+          ...(options.token ? {Authorization:`Bearer ${options.token}`} : {}),
+          ...(options.body ? {"Content-Type":"application/json"} : {})
+        },
+        body:options.body ? JSON.stringify(options.body) : undefined,
+        signal:controller.signal
+      });
+      const payload=await response.json().catch(()=>null);
+      if (!response.ok || !payload || payload.ok===false) {
+        const error=new Error(payload&&payload.error ? payload.error : `Nowy serwer zwrócił błąd ${response.status}.`);
+        error.status=response.status;
+        throw error;
+      }
+      return payload;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  let cloudflareSessionInFlight=null;
+
+  async function cloudflareEnsureSession() {
+    if (cloudflareSessionInFlight) return cloudflareSessionInFlight;
+    const request=(async()=>{
+      let token=cloudflareSessionToken();
+      if (token) {
+        try {
+          await cloudflareApi("/auth/session",{token});
+          return token;
+        } catch (err) {
+          if (err&&err.status!==401) throw err;
+          setCloudflareSessionToken("");
+          token="";
+        }
+      }
+      const legacySessionToken=playerAccountSessionToken();
+      if (!legacySessionToken) throw new Error("Zaloguj się najpierw do Konta.");
+      const result=await cloudflareApi("/auth/legacy-exchange",{
+        method:"POST",
+        body:{legacySessionToken}
+      });
+      token=String(result&&result.session&&result.session.token||"");
+      if (!token) throw new Error("Nowy serwer nie utworzył sesji.");
+      setCloudflareSessionToken(token);
+      return token;
+    })();
+    cloudflareSessionInFlight=request;
+    try { return await request; }
+    finally { if (cloudflareSessionInFlight===request) cloudflareSessionInFlight=null; }
+  }
+
   // Każda odpowiedź asynchroniczna pamięta numer sesji, dla której została
   // uruchomiona. Po wylogowaniu lub zalogowaniu na inne konto spóźniona
   // odpowiedź nie może już zmienić ekranu ani wyczyścić nowej sesji.
@@ -3816,6 +3890,7 @@ function mapRenderRouteResult() {
 
     if (previousToken !== nextToken) {
       playerAccountSessionEpoch++;
+      setCloudflareSessionToken("");
     }
 
     cachedAccountStatus = null;
@@ -8412,6 +8487,25 @@ function renderGangDemandGlobal(payload) {
   box.querySelectorAll("[data-gang-demand-close]").forEach(button=>button.addEventListener("click",()=>gangDemandCloseGlobal(button.dataset.gangDemandClose,button.textContent.includes("Usuń"))));
 }
 
+async function testCloudflareGangDemandGlobal(appsPayload) {
+  if (!cloudflareMigrationTestEnabled()) return;
+  const status=el("gang-demand-status");
+  if (status) status.textContent="🧪 Porównuję dane ze starym i nowym serwerem…";
+  try {
+    const token=await cloudflareEnsureSession();
+    const cloudPayload=await cloudflareApi("/gang/demands",{token});
+    const legacyEntries=Array.isArray(appsPayload&&appsPayload.entries) ? appsPayload.entries : [];
+    const cloudEntries=Array.isArray(cloudPayload&&cloudPayload.entries) ? cloudPayload.entries : [];
+    const legacyIds=legacyEntries.map(entry=>String(entry.id)).sort();
+    const cloudIds=cloudEntries.map(entry=>String(entry.id)).sort();
+    const same=legacyIds.length===cloudIds.length && legacyIds.every((id,index)=>id===cloudIds[index]);
+    if (!same) throw new Error(`Bazy nie są zgodne: Apps Script ${legacyIds.length}, Cloudflare ${cloudIds.length}.`);
+    if (status) status.textContent=`✅ Test Cloudflare udany — obie bazy mają te same ${cloudIds.length} aktywne wpisy.`;
+  } catch(err) {
+    if (status) status.textContent=`❌ Test Cloudflare: ${err&&err.message ? err.message : "nie udało się porównać danych."}`;
+  }
+}
+
 async function loadGangDemandGlobal(options={}) {
   if (gangDemandLoadInFlightGlobal) return gangDemandLoadInFlightGlobal;
   if (gangDemandCacheGlobal && !options.force) {
@@ -8455,6 +8549,7 @@ async function loadGangDemandGlobal(options={}) {
       renderGangDemandAdminToolsGlobal();
       refreshGangDemandChoicesIfOpenGlobal();
       syncGangDemandAdminFromAccountGlobal(token);
+      testCloudflareGangDemandGlobal(payload).catch(()=>{});
       return payload;
     } catch(err) {
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return null;
