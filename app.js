@@ -14,7 +14,8 @@
   const CLOUDFLARE_FEATURES = Object.freeze({
     gangDemand:true,
     achievements:true,
-    builds:true
+    builds:true,
+    garden:false
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -3806,6 +3807,10 @@ function mapRenderRouteResult() {
     return new URLSearchParams(location.search).get("migrationTest") === "builds";
   }
 
+  function cloudflareGardenTestEnabled() {
+    return new URLSearchParams(location.search).get("migrationTest") === "garden";
+  }
+
   function cloudflareAchievementsEnabled() {
     return CLOUDFLARE_FEATURES.achievements ||
       new URLSearchParams(location.search).get("migrationBackend") === "achievements";
@@ -3819,6 +3824,11 @@ function mapRenderRouteResult() {
   function cloudflareBuildsEnabled() {
     return CLOUDFLARE_FEATURES.builds ||
       new URLSearchParams(location.search).get("migrationBackend") === "builds";
+  }
+
+  function cloudflareGardenEnabled() {
+    return CLOUDFLARE_FEATURES.garden ||
+      new URLSearchParams(location.search).get("migrationBackend") === "garden";
   }
 
   function cloudflareSessionToken() {
@@ -3849,6 +3859,7 @@ function mapRenderRouteResult() {
       if (!response.ok || !payload || payload.ok===false) {
         const error=new Error(payload&&payload.error ? payload.error : `Nowy serwer zwrócił błąd ${response.status}.`);
         error.status=response.status;
+        error.payload=payload;
         throw error;
       }
       return payload;
@@ -14554,6 +14565,31 @@ function setupAdmin() {
 
   async function gardenPostAction(action,payload) {
     const nonce=makeRecipeNonce();
+    if (cloudflareGardenEnabled()) {
+      const routes={
+        gardenStart:"/garden/start",
+        gardenFinish:"/garden/finish",
+        gardenCancel:"/garden/cancel",
+        gardenPhase:"/garden/phase",
+        gardenCheck:"/garden/check"
+      };
+      const path=routes[action];
+      if (!path) throw new Error("Nieznana operacja Ogrodu.");
+      let token="";
+      if (playerAccountSessionToken()) token=await cloudflareEnsureSession();
+      try {
+        return await cloudflareApi(path,{
+          method:"POST",
+          token,
+          body:{...payload,requestId:nonce}
+        });
+      } catch (err) {
+        // Duplikat ustawienia i prośba o potwierdzenie korekty są oczekiwanymi
+        // odpowiedziami formularza, nie awarią transportu.
+        if (err&&err.payload&&(err.payload.duplicate||err.payload.correctionRequired)) return err.payload;
+        throw err;
+      }
+    }
     let sendError=null;
     try {
       await timedBackendPost(action,Object.assign({},payload,{action,nonce}));
@@ -15563,6 +15599,33 @@ function setupAdmin() {
     }
   }
 
+  function gardenMigrationSnapshot(payload) {
+    const experiment = item => ({
+      id:String(item&&item.id||""),plant:String(item&&item.plant||""),sun:Number(item&&item.sun||0),
+      water:Number(item&&item.water||0),ph:Number(item&&item.ph||0),nick:String(item&&item.nick||""),
+      plot:Number(item&&item.plot||0),startedAt:Number(item&&item.startedAt||0),
+      finishedAt:Number(item&&item.finishedAt||0),durationMs:Number(item&&item.durationMs||0),
+      status:String(item&&item.status||""),startSource:String(item&&item.startSource||""),
+      modelVersion:String(item&&item.modelVersion||"")
+    });
+    const event = item => ({
+      eventId:String(item&&item.eventId||""),experimentId:String(item&&item.experimentId||""),
+      nick:String(item&&item.nick||""),plot:Number(item&&item.plot||0),plant:String(item&&item.plant||""),
+      eventType:String(item&&item.eventType||""),atlasFrame:item&&item.atlasFrame!=null?Number(item.atlasFrame):null,
+      observedAt:Number(item&&item.observedAt||0),source:String(item&&item.source||""),
+      createdAt:Number(item&&item.createdAt||0),correctionOfEventId:String(item&&item.correctionOfEventId||""),
+      expectedFrame:item&&item.expectedFrame!=null?Number(item.expectedFrame):null,answer:String(item&&item.answer||"")
+    });
+    const sorted = (items,mapper) => (Array.isArray(items)?items:[]).map(mapper)
+      .sort((left,right)=>JSON.stringify(left).localeCompare(JSON.stringify(right)));
+    return {
+      plants:[...(Array.isArray(payload&&payload.plants)?payload.plants:[])].map(String).sort(),
+      active:sorted(payload&&payload.active,experiment),
+      results:sorted(payload&&payload.results,experiment),
+      phases:sorted(payload&&payload.phases,event)
+    };
+  }
+
   async function gardenFetchData(options={}) {
     if (
       gardenDataLoaded &&
@@ -15571,15 +15634,31 @@ function setupAdmin() {
     ) {
       return true;
     }
-    const payload = await jsonp("gardenData",{
-      sessionToken:playerAccountSessionToken() || ""
-    });
+    const payload = cloudflareGardenEnabled()
+      ? await cloudflareApi("/garden")
+      : await jsonp("gardenData",{
+          sessionToken:playerAccountSessionToken() || ""
+        });
     if (!payload || !payload.ok) {
       if (payload && payload.authRequired) {
         await showModuleAccountGate("garden");
         return false;
       }
       throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać Ogrodu.");
+    }
+    if (cloudflareGardenTestEnabled() && !cloudflareGardenEnabled()) {
+      const status=el("garden-action-status");
+      try {
+        const cloudPayload=await cloudflareApi("/garden");
+        const legacySnapshot=gardenMigrationSnapshot(payload);
+        const cloudSnapshot=gardenMigrationSnapshot(cloudPayload);
+        if (JSON.stringify(legacySnapshot)!==JSON.stringify(cloudSnapshot)) {
+          throw new Error("dane obu serwerów różnią się");
+        }
+        if (status) status.textContent=`✅ Test Cloudflare: zgodne ${legacySnapshot.active.length} aktywne, ${legacySnapshot.results.length} wyników i ${legacySnapshot.phases.length} zdarzeń.`;
+      } catch (err) {
+        if (status) status.textContent=`❌ Test Ogrodu Cloudflare: ${err&&err.message?err.message:"nie udało się porównać danych."}`;
+      }
     }
     const serverPhases=Array.isArray(payload.phases) ? payload.phases : [];
     const phases=gardenPendingPhase
