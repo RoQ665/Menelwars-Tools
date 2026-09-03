@@ -3865,6 +3865,20 @@ function mapRenderRouteResult() {
       accountAdminPlayersCacheToken = "";
       accountAdminPlayersInFlight = null;
     }
+    if (typeof adminSubmissionsCache !== "undefined") {
+      invalidateAdminSubmissionsCache();
+      adminSubmissionsInFlight = null;
+      adminPendingSubmissionRows.clear();
+    }
+    if (typeof adminDashboardStatusInFlight !== "undefined") {
+      adminDashboardStatusInFlight = null;
+    }
+    if (typeof adminSectionLoadedAt !== "undefined") {
+      adminSectionLoadedAt.clear();
+    }
+    if (typeof adminWarmLoadedAt !== "undefined") {
+      adminWarmLoadedAt = 0;
+    }
   }
 
   async function playerAccountPostAction(action,data={}) {
@@ -3942,7 +3956,7 @@ function mapRenderRouteResult() {
 
     // Po wygaśnięciu cache nie blokujemy nawigacji.
     // Zwracamy ostatni poprawny status i odnawiamy go w tle.
-    if (!force && hasCachedAccount) {
+    if (!force && !strict && hasCachedAccount) {
       if (!accountStatusInFlight) {
         const requestPromise = (async () => {
           try {
@@ -4574,6 +4588,7 @@ async function fetchAccountAdminPlayers(
 
   const token =
     playerAccountSessionToken();
+  const sessionEpoch = playerAccountSessionEpoch;
 
   if (!token) {
     accountAdminPlayersCache = null;
@@ -4597,9 +4612,7 @@ async function fetchAccountAdminPlayers(
     return accountAdminPlayersInFlight;
   }
 
-  accountAdminPlayersInFlight =
-    (async () => {
-      try {
+  const requestPromise = (async () => {
         const result =
           await jsonp(
             "accountAdminPlayers",
@@ -4607,6 +4620,10 @@ async function fetchAccountAdminPlayers(
               sessionToken:token
             }
           );
+
+        if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
+          return null;
+        }
 
         if (
           result &&
@@ -4623,14 +4640,17 @@ async function fetchAccountAdminPlayers(
         }
 
         return result;
-
-      } finally {
-        accountAdminPlayersInFlight =
-          null;
-      }
     })();
 
-  return accountAdminPlayersInFlight;
+  accountAdminPlayersInFlight = requestPromise;
+
+  try {
+    return await requestPromise;
+  } finally {
+    if (accountAdminPlayersInFlight === requestPromise) {
+      accountAdminPlayersInFlight = null;
+    }
+  }
 }
 
 
@@ -4642,12 +4662,17 @@ async function loadAccountAdminPermissions(
 
     if (!holder) return;
 
+    const sessionToken = playerAccountSessionToken();
+    const sessionEpoch = playerAccountSessionEpoch;
+
     try {
       const result =
         await fetchAccountAdminPlayers({
           force:
             Boolean(options.force)
         });
+
+      if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch)) return;
 
       if (
         !result ||
@@ -5363,6 +5388,7 @@ async function loadAccountAdminPermissions(
   async function fetchGangPollsPayload(options={}) {
     const force = Boolean(options.force);
     const token = playerAccountSessionToken();
+    const sessionEpoch = playerAccountSessionEpoch;
 
     if (!token) {
       invalidateGangPollsCache();
@@ -5382,8 +5408,7 @@ async function loadAccountAdminPermissions(
       return gangPollsLoadInFlight;
     }
 
-    gangPollsLoadInFlight = (async () => {
-      try {
+    const requestPromise = (async () => {
         const payload = await jsonp(
           "gangPolls",
           {
@@ -5392,6 +5417,10 @@ async function loadAccountAdminPermissions(
           }
         );
 
+        if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
+          return null;
+        }
+
         if (payload && payload.ok !== false) {
           gangPollsCache = payload;
           gangPollsCacheAt = Date.now();
@@ -5399,12 +5428,17 @@ async function loadAccountAdminPermissions(
         }
 
         return payload;
-      } finally {
-        gangPollsLoadInFlight = null;
-      }
     })();
 
-    return gangPollsLoadInFlight;
+    gangPollsLoadInFlight = requestPromise;
+
+    try {
+      return await requestPromise;
+    } finally {
+      if (gangPollsLoadInFlight === requestPromise) {
+        gangPollsLoadInFlight = null;
+      }
+    }
   }
 
   async function loadGangPolls(options={}) {
@@ -5413,9 +5447,14 @@ async function loadAccountAdminPermissions(
 
     if (!box) return;
 
+    const token = playerAccountSessionToken();
+    const sessionEpoch = playerAccountSessionEpoch;
+
     try {
       const payload =
         await fetchGangPollsPayload(options);
+
+      if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return;
 
       const polls =
         Array.isArray(
@@ -7664,10 +7703,15 @@ async function loadAdminDashboardStatus() {
   if (adminDashboardStatusInFlight) return adminDashboardStatusInFlight;
 
   const token = adminToken();
+  const sessionToken = playerAccountSessionToken();
+  const sessionEpoch = playerAccountSessionEpoch;
   if (!token) return null;
 
-  adminDashboardStatusInFlight = (async () => {
+  const requestPromise = (async () => {
     const payload = await jsonp("adminDashboardStatus",{token});
+    if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch) || adminToken() !== token) {
+      return null;
+    }
     if (!payload || !payload.ok) {
       throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać statusu Admina.");
     }
@@ -7675,8 +7719,14 @@ async function loadAdminDashboardStatus() {
     return payload;
   })();
 
-  try { return await adminDashboardStatusInFlight; }
-  finally { adminDashboardStatusInFlight = null; }
+  adminDashboardStatusInFlight = requestPromise;
+
+  try { return await requestPromise; }
+  finally {
+    if (adminDashboardStatusInFlight === requestPromise) {
+      adminDashboardStatusInFlight = null;
+    }
+  }
 }
 
 async function loadAdminSection(
@@ -8490,6 +8540,8 @@ function invalidateAdminSubmissionsCache() {
 async function fetchAdminSubmissionsPayload(options={}) {
   const force = Boolean(options.force);
   const token = adminToken();
+  const sessionToken = playerAccountSessionToken();
+  const sessionEpoch = playerAccountSessionEpoch;
 
   if (!token) {
     invalidateAdminSubmissionsCache();
@@ -8509,12 +8561,15 @@ async function fetchAdminSubmissionsPayload(options={}) {
     return adminSubmissionsInFlight;
   }
 
-  adminSubmissionsInFlight = (async () => {
-    try {
+  const requestPromise = (async () => {
       const payload = await jsonp(
         "adminSubmissions",
         {token}
       );
+
+      if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch) || adminToken() !== token) {
+        return null;
+      }
 
       if (payload && payload.ok) {
         adminSubmissionsCache = payload;
@@ -8523,18 +8578,25 @@ async function fetchAdminSubmissionsPayload(options={}) {
       }
 
       return payload;
-    } finally {
-      adminSubmissionsInFlight = null;
-    }
   })();
 
-  return adminSubmissionsInFlight;
+  adminSubmissionsInFlight = requestPromise;
+
+  try {
+    return await requestPromise;
+  } finally {
+    if (adminSubmissionsInFlight === requestPromise) {
+      adminSubmissionsInFlight = null;
+    }
+  }
 }
 
 async function loadAdminSubmissions(options={}) {
 
   const token =
     adminToken();
+  const sessionToken = playerAccountSessionToken();
+  const sessionEpoch = playerAccountSessionEpoch;
 
   if (!token) {
     showAdminLogin();
@@ -8548,6 +8610,8 @@ async function loadAdminSubmissions(options={}) {
 
     const payload =
       await fetchAdminSubmissionsPayload(options);
+
+    if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch) || adminToken() !== token) return;
 
     if (
       !payload ||
@@ -14159,6 +14223,7 @@ function setupAdmin() {
 
   async function achievementTrack(ids) {
     const sessionToken=playerAccountSessionToken();
+    const sessionEpoch=playerAccountSessionEpoch;
     if (!sessionToken) return null;
     const unlocked=cachedAccountStatus && cachedAccountStatus.achievements || {};
     const wanted=Array.from(new Set((Array.isArray(ids)?ids:[ids]).map(String).filter(Boolean)))
@@ -14167,6 +14232,7 @@ function setupAdmin() {
     wanted.forEach(id=>achievementTrackCompleted.add(`${sessionToken}:${id}`));
     try {
       const result=await playerAccountPostAction("achievementTrack",{sessionToken,ids:wanted});
+      if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch)) return null;
       if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
       return result;
     } catch (err) {
@@ -14178,6 +14244,7 @@ function setupAdmin() {
 
   async function achievementTrackAiWin(presetId,ownLevel) {
     const sessionToken=playerAccountSessionToken();
+    const sessionEpoch=playerAccountSessionEpoch;
     if (!sessionToken) return null;
     const levelMatch=String(presetId||"").match(/^preset-(\d+)-/);
     const isUnderdog=Boolean(levelMatch && Number(ownLevel||0)<=Number(levelMatch[1])-5);
@@ -14190,6 +14257,7 @@ function setupAdmin() {
         presetId,
         ownLevel
       });
+      if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch)) return null;
       if (cachedAccountStatus && result.unlocked) cachedAccountStatus.achievements=result.unlocked;
       return result;
     } catch (err) {
@@ -15924,7 +15992,7 @@ function setupAdmin() {
       combatLevel:exactLevel || Math.max(1,Number(calculated.characterLevel)||1),
       maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
       bleeding:null,stunned:false,firstAttack:true,
-      procMeters:{crit:0,double:0,counter:0,stun:0,bleed:0,evasion:0},
+      procMeters:{crit:0,double:0,counter:0,stun:0,bleed:0,bleedTickResist:0,evasion:0},
       metrics:{
         damage:0,crit:0,double:0,counter:0,bleed:0,bleedProc:0,stun:0,execute:0,evade:0,miss:0,hit:0,hitAttempts:0,lifesteal:0,regen:0,
         normalHitDamage:0,normalHitCount:0,critDamage:0,critHitCount:0,counterDamage:0,counterHitCount:0,
@@ -16035,6 +16103,10 @@ function setupAdmin() {
 
   function pvpApplyBleedTick(victim,round) {
     if (!victim.bleeding) return {damage:0,killed:false};
+    const resistChance=pvpClamp(Number(victim.stats.bleedResist)||0,0,100);
+    if (pvpProc(victim,"bleedTickResist",resistChance)) {
+      return {damage:0,killed:false,resisted:true};
+    }
     const source=victim.bleeding;
     const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(14,round-1))]||0)/100;
     const damage=Math.max(1,Math.round(victim.maxHp*0.02*(1+(Number(source.stats.bleedDamage)||0)/100)*escalation));
@@ -16496,7 +16568,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftItem.source,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftItem.source,rightItem.source,params);
-      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki, ale każdy jego tick może zostać odparty zgodnie z odpornością na krwawienie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
