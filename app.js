@@ -15885,10 +15885,14 @@ function setupAdmin() {
     return pvpSimulationSources().find(item=>item.key===key) || null;
   }
 
-  const PVP_BOSS_CONSUMABLES = [
-    {id:"pvp-boss-krokodyl",name:"Krokodyl",stat:"hp",amount:60,label:"+60 maks. HP"},
-    {id:"pvp-boss-mocarz",name:"Mocarz",stat:"defense",amount:80,label:"+80 DEF"},
-    {id:"pvp-boss-tajfun",name:"Tajfun",stat:"attack",amount:20,label:"+20 ATK"}
+  const PVP_COMBAT_CONSUMABLES = [
+    {id:"pvp-food-baton",name:"Baton proteinowy",bonuses:{attack:2,defense:2},label:"+2 ATK · +2 DEF"},
+    {id:"pvp-food-jabol",name:"Jabol „Mocny”",bonuses:{attack:5,defense:5},label:"+5 ATK · +5 DEF"},
+    {id:"pvp-food-kebab",name:"Kebab bardzo ostry",bonuses:{attack:10},label:"+10 ATK"},
+    {id:"pvp-food-grochowka",name:"Grochówka „Czarnobylska Mgła”",bonuses:{defense:10},label:"+10 DEF"},
+    {id:"pvp-boss-krokodyl",name:"Krokodyl",bonuses:{hp:60},label:"+60 maks. HP",bossOnly:true},
+    {id:"pvp-boss-mocarz",name:"Mocarz",bonuses:{defense:80},label:"+80 DEF",bossOnly:true},
+    {id:"pvp-boss-tajfun",name:"Tajfun",bonuses:{attack:20},label:"+20 ATK",bossOnly:true}
   ];
 
   function pvpIsBossSource(item) {
@@ -15901,34 +15905,49 @@ function setupAdmin() {
     const rightItem=pvpResolveSource(el("pvp-sim-right")?.value||"");
     const enabled=pvpIsBossSource(rightItem);
     host.hidden=!enabled;
-    PVP_BOSS_CONSUMABLES.forEach(item=>{
+    PVP_COMBAT_CONSUMABLES.filter(item=>item.bossOnly).forEach(item=>{
       const input=el(item.id);
       if (input) input.disabled=!enabled;
     });
   }
 
-  function pvpSelectedBossConsumables(rightItem) {
-    if (!pvpIsBossSource(rightItem)) return [];
-    return PVP_BOSS_CONSUMABLES.filter(item=>Boolean(el(item.id)?.checked));
+  function pvpSelectedCombatConsumables(rightItem) {
+    return PVP_COMBAT_CONSUMABLES.filter(item=>{
+      if (item.bossOnly && !pvpIsBossSource(rightItem)) return false;
+      return Boolean(el(item.id)?.checked);
+    });
   }
 
-  function pvpApplyBossConsumables(source,consumables) {
+  function pvpApplyCombatConsumables(source,consumables) {
     if (!consumables.length) return source;
     const profile=Object.assign({},source?.profile||{});
+    const calculated=buildCalculateStats(source);
+    const stats=calculated?.stats||{};
+    const totals={attack:0,defense:0,hp:0};
     consumables.forEach(item=>{
-      if (item.stat==="attack") profile.combatAttack=buildStatNumber(Number(profile.combatAttack)||0)+item.amount;
-      if (item.stat==="defense") profile.combatDefense=buildStatNumber(Number(profile.combatDefense)||0)+item.amount;
-      if (item.stat==="hp") profile.combatHp=buildStatNumber(Number(profile.combatHp)||0)+item.amount;
+      Object.entries(item.bonuses||{}).forEach(([stat,amount])=>{
+        if (Object.hasOwn(totals,stat)) totals[stat]+=Number(amount)||0;
+      });
     });
+    // Kontrolowany pomiar: +17 ATK i +17 DEF z jedzenia zmieniło ekran
+    // startowy o +19 ATK i +33 DEF. Płaskie efekty są więc dodawane przed
+    // procentowymi premiami buildu, a nie bezpośrednio do końcowego wyniku.
+    const scaledAttack=Math.round(totals.attack*(1+(Number(stats.attackPct)||0)/100));
+    const scaledDefense=Math.round(totals.defense*(1+(Number(stats.defensePct)||0)/100));
+    const scaledHp=Math.round(totals.hp*(1+(Number(stats.maxHpPct)||0)/100));
+    profile.combatAttack=buildStatNumber(Number(profile.combatAttack)||0)+scaledAttack;
+    profile.combatDefense=buildStatNumber(Number(profile.combatDefense)||0)+scaledDefense;
+    profile.combatHp=buildStatNumber(Number(profile.combatHp)||0)+scaledHp;
     return Object.assign({},source,{profile});
   }
 
-  function pvpBossConsumablesResultHtml(rightItem,consumables) {
-    if (!pvpIsBossSource(rightItem)) return "";
-    const summary=consumables.length
-      ? consumables.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · ")
-      : "bez dopalaczy";
-    return `<div class="pvp-boss-consumables-result">🧪 Walka z bossem: ${summary}</div>`;
+  function pvpCombatConsumablesResultHtml(rightItem,consumables) {
+    const regular=consumables.filter(item=>!item.bossOnly);
+    const boss=consumables.filter(item=>item.bossOnly);
+    const rows=[];
+    if (regular.length) rows.push(`🍖 Aktywne efekty: ${regular.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · ")}`);
+    if (pvpIsBossSource(rightItem)) rows.push(`🧪 Dopalacze bossowe: ${boss.length?boss.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · "):"brak"}`);
+    return rows.length?`<div class="pvp-boss-consumables-result">${rows.join("<br>")}</div>`:"";
   }
 
   function pvpUpdateReadiness() {
@@ -16609,15 +16628,15 @@ function setupAdmin() {
     };
     const runs=[10,100,1000].includes(Number(el("pvp-sim-runs")?.value))?Number(el("pvp-sim-runs")?.value):1000;
     const mode=String(el("pvp-sim-mode")?.value||"both");
-    const bossConsumables=pvpSelectedBossConsumables(rightItem);
-    const leftSource=pvpApplyBossConsumables(leftItem.source,bossConsumables);
+    const combatConsumables=pvpSelectedCombatConsumables(rightItem);
+    const leftSource=pvpApplyCombatConsumables(leftItem.source,combatConsumables);
     button.disabled=true; if (readinessHost) readinessHost.textContent=`⏳ Symuluję ${runs.toLocaleString("pl-PL")} walk...`;
     try {
       // Jeden raport. Nie dublujemy już symulacji „atakuję / bronię”, bo
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftSource,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftSource,rightItem.source,params);
-      host.innerHTML=`${pvpBossConsumablesResultHtml(rightItem,bossConsumables)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki, ale każdy jego tick może zostać odparty zgodnie z odpornością na krwawienie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki, ale każdy jego tick może zostać odparty zgodnie z odpornością na krwawienie. Zwykły DR zawiera pasywny unik = Unik/3.5 i ma wspólny limit 60%; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;

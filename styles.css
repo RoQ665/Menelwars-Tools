@@ -3233,6 +3233,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .pvp-boss-consumables[hidden]{display:none!important}
 .pvp-boss-consumables legend{padding:0 6px;font-size:12px;font-weight:900;color:#744b1f}
 .pvp-boss-consumables-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.pvp-combat-consumables-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .pvp-boss-consumables-grid label{
   display:flex;
   gap:7px;
