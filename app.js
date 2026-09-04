@@ -5078,11 +5078,25 @@ const goal = payload && payload.goal;
 
     } catch (err) {
 
+      const message =
+        err && err.message
+          ? err.message
+          : "Nie udało się pobrać danych Gangu.";
+
       if (!background) {
-        el("payments-status").textContent =
-          err && err.message
-            ? err.message
-            : "Nie udało się pobrać danych.";
+        el("payments-status").textContent = message;
+      }
+
+      if (!latestGangPayload) {
+        const companyBox = el("company-summary");
+        if (companyBox) {
+          companyBox.innerHTML = `
+            <div class="empty">
+              Nie udało się pobrać danych Spółki.<br>
+              <small>${escapeHtml(message)}</small>
+            </div>
+          `;
+        }
       }
     }
   
@@ -15966,6 +15980,27 @@ function setupAdmin() {
     const isPaymentsOrCompany =
       target === "payments-view" ||
       target === "company-view";
+
+    // Obie zakładki korzystają z jednego payloadu, ale sama nawigacja nie
+    // może czekać na sieć. Dzięki temu przycisk zawsze reaguje, a ewentualny
+    // błąd pobrania jest widoczny również wewnątrz Spółki.
+    if (isPaymentsOrCompany) {
+      el("gang-tabs").hidden = false;
+      showToolView(target,"gang");
+      gangTrackIndecisiveEasterEgg(target);
+
+      if (latestGangPayload) {
+        renderGangPayload(latestGangPayload);
+      } else if (target === "company-view") {
+        const companyBox = el("company-summary");
+        if (companyBox) companyBox.innerHTML = `<div class="muted">Pobieranie danych spółki...</div>`;
+      }
+
+      await loadPayments({background:true,force:forceRefresh});
+      if (latestGangPayload) renderGangPayload(latestGangPayload);
+      validateGangSessionInBackground();
+      return;
+    }
 
     // Zapotrzebowanie jest prostą listą. Otwieramy ją natychmiast, a odczyt
     // serwera działa w tle — awaria nie może zatrzymać całej zakładki Gangu.
