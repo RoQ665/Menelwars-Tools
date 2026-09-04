@@ -2567,6 +2567,13 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .ai-dump-payment.credit { color:#285c8a; }
 .ai-dump-payment.debt { color:#9b2d2d; }
 .ai-dump-payment.zero { color:#39713d; }
+.ai-dump-access {
+  margin-top:3px;
+  font-size:11px;
+  font-weight:800;
+}
+.ai-dump-access.allowed { color:#39713d; }
+.ai-dump-access.blocked { color:#9b2d2d; }
 
 /* ============================================================
    v20.70 — SNAPSHOTY / ADMIN LAZY / BLOKUJĄCY OVERLAY

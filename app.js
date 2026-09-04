@@ -2972,8 +2972,11 @@ function mapRenderRouteResult() {
           <div class="finance-name">${escapeHtml(player.nick)}</div>
           <div class="finance-meta"><span>${status}</span></div>
           <div class="finance-meta ai-dump-payment ${aiSaldo < 0 ? "debt" : aiSaldo > 0 ? "credit" : "zero"}">
-            <span>🤖 Wysypisko AI: ${aiSaldo < 0 ? "Dług" : aiSaldo > 0 ? "Nadpłata" : "Na bieżąco"}</span>
+            <span>🤖 Wysypisko AI: ${aiSaldo < 0 ? "Dług" : aiSaldo > 0 ? "Nadpłata" : "Saldo 0"}</span>
             <strong>${aiSaldo > 0 ? "+" : ""}${formatSaldo(aiSaldo)} pkt</strong>
+          </div>
+          <div class="ai-dump-access ${aiSaldo >= 0 ? "allowed" : "blocked"}">
+            ${aiSaldo >= 0 ? "✅ Może kopać" : "⛔ Dług — brak wejścia"}
           </div>
         </div>
         <div class="payment-total">${amount}</div>
