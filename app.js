@@ -4093,10 +4093,6 @@ async function loadAccountAdminPermissions(
                     ${player.officer ? "✅ Oficer" : "Nadaj Oficera"}
                   </button>
 
-                  <button type="button" data-account-garden-plots="${escapeHtml(player.nick)}" data-max-plots="${Number(player.gardenMaxPlots)===6?6:4}">
-                    ${Number(player.gardenMaxPlots)===6?"🏡 Domek · 6 grządek":"🌱 4 grządki"}
-                  </button>
-
                   <button
                     data-account-logout="${escapeHtml(player.nick)}">
                     🚫 Wyloguj
@@ -4192,17 +4188,6 @@ async function loadAccountAdminPermissions(
               }
             };
         });
-
-      holder.querySelectorAll("[data-account-garden-plots]").forEach(button=>{
-        button.onclick=async()=>{
-          const current=Number(button.dataset.maxPlots)===6?6:4,next=current===6?4:6;
-          criticalOperationStart("🏡 Zmieniam limit Ogrodu…",next===6?"Potwierdzam Domek letniskowy i odblokowuję 6 grządek.":"Przywracam podstawowy limit 4 grządek.");
-          try{
-            await confirmedAdminMutationPost("accountAdminSetGardenPlots",{nick:button.dataset.accountGardenPlots,maxPlots:next},{token:playerAccountSessionToken()});
-            accountAdminPlayersCacheAt=0;await loadAccountAdminPermissions({force:true});
-          }finally{criticalOperationFinish();}
-        };
-      });
 
       holder
         .querySelectorAll(
@@ -5583,11 +5568,6 @@ async function confirmedAdminMutationPost(
   if (action === "accountAdminSetOfficer") {
     return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
       method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"officer",enabled:Boolean(body.enabled)}
-    });
-  }
-  if(action==="accountAdminSetGardenPlots"){
-    return cloudflareApi(`/admin/accounts/${encodedNick}/garden-plots`,{
-      method:"POST",token:await cloudflareEnsureSession(),body:{requestId,maxPlots:Number(body.maxPlots)}
     });
   }
   if (action === "accountAdminLogoutAll") {
