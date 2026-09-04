@@ -4794,6 +4794,7 @@ async function loadAccountAdminPermissions(
                     Wpłaty ${money(player.paymentsContribution)}
                     · Fundusz ${money(player.fundGiven)}
                     · Bonus ${money(player.fundBonus)}
+                    · 🤖 AI ${money(player.aiDumpContribution)}
                   </div>
 
                   <div class="finance-meta company-salary-line">
@@ -5564,6 +5565,7 @@ async function adminPostAction(action, data={}) {
     };
     const financeRoutes={
       adminSetCompanyIncome:["/admin/company/income",{income:Number(data.income)}],
+      adminSetCompanyAiDumpRate:["/admin/company/ai-dump-rate",{pointValue:Number(data.pointValue)}],
       adminActivateCompanySalaryPlan:["/admin/company/activate-plan",{}]
     };
     const accessRoutes={
@@ -8145,6 +8147,9 @@ function renderAdminCompanyPlan(
   input.value =
     String(income);
 
+  const aiDumpPointValueInput=el("admin-ai-dump-point-value");
+  if(aiDumpPointValueInput)aiDumpPointValueInput.value=String(Number(payload.aiDumpPointValue)||0);
+
   const plan =
     companyPlan(
       payload,
@@ -8955,6 +8960,22 @@ function setupAdmin() {
         }
       }
     );
+
+  el("admin-ai-dump-point-value")
+    ?.addEventListener("change",async event=>{
+      const input=event.target;
+      const pointValue=Math.max(0,Number(String(input.value||"").replace(/\s+/g,"").replace(",","."))||0);
+      input.disabled=true;
+      try {
+        await adminPostAction("adminSetCompanyAiDumpRate",{pointValue:String(pointValue)});
+        await loadAdminPaymentsStatus();
+        await runtimeLoaderFinish("✅ Przelicznik AI zaktualizowany");
+      } catch(err) {
+        const status=el("admin-status");
+        if(status)status.textContent=err&&err.message?err.message:"Nie udało się zapisać przelicznika AI.";
+        await runtimeLoaderFinish("❌ Aktualizacja nieudana");
+      } finally { input.disabled=false; }
+    });
 
   el("admin-company-plan-activate")
     ?.addEventListener(
