@@ -3257,6 +3257,9 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   border-radius:10px;
   background:#fff5df;
 }
+.garden-fastest-known{margin-top:9px;padding-top:8px;border-top:1px solid #dfc987}
+.garden-recommendation-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.garden-recommendation-actions button{flex:1 1 190px}
 .pvp-boss-consumables[hidden]{display:none!important}
 .pvp-boss-consumables legend{padding:0 6px;font-size:12px;font-weight:900;color:#744b1f}
 .pvp-boss-consumables-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}

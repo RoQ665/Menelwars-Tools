@@ -13527,6 +13527,15 @@ function setupAdmin() {
     return rows[0]||null;
   }
 
+  function gardenFastestKnown(plant) {
+    const rows=(gardenData.results||[])
+      .filter(item=>item.plant===plant)
+      .map(item=>({item,obs:gardenObservationForModel(item)}))
+      .filter(row=>row.obs&&Number(row.obs.duration)>0);
+    rows.sort((left,right)=>Number(left.obs.duration)-Number(right.obs.duration)||Number(right.obs.weight)-Number(left.obs.weight));
+    return rows[0]||null;
+  }
+
   function gardenRaceCenter(plant) {
     const grouped=new Map();
     (gardenData.active||[])
@@ -13802,18 +13811,24 @@ function setupAdmin() {
     if (own) {host.hidden=true;host.innerHTML="";return;}
     const rec=gardenExperimentalRecommendation(gardenCurrentControls());
     const c=rec.candidate;
+    const fastest=gardenFastestKnown(c.plant);
     host.hidden=false;
     const prediction=rec.prediction;
     const modelLine=prediction
       ? `<div class="garden-model-prediction">🧪 Lokalny model: przewidywany górny czas ~<b>${escapeHtml(gardenFormatDuration(prediction.predictedMs))}</b> · pewność ${escapeHtml(prediction.confidence)} · wsparcie ${Number(prediction.effectiveN).toLocaleString("pl-PL",{maximumFractionDigits:1})}</div>`
       : `<div class="garden-model-prediction muted">🧪 Za mało porównywalnych, wiarygodnych wyników — wybieramy test, który dostarczy nowej informacji.</div>`;
-    host.innerHTML=`<strong>🔬 Polecany eksperyment — 🧪 Eksperymentalne</strong><div class="garden-recommendation-values">☀️ ${c.sun} · 💧 ${c.water} · pH ${Number(c.ph).toFixed(1)}</div><div><b>${escapeHtml(rec.mode)}</b> · ${escapeHtml(rec.reason)}</div>${modelLine}<div class="muted">Nowe pomiary uwzględniają czas zbioru, odpowiedzi Tak/Nie i ich regularność. Późny zbiór bez obserwacji nie jest traktowany jako wolny wzrost.</div><button type="button" class="secondary-btn" data-garden-use-recommendation>Ustaw te wartości</button>`;
-    host.querySelector("[data-garden-use-recommendation]")?.addEventListener("click",()=>{
-      if (el("garden-sun")) el("garden-sun").value=String(c.sun);
-      if (el("garden-water")) el("garden-water").value=String(c.water);
-      if (el("garden-ph")) el("garden-ph").value=Number(c.ph).toFixed(1);
+    const fastestLine=fastest
+      ? `<div class="garden-fastest-known">🏁 Najszybszy znany wynik: <b>${escapeHtml(gardenFormatDuration(fastest.obs.duration))}</b> · ☀️ ${fastest.item.sun} · 💧 ${fastest.item.water} · pH ${Number(fastest.item.ph).toFixed(1)}</div>`
+      : `<div class="garden-fastest-known muted">🏁 Brak zakończonego, wiarygodnego pomiaru dla tej sadzonki.</div>`;
+    host.innerHTML=`<strong>🔬 Polecany eksperyment — 🧪 Eksperymentalne</strong><div class="garden-recommendation-values">☀️ ${c.sun} · 💧 ${c.water} · pH ${Number(c.ph).toFixed(1)}</div><div><b>${escapeHtml(rec.mode)}</b> · ${escapeHtml(rec.reason)}</div>${modelLine}<div class="muted">Nowe pomiary uwzględniają czas zbioru, odpowiedzi Tak/Nie i ich regularność. Późny zbiór bez obserwacji nie jest traktowany jako wolny wzrost.</div>${fastestLine}<div class="garden-recommendation-actions"><button type="button" class="secondary-btn" data-garden-use-recommendation>Ustaw polecany eksperyment</button>${fastest?`<button type="button" class="secondary-btn" data-garden-use-fastest>Ustaw najszybszą znaną</button>`:""}</div>`;
+    const applyValues=candidate=>{
+      if (el("garden-sun")) el("garden-sun").value=String(candidate.sun);
+      if (el("garden-water")) el("garden-water").value=String(candidate.water);
+      if (el("garden-ph")) el("garden-ph").value=Number(candidate.ph).toFixed(1);
       gardenSyncAllManualInputs(); gardenRenderComboStatus();
-    });
+    };
+    host.querySelector("[data-garden-use-recommendation]")?.addEventListener("click",()=>applyValues(c));
+    host.querySelector("[data-garden-use-fastest]")?.addEventListener("click",()=>applyValues(fastest.item));
   }
 
   function gardenRenderRace() {
