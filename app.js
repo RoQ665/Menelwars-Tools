@@ -4110,11 +4110,11 @@ function mapRenderRouteResult() {
     if (cloudflareAchievementSyncInFlight) return cloudflareAchievementSyncInFlight;
     const request=(async()=>{
       const token=await cloudflareEnsureSession();
-      const result=await cloudflareApi("/achievements/legacy-sync",{
-        method:"POST",
-        token,
-        body:{legacySessionToken,requestId:makeRecipeNonce()}
-      });
+      const result=cloudflareAccountAuthEnabled()
+        ? await cloudflareApi("/achievements",{token})
+        : await cloudflareApi("/achievements/legacy-sync",{
+            method:"POST",token,body:{legacySessionToken,requestId:makeRecipeNonce()}
+          });
       if (!playerAccountSessionIsCurrent(legacySessionToken,sessionEpoch)) return {};
       const unlocked=result&&result.unlocked||{};
       cloudflareAchievementCache=unlocked;
