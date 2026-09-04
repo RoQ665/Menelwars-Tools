@@ -12779,7 +12779,6 @@ function setupAdmin() {
   let gardenControlRenderTimer = null;
   const GARDEN_AUTO_MODEL_VERSION = "AUTO52";
   const GARDEN_AUTO_MODEL_HOURS = 52;
-  const GARDEN_AUTO_STAGE_MS = (GARDEN_AUTO_MODEL_HOURS * 60 * 60 * 1000) / 10;
   const GARDEN_OPTIMAL_LIMIT_MS = 56 * 60 * 60 * 1000;
 
   function gardenLoadLocalPlots() {
@@ -13088,9 +13087,24 @@ function setupAdmin() {
     return String(item && item.modelVersion || "").toUpperCase() === GARDEN_AUTO_MODEL_VERSION;
   }
 
+  function gardenDynamicDurationMs(item) {
+    const prediction=gardenKernelPrediction({
+      plant:item&&item.plant,sun:item&&item.sun,water:item&&item.water,ph:item&&item.ph
+    });
+    const stored=Math.max(0,Number(item&&item.estimatedReadyAt||0)-Number(item&&item.startedAt||0));
+    const duration=prediction&&Number.isFinite(Number(prediction.predictedMs))
+      ? Number(prediction.predictedMs)
+      : stored || GARDEN_AUTO_MODEL_HOURS*60*60*1000;
+    return Math.max(24*60*60*1000,Math.min(96*60*60*1000,Math.round(duration)));
+  }
+
+  function gardenAutoStageMs(item) {
+    return gardenDynamicDurationMs(item)/10;
+  }
+
   function gardenAutoFrame(item,now=Date.now()) {
     const age=Math.max(0,Number(now)-Number(item && item.startedAt || 0));
-    return Math.max(0,Math.min(9,Math.floor(age/GARDEN_AUTO_STAGE_MS)));
+    return Math.max(0,Math.min(9,Math.floor(age/gardenAutoStageMs(item))));
   }
 
   function gardenDisplayFrame(item,summary,now=Date.now()) {
@@ -13277,7 +13291,7 @@ function setupAdmin() {
     try {
       const result=await gardenPostAction("gardenCheck",{
         id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
-        expectedFrame:Number(frame),answer:String(answer)
+        expectedFrame:Number(frame),answer:String(answer),estimatedDurationMs:gardenDynamicDurationMs(own)
       });
       if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać odpowiedzi.");
       gardenPendingPhase=null;
@@ -13420,13 +13434,14 @@ function setupAdmin() {
     const check=canAskForCheck ? gardenCheckForFrame(summary,frame) : null;
     const sprite=gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant);
     const stats=gardenCheckStats(own,summary);
-    const modelRemaining=Math.max(0,GARDEN_AUTO_MODEL_HOURS*60*60*1000-(Date.now()-Number(own.startedAt||0)));
-    const stageRemaining=Math.max(0,(frame+1)*GARDEN_AUTO_STAGE_MS-(Date.now()-Number(own.startedAt||0)));
+    const estimatedReadyAt=Number(own.startedAt||0)+gardenDynamicDurationMs(own);
+    const modelRemaining=Math.max(0,estimatedReadyAt-Date.now());
+    const stageRemaining=Math.max(0,(frame+1)*gardenAutoStageMs(own)-(Date.now()-Number(own.startedAt||0)));
     const timingText=frame===9
       ? modelRemaining>0
-        ? `Model 52 h · modelowy czas wzrostu za ${gardenFormatDuration(modelRemaining)}.`
-        : "Modelowy czas 52 h już minął · etap 10 pozostaje do faktycznego zbioru w grze."
-      : `Model 52 h · kolejny etap za ${gardenFormatDuration(stageRemaining)}.`;
+        ? `Szacowany czas wzrostu za ${gardenFormatDuration(modelRemaining)}.`
+        : "Szacowany czas wzrostu już minął · sprawdź w grze, czy można zebrać plon."
+      : `Kolejny etap za ${gardenFormatDuration(stageRemaining)} · przewidywany zbiór za ${gardenFormatDuration(modelRemaining)}.`;
     const report=frame===0
       ? `<div class="garden-phase-note">🌱 Etap 1 został potwierdzony przez posadzenie. Pierwsze pytanie pojawi się przy etapie 2.</div>`
       : frame===9
@@ -14145,7 +14160,7 @@ function setupAdmin() {
       const frame=gardenAutoFrame(own);
       const stats=gardenCheckStats(own,gardenPhaseSummary(own));
       box.textContent=`⏱️ Rośnie już: ${gardenFormatDuration(age)} · model: etap ${gardenDisplayStage(frame)}/10 · raporty ${stats.yes.length} Tak / ${stats.no.length} Nie`;
-      const nextStageRemaining=Math.max(0,(frame+1)*GARDEN_AUTO_STAGE_MS-age);
+      const nextStageRemaining=Math.max(0,(frame+1)*gardenAutoStageMs(own)-age);
       const phaseMinute=Math.floor(nextStageRemaining/60000);
       const phaseSignature=`${own.id}:${frame}:${stats.yes.length}:${stats.no.length}:${gardenNeedsModelCheck(own,gardenPhaseSummary(own))?1:0}:${gardenPendingPhase?.eventId||""}:${phaseMinute}`;
       if (phaseSignature!==gardenLastPhaseToolsSignature) {
