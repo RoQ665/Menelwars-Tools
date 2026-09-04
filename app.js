@@ -1085,103 +1085,18 @@ function mapRenderRouteResult() {
 
       const nonce = makeRecipeNonce();
 
-      if (cloudflareDistilleryEnabled()) {
-        criticalOperationStart(
-          "🔬 Rezerwuję recepturę…",
-          "Zapisuję rezerwację i czekam na potwierdzenie serwera."
-        );
-        const result=await cloudflareApi("/distillery/reservations",{
-          method:"POST",
-          token:await cloudflareEnsureSession(),
-          body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program}
-        });
-        if (result.ownerToken) saveReservationOwner(recipe,result.ownerToken,result.reservation);
-        showRecipeActionNotice(result.message||"✅ Receptura zarezerwowana na 24 godziny.","success");
-        achievementTrack(["distillery_reserve"]);
-        await fetchApprovedRecipes({force:true});
-        return;
-      }
-
-      let sendError = null;
-
       criticalOperationStart(
         "🔬 Rezerwuję recepturę…",
         "Zapisuję rezerwację i czekam na potwierdzenie serwera."
       );
-
-      try {
-        await timedBackendPost(
-          "reserveRecipe",
-          {
-            action:"reserveRecipe",
-            nonce,
-            nick:cleanNick,
-            baza:recipe.baza,
-            drozdze:recipe.drozdze,
-            woda:recipe.woda,
-            program:recipe.program,
-            ownerToken:
-              owner && owner.token
-                ? owner.token
-                : "",
-            sessionToken:
-              playerAccountSessionToken() || ""
-          }
-        );
-      } catch (err) {
-        // POST nie jest ponawiany. Sprawdzamy wynik pod tym samym nonce.
-        sendError = err;
-      }
-
-      let result = null;
-      for (let attempt=0; attempt<20; attempt++) {
-        if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve,650));
-        }
-
-        try {
-          result = await jsonp("reserveRecipeResult",{nonce});
-        } catch (err) {
-          if (attempt === 19 && !sendError) sendError = err;
-          continue;
-        }
-
-        if (result && !result.pending) break;
-      }
-
-      if (!result || result.pending) {
-        throw sendError || new Error(
-          "Serwer nie potwierdził rezerwacji receptury."
-        );
-      }
-
-      if (
-        !result ||
-        !result.ok
-      ) {
-        throw new Error(
-          result &&
-          result.error
-            ? result.error
-            : "Nie udało się zarezerwować receptury."
-        );
-      }
-
-      if (result.ownerToken) {
-        saveReservationOwner(
-          recipe,
-          result.ownerToken,
-          result.reservation
-        );
-      }
-
-      showRecipeActionNotice(
-        result.message ||
-        "✅ Receptura zarezerwowana na 24 godziny.",
-        "success"
-      );
+      const result=await cloudflareApi("/distillery/reservations",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program}
+      });
+      if (result.ownerToken) saveReservationOwner(recipe,result.ownerToken,result.reservation);
+      showRecipeActionNotice(result.message||"✅ Receptura zarezerwowana na 24 godziny.","success");
       achievementTrack(["distillery_reserve"]);
-
       await fetchApprovedRecipes({force:true});
 
     } catch (err) {
@@ -1279,100 +1194,14 @@ function mapRenderRouteResult() {
     );
 
     try {
-      let sendError = null;
-
-      if (cloudflareDistilleryEnabled()) {
-        const result=await cloudflareApi("/distillery/reservations/submit",{
-          method:"POST",
-          token:await cloudflareEnsureSession(),
-          body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program,litry}
-        });
-        if (!result||!result.ok) throw new Error(result&&result.error||"Nie udało się wysłać wyniku.");
-        showRecipeActionNotice("✅ Wynik został wysłany do weryfikacji.","success");
-        achievementTrack(["distillery_result"]);
-        await fetchApprovedRecipes({force:true});
-        return;
-      }
-
-      try {
-        await timedBackendPost(
-          "submitReservedRecipe",
-          {
-            action:
-              "submitReservedRecipe",
-            nonce,
-            ownerToken:
-              owner &&
-              owner.token
-                ? owner.token
-                : "",
-            sessionToken:
-              playerAccountSessionToken() || "",
-            baza:recipe.baza,
-            drozdze:recipe.drozdze,
-            woda:recipe.woda,
-            program:recipe.program,
-            litry
-          }
-        );
-      } catch (err) {
-        sendError = err;
-      }
-
-      let result = null;
-
-      for (
-        let attempt = 0;
-        attempt < 20;
-        attempt++
-      ) {
-        if (attempt > 0) {
-          await new Promise(
-            resolve =>
-              setTimeout(
-                resolve,
-                350
-              )
-          );
-        }
-
-        result =
-          await jsonp(
-            "reservedSubmitResult",
-            {nonce}
-          );
-
-        if (
-          result &&
-          !result.pending
-        ) {
-          break;
-        }
-      }
-
-      if (
-        !result ||
-        result.pending
-      ) {
-        throw sendError || new Error(
-          "Serwer nie zwrócił wyniku zapisu."
-        );
-      }
-
-      if (!result.ok) {
-        throw new Error(
-          result.error ||
-          "Nie udało się wysłać wyniku."
-        );
-      }
-
-      showRecipeActionNotice(
-        "✅ Wynik został wysłany do weryfikacji.",
-        "success"
-      );
+      const result=await cloudflareApi("/distillery/reservations/submit",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program,litry}
+      });
+      if (!result||!result.ok) throw new Error(result&&result.error||"Nie udało się wysłać wyniku.");
+      showRecipeActionNotice("✅ Wynik został wysłany do weryfikacji.","success");
       achievementTrack(["distillery_result"]);
-
-      // Tak jak w stabilnym v20: po zapisie pobieramy pełny stan.
       await fetchApprovedRecipes({force:true});
 
     } catch (err) {
@@ -2347,79 +2176,11 @@ function mapRenderRouteResult() {
     );
 
     try {
-      let sendError = null;
-
-      if (cloudflareDistilleryEnabled()) {
-        const result=await cloudflareApi("/distillery/submissions",{
-          method:"POST",
-          token:await cloudflareEnsureSession(),
-          body:{requestId:nonce,items:[{...payload,uwagi:payload.uwagi||"Ręczne zgłoszenie z MenelWars Tools."}]}
-        });
-        if (Number(result.insertedCount)>0) status.innerHTML="✅ Zgłoszenie wysłane do weryfikacji.";
-        else if (Number(result.skippedKnown)>0) status.innerHTML="✅ Ten sam wynik jest już potwierdzony w bazie.";
-        else if (Number(result.skippedPending)>0) status.innerHTML="ℹ️ Identyczne zgłoszenie już czeka na weryfikację.";
-        else status.innerHTML="✅ Zgłoszenie zostało sprawdzone przez serwer.";
-        el("submit-liters").value="";
-        el("submit-notes").value="";
-        if (Number(result.insertedCount)>0) achievementTrack(["distillery_result"]);
-        await fetchApprovedRecipes({force:true});
-        return;
-      }
-
-      try {
-        await timedBackendPost(
-          "submitRecipeBatch",
-          {
-            action:"submitRecipeBatch",
-            nonce,
-            nick,
-            sessionToken:playerAccountSessionToken() || "",
-            items:[{
-              ...payload,
-              uwagi:
-                payload.uwagi ||
-                "Ręczne zgłoszenie z MenelWars Tools."
-            }]
-          }
-        );
-      } catch (err) {
-        // Nie ponawiamy POST. Wynik jest sprawdzany po tym samym nonce.
-        sendError = err;
-      }
-
-      let result = null;
-
-      for (let attempt=0; attempt<20; attempt++) {
-        if (attempt > 0) {
-          await new Promise(resolve => setTimeout(resolve,650));
-        }
-
-        try {
-          result = await jsonp(
-            "recipeBatchImportResult",
-            {nonce}
-          );
-        } catch (err) {
-          if (attempt === 19 && !sendError) sendError = err;
-          continue;
-        }
-
-        if (result && !result.pending) break;
-      }
-
-      if (!result || result.pending) {
-        throw sendError || new Error(
-          "Serwer nie potwierdził zapisu receptury."
-        );
-      }
-
-      if (!result.ok) {
-        throw new Error(
-          result.error ||
-          "Nie udało się zapisać zgłoszenia."
-        );
-      }
-
+      const result=await cloudflareApi("/distillery/submissions",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{requestId:nonce,items:[{...payload,uwagi:payload.uwagi||"Ręczne zgłoszenie z MenelWars Tools."}]}
+      });
       if (Number(result.insertedCount) > 0) {
         status.innerHTML =
           "✅ Zgłoszenie wysłane do weryfikacji.";
@@ -2437,6 +2198,7 @@ function mapRenderRouteResult() {
       el("submit-liters").value = "";
       el("submit-notes").value = "";
       if (Number(result.insertedCount)>0) achievementTrack(["distillery_result"]);
+      await fetchApprovedRecipes({force:true});
 
     } catch (err) {
       status.textContent =
@@ -2738,58 +2500,11 @@ function mapRenderRouteResult() {
     );
 
     try {
-      let sendError = null;
-
-      if (cloudflareDistilleryEnabled()) {
-        const result=await cloudflareApi("/distillery/submissions",{
-          method:"POST",
-          token:await cloudflareEnsureSession(),
-          body:{requestId:nonce,items}
-        });
-        status.textContent=
-          `✅ Zapisano ${Number(result.insertedCount)||0} zgłoszeń do weryfikacji. `+
-          `Pominięto: ${Number(result.skippedKnown)||0} już znanych, `+
-          `${Number(result.skippedPending)||0} już oczekujących. `+
-          (Number(result.rejectedCount)?`Odrzucono ${Number(result.rejectedCount)} błędnych.`:"");
-        el("recipe-batch-text").value="";
-        recipeBatchPreviewRows=[];
-        renderRecipeBatchPreview();
-        if (Number(result.insertedCount)>0) achievementTrack(["distillery_import"]);
-        await fetchApprovedRecipes({force:true});
-        return;
-      }
-
-      try {
-        await timedBackendPost(
-          "submitRecipeBatch",
-          {
-            action:"submitRecipeBatch",
-            nonce,
-            nick,
-            sessionToken:playerAccountSessionToken() || "",
-            items
-          }
-        );
-      } catch (err) {
-        sendError = err;
-      }
-
-      let result = null;
-
-      for (let attempt=0; attempt<20; attempt++) {
-        if (attempt > 0) await new Promise(resolve => setTimeout(resolve,650));
-        result = await jsonp("recipeBatchImportResult",{nonce});
-        if (result && !result.pending) break;
-      }
-
-      if (!result || result.pending) {
-        throw sendError || new Error("Serwer nie zwrócił wyniku importu.");
-      }
-
-      if (!result.ok) {
-        throw new Error(result.error || "Nie udało się zapisać importu.");
-      }
-
+      const result=await cloudflareApi("/distillery/submissions",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{requestId:nonce,items}
+      });
       status.textContent =
         `✅ Zapisano ${Number(result.insertedCount)||0} zgłoszeń do weryfikacji. ` +
         `Pominięto: ${Number(result.skippedKnown)||0} już znanych, ` +
@@ -6519,95 +6234,6 @@ async function timedBackendPost(
 }
 
 
-async function waitForAdminMutationResult(
-  mutationAction,
-  requestId,
-  token,
-  options={}
-) {
-  const attempts =
-    Math.max(4,Number(options.attempts) || 28);
-
-  const intervalMs =
-    Math.max(300,Number(options.intervalMs) || 650);
-
-  let lastTransportError = null;
-
-  for (let attempt=0; attempt<attempts; attempt++) {
-    if (attempt > 0) {
-      await new Promise(resolve => setTimeout(resolve,intervalMs));
-    }
-
-    let payload = null;
-
-    try {
-      payload = await jsonp(
-        "adminMutationResult",
-        {
-          token,
-          mutationAction,
-          requestId
-        }
-      );
-    } catch (err) {
-      lastTransportError = err;
-      continue;
-    }
-
-    if (!payload) {
-      continue;
-    }
-
-    if (payload.ok === false) {
-      throw new Error(
-        payload.error ||
-        "Serwer odrzucił potwierdzenie operacji administratora."
-      );
-    }
-
-    if (payload.pending) {
-      continue;
-    }
-
-    const result =
-      payload.result && typeof payload.result === "object"
-        ? payload.result
-        : null;
-
-    if (!result) {
-      throw new Error(
-        "Serwer zwrócił nieprawidłowe potwierdzenie zapisu."
-      );
-    }
-
-    if (result.ok === false) {
-      const error = new Error(
-        result.error ||
-        "Operacja nie została wykonana."
-      );
-      error.result = result;
-      throw error;
-    }
-
-    return result;
-  }
-
-  if (lastTransportError) {
-    throw new Error(
-      `Nie udało się potwierdzić zapisu: ${
-        lastTransportError && lastTransportError.message
-          ? lastTransportError.message
-          : "błąd połączenia"
-      }`
-    );
-  }
-
-  throw new Error(
-    "Serwer nie potwierdził zapisu w wymaganym czasie. Nie ponawiaj operacji automatycznie — odśwież dane i sprawdź stan."
-  );
-}
-
-
 async function confirmedAdminMutationPost(
   action,
   body,
@@ -6621,88 +6247,34 @@ async function confirmedAdminMutationPost(
       makeRecipeNonce()
     ).trim();
 
-  const token =
-    String(
-      options.token ||
-      body.token ||
-      body.sessionToken ||
-      adminToken() ||
-      ""
-    );
-
-  const postBody = {
-    ...body,
-    requestId
-  };
-
-  if (cloudflareAccountAdminEnabled()) {
-    const nick=String(body.nick||"").trim();
-    const encodedNick=encodeURIComponent(nick);
-    if (action === "accountAdminSetPermission") {
-      return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
-        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"admin",enabled:Boolean(body.enabled)}
-      });
-    }
-    if (action === "accountAdminSetOfficer") {
-      return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
-        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"officer",enabled:Boolean(body.enabled)}
-      });
-    }
-    if (action === "accountAdminLogoutAll") {
-      return cloudflareApi(`/admin/accounts/${encodedNick}/logout-all`,{
-        method:"POST",token:await cloudflareEnsureSession(),body:{requestId}
-      });
-    }
-    if (action === "adminAddPlayer") {
-      return cloudflareApi("/admin/roster",{
-        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,nick}
-      });
-    }
-    if (action === "adminDeletePlayer") {
-      return cloudflareApi(`/admin/roster/${encodedNick}/delete`,{
-        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,confirmationNick:body.confirmationNick}
-      });
-    }
+  const nick=String(body.nick||"").trim();
+  const encodedNick=encodeURIComponent(nick);
+  if (action === "accountAdminSetPermission") {
+    return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"admin",enabled:Boolean(body.enabled)}
+    });
   }
-
-  let transportError = null;
-
-  try {
-    await timedBackendPost(
-      action,
-      postBody,
-      options
-    );
-  } catch (err) {
-    // POST mógł zostać wykonany po stronie Apps Script mimo zerwanego
-    // połączenia. Nie wysyłamy go ponownie — sprawdzamy dokładnie ten
-    // sam requestId w osobnym, bezpiecznym GET.
-    transportError = err;
+  if (action === "accountAdminSetOfficer") {
+    return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"officer",enabled:Boolean(body.enabled)}
+    });
   }
-
-  try {
-    return await waitForAdminMutationResult(
-      action,
-      requestId,
-      token,
-      options
-    );
-  } catch (confirmationError) {
-    if (
-      transportError &&
-      confirmationError &&
-      /nie potwierdził|nie udało się potwierdzić/i.test(
-        String(confirmationError.message || "")
-      )
-    ) {
-      throw new Error(
-        `${transportError.message || "Błąd wysyłania zapisu."} ` +
-        "Nie udało się również potwierdzić, czy serwer wykonał operację. Odśwież dane przed ponowną próbą."
-      );
-    }
-
-    throw confirmationError;
+  if (action === "accountAdminLogoutAll") {
+    return cloudflareApi(`/admin/accounts/${encodedNick}/logout-all`,{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId}
+    });
   }
+  if (action === "adminAddPlayer") {
+    return cloudflareApi("/admin/roster",{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId,nick}
+    });
+  }
+  if (action === "adminDeletePlayer") {
+    return cloudflareApi(`/admin/roster/${encodedNick}/delete`,{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId,confirmationNick:body.confirmationNick}
+    });
+  }
+  throw new Error("Ta operacja administratora nie jest obsługiwana.");
 }
 
 
@@ -6771,22 +6343,14 @@ async function adminPostAction(action, data={}) {
       adminRenamePlayer:[`/admin/roster/${encodeURIComponent(data.oldNick||"")}/rename`,{newNick:data.newNick}],
       adminGenerateSalaryClaimCode:[`/admin/accounts/${encodeURIComponent(data.nick||"")}/access-code`,{}]
     };
-    const cloudRoute=(cloudflareGangContentEnabled()&&gangContentRoutes[action]) ||
-      (cloudflareDistilleryEnabled()&&distilleryRoutes[action]) ||
-      (cloudflarePaymentsEnabled()&&financeRoutes[action]) ||
-      (cloudflareModuleAccessEnabled()&&accessRoutes[action]) ||
-      (cloudflareAccountAdminEnabled()&&rosterRoutes[action]);
-    const result = cloudRoute
-      ? await cloudflareApi(cloudRoute[0],{
-          method:"POST",token:await cloudflareEnsureSession(),body:{...cloudRoute[1],requestId:makeRecipeNonce()}
-        })
-      : await confirmedAdminMutationPost(
-          action,
-          {action,token,...data},
-          {token}
-        );
+    const cloudRoute=gangContentRoutes[action] || distilleryRoutes[action] ||
+      financeRoutes[action] || accessRoutes[action] || rosterRoutes[action];
+    if (!cloudRoute) throw new Error("Ta operacja administratora nie jest obsługiwana.");
+    const result = await cloudflareApi(cloudRoute[0],{
+      method:"POST",token:await cloudflareEnsureSession(),body:{...cloudRoute[1],requestId:makeRecipeNonce()}
+    });
 
-    if (cloudflareGangContentEnabled() && gangContentRoutes[action]) {
+    if (gangContentRoutes[action]) {
       gangGoalCache=null;
       gangGoalCacheAt=0;
       gangAnnouncementsCache=null;
@@ -8132,25 +7696,11 @@ async function setAdminSubmissionStatus(
 
   try {
 
-    if (cloudflareDistilleryEnabled()) {
-      await cloudflareApi(`/admin/distillery/submissions/${encodeURIComponent(row)}/status`,{
-        method:"POST",
-        token:await cloudflareEnsureSession(),
-        body:{requestId:makeRecipeNonce(),status:newStatus,correction:Boolean(correction)}
-      });
-    } else {
-      await confirmedAdminMutationPost(
-        "adminSetSubmissionStatus",
-        {
-          action:"adminSetSubmissionStatus",
-          token,
-          row,
-          status:newStatus,
-          correction:Boolean(correction)
-        },
-        {token}
-      );
-    }
+    await cloudflareApi(`/admin/distillery/submissions/${encodeURIComponent(row)}/status`,{
+      method:"POST",
+      token:await cloudflareEnsureSession(),
+      body:{requestId:makeRecipeNonce(),status:newStatus,correction:Boolean(correction)}
+    });
 
 
     // Backend v20.19 robi SpreadsheetApp.flush()
