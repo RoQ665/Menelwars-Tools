@@ -3674,10 +3674,10 @@ function mapRenderRouteResult() {
       </div>
 
       <div class="account-card notification-settings">
-        <b>🔔 Ważne ogłoszenia</b>
+        <b>🔔 Powiadomienia</b>
         <label style="margin-top:9px"><input id="account-notifications-enabled" type="checkbox" checked> Chcę otrzymywać powiadomienia</label>
         <button id="account-notifications-device" type="button" style="margin-top:9px">🔔 Aktywuj na tym urządzeniu</button>
-        <div id="account-notifications-note" class="account-note">Telefon poprosi jednorazowo o zgodę systemową.</div>
+        <div id="account-notifications-note" class="account-note">Ogłoszenia, Zapotrzebowanie, Ogród i Destylarnia. Telefon poprosi jednorazowo o zgodę systemową.</div>
       </div>
 
       <div id="account-change-panel" class="account-card" style="margin-top:10px" hidden>
@@ -5250,7 +5250,7 @@ const goal = payload && payload.goal;
           if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64Bytes(payload.notifications.publicKey)});
           await cloudflareApi("/notifications/subscription",{method:"POST",token:await cloudflareEnsureSession(),body:subscription.toJSON()});
           toggle.checked=true;await cloudflareApi("/notifications/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{enabled:true}});
-          button.textContent="✅ Powiadomienia aktywne na tym urządzeniu";if(note)note.textContent="Ważne ogłoszenia będą przychodziły na ten telefon.";
+          button.textContent="✅ Powiadomienia aktywne na tym urządzeniu";if(note)note.textContent="Ogłoszenia i osobiste przypomnienia będą przychodziły na ten telefon.";
         }catch(error){if(note)note.textContent=error.message||"Nie udało się aktywować powiadomień.";}finally{button.disabled=false;}
       };
     }catch(error){if(note)note.textContent=error.message||"Nie udało się pobrać ustawień.";}
@@ -7056,6 +7056,7 @@ let gangDemandBlockedIdsGlobal = new Set();
 let gangDemandAdminGlobal = false;
 let gangDemandCatalogCacheGlobal = null;
 let gangDemandSearchFrameGlobal = 0;
+let gangDemandFilterGlobal = "active";
 
 function gangDemandCatalogAllGlobal() {
   if (gangDemandCatalogCacheGlobal) return gangDemandCatalogCacheGlobal;
@@ -7096,7 +7097,7 @@ function renderGangDemandChoicesGlobal(query) {
       Number(gangDemandBlockedIdsGlobal.has(b.id)) ||
     a.name.localeCompare(b.name,"pl")
   );
-  const matches=(needle ? catalog.filter(item=>item.searchText.includes(needle)) : catalog).slice(0,40);
+  const matches=needle ? catalog.filter(item=>item.searchText.includes(needle)) : catalog;
   box.hidden=!matches.length;
   box.innerHTML=matches.length ? `${!needle?'<div class="gang-demand-list-hint">Wybierz z listy lub wpisz nazwę, aby ją zawęzić. Admin widzi wykluczone przedmioty na dole listy.</div>':''}${matches.map(item=>{
     const isBlocked=gangDemandBlockedIdsGlobal.has(item.id);
@@ -7164,14 +7165,26 @@ function syncGangDemandAdminFromAccountGlobal(token) {
 function renderGangDemandGlobal(payload) {
   const box=el("gang-demand-list");
   if (!box) return;
-  const entries=Array.isArray(payload&&payload.entries) ? payload.entries : [];
-  box.innerHTML=entries.length ? entries.map(entry=>{
-    const item=gangDemandItemGlobal(entry.itemId);
-    const action=entry.canClose ? `<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete?"🗑 Usuń":"✅ Załatwione"}</button>` : "";
-    const blocked=gangDemandBlockedIdsGlobal.has(Number(entry.itemId)) ? '<span class="gang-demand-card-meta">🚫 Przedmiot oznaczony jako niewymienialny</span>' : "";
-    return `<article class="gang-demand-card">${gangDemandIconGlobal(item)}<div class="gang-demand-card-main"><strong>${escapeHtml(item.name)} × ${Math.max(1,Number(entry.amount)||1)}</strong><span class="gang-demand-card-meta">${escapeHtml(entry.nick||"Członek Gangu")} · ${escapeHtml(gangAnnouncementDate(entry.createdAt))}</span>${blocked}${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}</div>${action}</article>`;
-  }).join("") : '<div class="empty">📦 Brak aktywnego zapotrzebowania. Dodaj pierwszy przedmiot, którego szukasz.</div>';
+  const all=Array.isArray(payload&&payload.entries) ? payload.entries : [];
+  const entries=all.filter(entry=>gangDemandFilterGlobal==="completed"?entry.completed:gangDemandFilterGlobal==="mine"?!entry.completed&&(entry.isOwner||(entry.offers||[]).some(offer=>offer.isMine)):!entry.completed);
+  const groups=new Map();
+  for(const entry of entries){const key=String(entry.itemId),list=groups.get(key)||[];list.push(entry);groups.set(key,list);}
+  box.innerHTML=groups.size?[...groups.entries()].map(([itemId,requests])=>{
+    const item=gangDemandItemGlobal(itemId);
+    const total=requests.reduce((sum,entry)=>sum+Math.max(1,Number(entry.amount)||1),0);
+    const offered=requests.reduce((sum,entry)=>sum+(entry.offers||[]).filter(offer=>!offer.withdrawn).reduce((part,offer)=>part+Number(offer.amount||0),0),0);
+    return `<section class="gang-demand-group"><div class="gang-demand-group-head">${gangDemandIconGlobal(item)}<div class="gang-demand-group-head-main"><strong>${escapeHtml(item.name)}</strong><small>${requests.length} ${requests.length===1?"osoba potrzebuje":"osoby potrzebują"} · łącznie ${total} szt.${!requests.every(entry=>entry.completed)?` · zadeklarowano ${Math.min(total,offered)}`:""}</small></div></div><div class="gang-demand-requests">${requests.map(entry=>{
+      const amount=Math.max(1,Number(entry.amount)||1),offers=Array.isArray(entry.offers)?entry.offers:[],activeOffers=offers.filter(offer=>!offer.withdrawn),given=activeOffers.reduce((sum,offer)=>sum+Number(offer.amount||0),0),percent=Math.min(100,Math.round(given/amount*100));
+      const blocked=gangDemandBlockedIdsGlobal.has(Number(entry.itemId))?'<span class="gang-demand-card-meta">🚫 Przedmiot oznaczony jako niewymienialny</span>':"";
+      const offerButton=!entry.completed&&!entry.isOwner&&given<amount?`<button type="button" class="gang-demand-offer" data-gang-demand-offer="${escapeHtml(entry.id)}" data-demand-remaining="${amount-given}">🤝 Mogę przekazać</button>`:"";
+      const closeButton=entry.canClose&&!entry.completed?`<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete?"🗑 Usuń":"✅ Załatwione"}</button>`:"";
+      const offerChips=offers.length?`<div class="gang-demand-offers">${offers.map(offer=>`<span class="gang-demand-offer-chip${offer.withdrawn?" withdrawn":""}">${escapeHtml(offer.nick)}: ${Number(offer.amount)||0}${offer.canWithdraw&&!offer.withdrawn?` <button type="button" data-demand-offer-withdraw="${escapeHtml(offer.id)}" title="Wycofaj deklarację">×</button>`:""}</span>`).join("")}</div>`:"";
+      return `<article id="demand-${escapeHtml(entry.id)}" class="gang-demand-card${entry.priority==="urgent"?" urgent":""}"><div class="gang-demand-card-main"><strong>${escapeHtml(entry.nick||"Członek Gangu")} potrzebuje ${amount} szt. ${entry.priority==="urgent"?'<span class="gang-demand-urgent">🔥 Pilne</span>':""}</strong><span class="gang-demand-card-meta">${escapeHtml(gangAnnouncementDate(entry.createdAt))}${entry.completed?" · ✅ Zrealizowane":""}</span>${blocked}${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}${!entry.completed?`<div class="gang-demand-progress" title="Zadeklarowano ${given} z ${amount}"><span style="width:${percent}%"></span></div><span class="gang-demand-card-meta">Zadeklarowano ${Math.min(amount,given)} z ${amount}</span>`:""}${offerChips}</div><div class="gang-demand-actions">${offerButton}${closeButton}</div></article>`;
+    }).join("")}</div></section>`;
+  }).join(""):'<div class="empty">📦 Brak wpisów w tym widoku.</div>';
   box.querySelectorAll("[data-gang-demand-close]").forEach(button=>button.addEventListener("click",()=>gangDemandCloseGlobal(button.dataset.gangDemandClose,button.textContent.includes("Usuń"))));
+  box.querySelectorAll("[data-gang-demand-offer]").forEach(button=>button.addEventListener("click",()=>gangDemandOfferGlobal(button.dataset.gangDemandOffer,Number(button.dataset.demandRemaining)||1)));
+  box.querySelectorAll("[data-demand-offer-withdraw]").forEach(button=>button.addEventListener("click",()=>gangDemandOfferWithdrawGlobal(button.dataset.demandOfferWithdraw)));
 }
 
 async function loadGangDemandGlobal(options={}) {
@@ -7247,6 +7260,91 @@ async function gangDemandCloseGlobal(id,isDelete) {
   catch(err) { if (status) status.textContent="❌ "+(err.message||"Nie udało się zmienić wpisu."); }
 }
 
+async function gangDemandOfferGlobal(id,remaining) {
+  const status=el("gang-demand-status");
+  const raw=window.prompt(`Ile sztuk możesz przekazać? (pozostało ${remaining})`,String(Math.min(1,remaining)));
+  if(raw===null)return;
+  const amount=Math.floor(Number(raw));
+  if(!Number.isFinite(amount)||amount<1){if(status)status.textContent="⚠️ Podaj ilość większą od zera.";return;}
+  if(status)status.textContent="⏳ Zapisuję deklarację…";
+  try{
+    const result=await cloudflareApi(`/gang/demands/${encodeURIComponent(id)}/offers`,{method:"POST",token:await cloudflareEnsureSession(),body:{amount,requestId:makeRecipeNonce()}});
+    gangDemandCacheGlobal=null;
+    if(status)status.textContent=result.complete?"✅ Zadeklarowano ostatnie brakujące sztuki.":`✅ Zadeklarowano ${result.amount} szt.`;
+    await loadGangDemandGlobal({force:true});
+  }catch(err){if(status)status.textContent="❌ "+(err.message||"Nie udało się zapisać deklaracji.");}
+}
+
+async function gangDemandOfferWithdrawGlobal(id) {
+  const status=el("gang-demand-status");
+  if(status)status.textContent="⏳ Wycofuję deklarację…";
+  try{
+    await cloudflareApi(`/gang/demand-offers/${encodeURIComponent(id)}/withdraw`,{method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce()}});
+    gangDemandCacheGlobal=null;
+    if(status)status.textContent="✅ Deklaracja została wycofana.";
+    await loadGangDemandGlobal({force:true});
+  }catch(err){if(status)status.textContent="❌ "+(err.message||"Nie udało się wycofać deklaracji.");}
+}
+
+async function markDemandNotificationReadGlobal(id){
+  if(!id)return;
+  await cloudflareApi(`/gang/demand-notifications/${encodeURIComponent(id)}/read`,{method:"POST",token:await cloudflareEnsureSession(),body:{}});
+}
+
+function showDemandNotificationGlobal(notification){
+  if(!notification||document.querySelector(".gang-demand-toast"))return;
+  const toast=document.createElement("aside");toast.className="gang-demand-toast";
+  toast.innerHTML=`<strong>${notification.kind==="complete"?"✅ Zapotrzebowanie skompletowane":"🤝 Nowa deklaracja"}</strong><span>${escapeHtml(notification.text)}</span><div class="gang-demand-toast-actions"><button type="button" data-demand-toast-close>Zamknij</button><button type="button" class="primary-btn" data-demand-toast-open>Otwórz</button></div>`;
+  document.body.appendChild(toast);
+  const finish=async open=>{toast.remove();try{await markDemandNotificationReadGlobal(notification.id);}catch{}if(open){await openGangModule("demand-view",{forceRefresh:true});const target=document.getElementById(`demand-${notification.demandId}`);target?.scrollIntoView({behavior:"smooth",block:"center"});}};
+  toast.querySelector("[data-demand-toast-close]")?.addEventListener("click",()=>finish(false));
+  toast.querySelector("[data-demand-toast-open]")?.addEventListener("click",()=>finish(true));
+}
+
+async function checkDemandNotificationsGlobal(){
+  if(!playerAccountSessionToken())return;
+  try{
+    const payload=await cloudflareApi("/gang/demands",{token:await cloudflareEnsureSession()});
+    if(!payload||!payload.ok)return;
+    gangDemandCacheGlobal=payload;
+    const params=new URL(location.href).searchParams,requested=params.get("demand"),notificationId=params.get("demandNotification");
+    if(requested){if(notificationId)await markDemandNotificationReadGlobal(notificationId);history.replaceState(null,"",location.pathname+location.hash);await openGangModule("demand-view",{forceRefresh:true});setTimeout(()=>document.getElementById(`demand-${requested}`)?.scrollIntoView({behavior:"smooth",block:"center"}),100);return;}
+    const pending=Array.isArray(payload.notifications)?payload.notifications[0]:null;
+    if(pending)showDemandNotificationGlobal(pending);
+  }catch{}
+}
+
+async function markActivityNotificationReadGlobal(id){
+  if(!id)return;
+  await cloudflareApi(`/notifications/${encodeURIComponent(id)}/read`,{method:"POST",token:await cloudflareEnsureSession(),body:{}});
+}
+
+async function openActivityNotificationTargetGlobal(kind){
+  if(kind==="garden_ready"){await openGardenModule();return;}
+  if(kind==="distillery_expiring"){await openDistilleryModule("optimizer-view",{forceRefresh:true});}
+}
+
+function showActivityNotificationGlobal(notification){
+  if(!notification||document.querySelector(".gang-demand-toast"))return;
+  const garden=notification.kind==="garden_ready",toast=document.createElement("aside");toast.className="gang-demand-toast";
+  toast.innerHTML=`<strong>${garden?"🌱 Sprawdź Ogród":"⚗️ Rezerwacja niedługo wygaśnie"}</strong><span>${escapeHtml(notification.text)}</span><div class="gang-demand-toast-actions"><button type="button" data-activity-toast-close>Zamknij</button><button type="button" class="primary-btn" data-activity-toast-open>Otwórz</button></div>`;
+  document.body.appendChild(toast);
+  const finish=async open=>{toast.remove();try{await markActivityNotificationReadGlobal(notification.id);}catch{}if(open)await openActivityNotificationTargetGlobal(notification.kind);};
+  toast.querySelector("[data-activity-toast-close]")?.addEventListener("click",()=>finish(false));
+  toast.querySelector("[data-activity-toast-open]")?.addEventListener("click",()=>finish(true));
+}
+
+async function checkActivityNotificationsGlobal(){
+  if(!playerAccountSessionToken())return;
+  try{
+    const params=new URL(location.href).searchParams,activity=params.get("activity"),notificationId=params.get("notification");
+    if(activity){if(notificationId)await markActivityNotificationReadGlobal(notificationId);history.replaceState(null,"",location.pathname+location.hash);await openActivityNotificationTargetGlobal(activity==="garden"?"garden_ready":"distillery_expiring");return;}
+    const payload=await cloudflareApi("/notifications/pending",{token:await cloudflareEnsureSession()});
+    const pending=payload&&Array.isArray(payload.notifications)?payload.notifications[0]:null;
+    if(pending)showActivityNotificationGlobal(pending);
+  }catch{}
+}
+
 async function gangDemandSetTradableGlobal(itemId,blocked) {
   const status=el("gang-demand-status"),item=gangDemandItemGlobal(itemId);
   if (!gangDemandAdminGlobal || !itemId) return;
@@ -7286,13 +7384,18 @@ function setupGangDemand() {
     gangDemandSearchFrameGlobal=requestAnimationFrame(()=>renderGangDemandChoicesGlobal(search.value));
   });
   search?.addEventListener("focus",()=>renderGangDemandChoicesGlobal(search.value));
+  document.querySelectorAll("[data-demand-filter]").forEach(button=>button.addEventListener("click",()=>{
+    gangDemandFilterGlobal=button.dataset.demandFilter||"active";
+    document.querySelectorAll("[data-demand-filter]").forEach(other=>other.classList.toggle("active",other===button));
+    renderGangDemandGlobal(gangDemandCacheGlobal||{entries:[]});
+  }));
   form?.addEventListener("submit",async event=>{
     event.preventDefault();
     const status=el("gang-demand-status"),itemId=Number(el("gang-demand-item-id").value),selected=gangDemandItemGlobal(itemId);
     if (!itemId||selected.id!==itemId||el("gang-demand-search").value!==selected.name) { if (status) status.textContent="⚠️ Wybierz przedmiot z listy."; return; }
     if (status) status.textContent="⏳ Dodaję zapotrzebowanie…";
     try {
-      const demandData={itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value};
+      const demandData={itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value,priority:el("gang-demand-priority")?.checked?"urgent":"normal"};
       await cloudflareApi("/gang/demands",{
         method:"POST",token:await cloudflareEnsureSession(),body:{...demandData,requestId:makeRecipeNonce()}
       });
@@ -14156,6 +14259,10 @@ function setupAdmin() {
     // wywołać blur/change, bierzemy dokładnie wartości widoczne w polach.
     gardenCommitAllManualInputs();
     const combo = gardenCurrentControls();
+    const growthPrediction=gardenKernelPrediction(combo);
+    const estimatedDurationMs=growthPrediction&&Number.isFinite(Number(growthPrediction.predictedMs))
+      ? Number(growthPrediction.predictedMs)
+      : GARDEN_AUTO_MODEL_HOURS*60*60*1000;
     // Nowe badania startują wyłącznie od czasu potwierdzonego przez backend.
     // Dzięki temu porównanie automatycznych etapów nie zależy od ręcznej daty.
     const timing = {startMode:"now"};
@@ -14169,6 +14276,7 @@ function setupAdmin() {
       nick,
       ...timing,
       modelVersion:GARDEN_AUTO_MODEL_VERSION,
+      estimatedDurationMs,
       sessionToken:playerAccountSessionToken() || "",
       forceDuplicate:forceDuplicate ? "1" : "0"
     });
@@ -16473,7 +16581,7 @@ function setupAdmin() {
           }
           statusPromise.then(result=>{
             updateHomeAccountState(result);
-            if(result) void checkImportantAnnouncement();
+            if(result){void checkImportantAnnouncement();void checkDemandNotificationsGlobal();void checkActivityNotificationsGlobal();}
           }).catch(()=>updateHomeAccountState(null));
           return;
         }
@@ -16487,7 +16595,7 @@ function setupAdmin() {
     }
 
     updateHomeAccountState(account);
-    if(account) void checkImportantAnnouncement();
+    if(account){void checkImportantAnnouncement();void checkDemandNotificationsGlobal();void checkActivityNotificationsGlobal();}
   }
 
 
