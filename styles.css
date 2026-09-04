@@ -3082,6 +3082,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .garden-race-explainer{margin-bottom:9px}
 
 .garden-race-list{display:grid;gap:7px}
+.garden-selected-seedling{margin:0 0 8px;color:#5f4a2f}
 .garden-result-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 9px}
 .garden-result-tab{border:1px solid #ccb998;border-radius:999px;padding:6px 10px;background:#f3ead8;color:#4c3a28;font:inherit;font-size:.8rem;font-weight:800;cursor:pointer}
 .garden-result-tab.active{border-color:#8a6135;background:#765632;color:#fff}

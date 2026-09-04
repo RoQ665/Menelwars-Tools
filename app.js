@@ -12787,6 +12787,7 @@ function setupAdmin() {
   let gardenEasterWaterSequence = [];
   let gardenEasterWaterStartedAt = 0;
   let gardenControlRenderTimer = null;
+  let gardenDraftPlant = "Cebula";
   const GARDEN_AUTO_MODEL_VERSION = "AUTO52";
   const GARDEN_AUTO_MODEL_HOURS = 52;
   const GARDEN_OPTIMAL_LIMIT_MS = 56 * 60 * 60 * 1000;
@@ -13827,7 +13828,8 @@ function setupAdmin() {
       const currentPlant=String(gardenCurrentControls().plant||"").trim();
       gardenResultsSelectedPlant=plants.includes(currentPlant) ? currentPlant : plants[0];
     }
-    const tabs=`<div class="garden-result-tabs" role="tablist" aria-label="Roślina wyników">${plants.map(plant=>`<button type="button" class="garden-result-tab ${plant===gardenResultsSelectedPlant?"active":""}" data-garden-result-plant="${escapeHtml(plant)}" aria-pressed="${plant===gardenResultsSelectedPlant}">${escapeHtml(plant)}</button>`).join("")}</div>`;
+    const selectedSeedling=String(gardenCurrentControls().plant||gardenDraftPlant||"Cebula");
+    const tabs=`<div class="garden-selected-seedling">🌱 Wybrana sadzonka: <b>${escapeHtml(selectedSeedling)}</b></div><div class="garden-result-tabs" role="tablist" aria-label="Roślina wyników">${plants.map(plant=>`<button type="button" class="garden-result-tab ${plant===gardenResultsSelectedPlant?"active":""}" data-garden-result-plant="${escapeHtml(plant)}" aria-pressed="${plant===gardenResultsSelectedPlant}">${escapeHtml(plant)}</button>`).join("")}</div>`;
     const groups=new Map();
     (gardenData.results||[]).filter(item=>String(item&&item.plant||"")===gardenResultsSelectedPlant).forEach(item=>{
       if (!item || !Number.isFinite(Number(item.durationMs)) || Number(item.durationMs)<=0) return;
@@ -14136,6 +14138,11 @@ function setupAdmin() {
       el("garden-water").value = String(own.water);
       el("garden-ph").value = Number(own.ph).toFixed(1);
       gardenSyncAllManualInputs();
+    } else {
+      const plantSelect=el("garden-plant");
+      if (plantSelect && [...plantSelect.options].some(option=>option.value===gardenDraftPlant)) {
+        plantSelect.value=gardenDraftPlant;
+      }
     }
 
     el("garden-start").hidden = Boolean(own);
@@ -14500,8 +14507,17 @@ function setupAdmin() {
       });
     });
 
-    el("garden-plant")?.addEventListener("input",gardenRenderEditor);
-    el("garden-plant")?.addEventListener("change",gardenRenderEditor);
+    const rememberGardenPlant=()=>{
+      const plant=String(el("garden-plant")?.value||"").trim();
+      if (plant) {
+        gardenDraftPlant=plant;
+        gardenResultsSelectedPlant=plant;
+      }
+      gardenRenderEditor();
+      gardenRenderRace();
+    };
+    el("garden-plant")?.addEventListener("input",rememberGardenPlant);
+    el("garden-plant")?.addEventListener("change",rememberGardenPlant);
 
     [el("garden-start-now"),el("garden-start-earlier")].forEach(radio => {
       radio?.addEventListener("change",()=>{
