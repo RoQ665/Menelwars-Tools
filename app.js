@@ -4077,6 +4077,8 @@ async function loadAccountAdminPermissions(
                       ${player.accountActive ? "aktywne" : "nieaktywne"}
                       · Sesje:
                       ${Number(player.sessions) || 0}
+                      <br>Ostatnia aktywność:
+                      ${player.lastActivity ? escapeHtml(formatPaymentsDateTime(new Date(Number(player.lastActivity)).toISOString())) : "nigdy"}
                     </small>
                   </div>
 
