@@ -4116,7 +4116,7 @@ function mapRenderRouteResult() {
             method:"POST",token,body:{legacySessionToken,requestId:makeRecipeNonce()}
           });
       if (!playerAccountSessionIsCurrent(legacySessionToken,sessionEpoch)) return {};
-      const unlocked=result&&result.unlocked||{};
+      const unlocked=result&&(result.achievements||result.unlocked)||{};
       cloudflareAchievementCache=unlocked;
       cloudflareAchievementCacheAt=Date.now();
       cloudflareAchievementCacheToken=legacySessionToken;
