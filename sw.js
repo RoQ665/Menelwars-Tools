@@ -1,16 +1,16 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v22.30";
+const CACHE = "menelwars-tools-v22.31";
 // Jednorazowa naprawa bardzo starych instalacji PWA, które nie pokazały
 // banera aktualizacji i nadal serwują app.js v21.58.
 const FORCE_LEGACY_RECOVERY = false;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=22.30",
+  "./styles.css?v=22.31",
   "./data.js?v=21.05",
-  "./app.js?v=22.30",
-  "./item-catalog.js?v=22.30",
+  "./app.js?v=22.31",
+  "./item-catalog.js?v=22.31",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
@@ -123,4 +123,24 @@ self.addEventListener("fetch",event => {
       ? networkFirst(request)
       : cacheFirst(request)
   );
+});
+
+self.addEventListener("push",event=>{
+  let data={};
+  try{data=event.data?event.data.json():{};}catch{data={body:event.data?event.data.text():""};}
+  event.waitUntil(self.registration.showNotification(data.title||"Ważne ogłoszenie",{
+    body:data.body||"W aplikacji pojawiło się ważne ogłoszenie.",icon:"./icon-192.png",badge:"./icon-192.png",
+    tag:data.announcementId?`announcement-${data.announcementId}`:"announcement",
+    data:{url:data.url||"./?announcement=latest",announcementId:data.announcementId||""}
+  }));
+});
+
+self.addEventListener("notificationclick",event=>{
+  event.notification.close();
+  const target=new URL(event.notification.data&&event.notification.data.url||"./?announcement=latest",self.registration.scope).href;
+  event.waitUntil((async()=>{
+    const windows=await self.clients.matchAll({type:"window",includeUncontrolled:true});
+    if(windows.length){await windows[0].navigate(target);return windows[0].focus();}
+    return self.clients.openWindow(target);
+  })());
 });

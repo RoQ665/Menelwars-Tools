@@ -2972,7 +2972,7 @@ function mapRenderRouteResult() {
           <div class="finance-name">${escapeHtml(player.nick)}</div>
           <div class="finance-meta"><span>${status}</span></div>
           <div class="finance-meta ai-dump-payment ${aiSaldo < 0 ? "debt" : aiSaldo > 0 ? "credit" : "zero"}">
-            <span>🤖 Wysypisko AI: ${aiSaldo < 0 ? "Dług" : aiSaldo > 0 ? "Nadpłata" : "Saldo 0"}</span>
+            <span>♻️ Wysypisko All Inclusive: ${aiSaldo < 0 ? "Dług" : aiSaldo > 0 ? "Nadpłata" : "Saldo 0"}</span>
             <strong>${aiSaldo > 0 ? "+" : ""}${formatSaldo(aiSaldo)} pkt</strong>
           </div>
           <div class="ai-dump-access ${aiSaldo >= 0 ? "allowed" : "blocked"}">
@@ -3673,6 +3673,13 @@ function mapRenderRouteResult() {
         ${account.admin ? `<div class="account-admin-link"><button id="account-admin-open" class="primary-btn" type="button">🛠 Panel administratora</button></div>` : ""}
       </div>
 
+      <div class="account-card notification-settings">
+        <b>🔔 Ważne ogłoszenia</b>
+        <label style="margin-top:9px"><input id="account-notifications-enabled" type="checkbox" checked> Chcę otrzymywać powiadomienia</label>
+        <button id="account-notifications-device" type="button" style="margin-top:9px">🔔 Aktywuj na tym urządzeniu</button>
+        <div id="account-notifications-note" class="account-note">Telefon poprosi jednorazowo o zgodę systemową.</div>
+      </div>
+
       <div id="account-change-panel" class="account-card" style="margin-top:10px" hidden>
         <b>🔑 Zmiana hasła</b>
         <div class="account-form" style="margin-top:8px">
@@ -3684,6 +3691,9 @@ function mapRenderRouteResult() {
       </div>
       ${achievementsHtml(account.achievements || {},expandedAchievementCategories)}
     `;
+
+    void configureNotificationControls();
+    void checkImportantAnnouncement();
 
     if (achievementSyncError) {
       status.textContent=`⚠️ Nie udało się odświeżyć osiągnięć z Cloudflare: ${achievementSyncError.message||"błąd połączenia"}. Pokazuję ostatnie dostępne dane.`;
@@ -4794,7 +4804,7 @@ async function loadAccountAdminPermissions(
                     Wpłaty ${money(player.paymentsContribution)}
                     · Fundusz ${money(player.fundGiven)}
                     · Bonus ${money(player.fundBonus)}
-                    · 🤖 AI ${money(player.aiDumpContribution)}
+                    · ♻️ All Inclusive ${money(player.aiDumpContribution)}
                   </div>
 
                   <div class="finance-meta company-salary-line">
@@ -5174,6 +5184,75 @@ const goal = payload && payload.goal;
         paymentsLoadInFlight = null;
       }
     }
+  }
+
+  function urlBase64Bytes(value) {
+    const padded=String(value||"").replace(/-/g,"+").replace(/_/g,"/").padEnd(Math.ceil(String(value||"").length/4)*4,"=");
+    const raw=atob(padded);return Uint8Array.from(raw,char=>char.charCodeAt(0));
+  }
+
+  async function markAnnouncementRead(id) {
+    if(!id)return;
+    await cloudflareApi(`/gang/announcements/${encodeURIComponent(id)}/read`,{method:"POST",token:await cloudflareEnsureSession(),body:{}});
+    gangAnnouncementsCache=null;gangAnnouncementsCacheAt=0;
+  }
+
+  function showImportantAnnouncementPopup(item) {
+    if(!item||document.querySelector(".announcement-popup-backdrop"))return;
+    const backdrop=document.createElement("div");backdrop.className="announcement-popup-backdrop";
+    backdrop.innerHTML=`<section class="announcement-popup" role="dialog" aria-modal="true" aria-labelledby="important-announcement-title">
+      <h2 id="important-announcement-title">📌 Ważne ogłoszenie</h2>
+      <div class="announcement-popup-body">${escapeHtml(item.text)}</div>
+      <div class="announcement-popup-actions"><button type="button" class="primary-btn" data-announcement-close>Rozumiem</button></div>
+    </section>`;
+    document.body.appendChild(backdrop);
+    backdrop.querySelector("[data-announcement-close]")?.addEventListener("click",async()=>{
+      backdrop.remove();try{await markAnnouncementRead(item.id);}catch{}
+    });
+  }
+
+  async function checkImportantAnnouncement() {
+    if(!playerAccountSessionToken())return;
+    try{
+      const payload=await cloudflareApi("/gang/announcements",{token:await cloudflareEnsureSession()});
+      if(!payload||!payload.ok)return;
+      gangAnnouncementsCache=payload;gangAnnouncementsCacheAt=Date.now();
+      const requested=new URL(location.href).searchParams.get("announcement");
+      if(requested){
+        const item=requested==="latest"?(payload.announcements||[]).find(entry=>entry.important):(payload.announcements||[]).find(entry=>entry.id===requested);
+        if(item)await markAnnouncementRead(item.id);
+        history.replaceState(null,"",location.pathname+location.hash);
+        showToolView("announcements-view","gang");
+        await loadGangAnnouncements({force:true});
+        return;
+      }
+      if(payload.pendingImportant)showImportantAnnouncementPopup(payload.pendingImportant);
+    }catch{}
+  }
+
+  async function configureNotificationControls() {
+    const toggle=el("account-notifications-enabled"),button=el("account-notifications-device"),note=el("account-notifications-note");
+    if(!toggle||!button)return;
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)||!("Notification" in window)){
+      toggle.disabled=true;button.disabled=true;if(note)note.textContent="To urządzenie nie obsługuje powiadomień aplikacji.";return;
+    }
+    try{
+      const payload=await cloudflareApi("/gang/announcements",{token:await cloudflareEnsureSession()});
+      toggle.checked=payload.notifications?.enabled!==false;
+      button.textContent=payload.notifications?.subscribed&&Notification.permission==="granted"?"✅ Powiadomienia aktywne na tym urządzeniu":"🔔 Aktywuj na tym urządzeniu";
+      toggle.onchange=async()=>{await cloudflareApi("/notifications/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{enabled:toggle.checked}});if(note)note.textContent=toggle.checked?"Powiadomienia są dozwolone na koncie.":"Powiadomienia zostały wyłączone na koncie.";};
+      button.onclick=async()=>{
+        button.disabled=true;try{
+          const permission=await Notification.requestPermission();if(permission!=="granted")throw new Error("Telefon nie udzielił zgody na powiadomienia.");
+          const registration=await navigator.serviceWorker.ready;
+          let subscription=await registration.pushManager.getSubscription();
+          if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64Bytes(payload.notifications.publicKey)});
+          await cloudflareApi("/notifications/subscription",{method:"POST",token:await cloudflareEnsureSession(),body:subscription.toJSON()});
+          toggle.checked=true;await cloudflareApi("/notifications/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{enabled:true}});
+          button.textContent="✅ Powiadomienia aktywne na tym urządzeniu";if(note)note.textContent="Ważne ogłoszenia będą przychodziły na ten telefon.";
+        }catch(error){if(note)note.textContent=error.message||"Nie udało się aktywować powiadomień.";}finally{button.disabled=false;}
+      };
+    }catch(error){if(note)note.textContent=error.message||"Nie udało się pobrać ustawień.";}
   }
 
   function setupPayments() {
@@ -5933,13 +6012,6 @@ function renderAdminGangTools(payload) {
               <div class="admin-actions-row">
                 <button
                   type="button"
-                  data-toggle-important="${escapeHtml(item.id)}"
-                  data-important="${item.important ? "1" : "0"}">
-                  ${item.important ? "📌 Odepnij" : "📌 Oznacz Ważne"}
-                </button>
-
-                <button
-                  type="button"
                   data-delete-announcement="${escapeHtml(item.id)}">
                   🗑 Usuń
                 </button>
@@ -5947,46 +6019,6 @@ function renderAdminGangTools(payload) {
             </div>
           `).join("")
         : `<div class="empty">Brak ogłoszeń.</div>`;
-
-    announcementsBox
-      .querySelectorAll("[data-toggle-important]")
-      .forEach(button => {
-        button.onclick = async () => {
-          const important =
-            button.dataset.important !== "1";
-
-          button.disabled = true;
-
-          try {
-            adminLoaderTexts(
-              "announcement"
-            );
-
-            await adminPostAction(
-              "adminSetAnnouncementImportant",
-              {
-                id:button.dataset.toggleImportant,
-                important
-              }
-            );
-            await Promise.allSettled([
-              loadAdminGangTools(),
-              loadPayments({background:true})
-            ]);
-
-            await runtimeLoaderFinish(
-              "✅ Ogłoszenie zaktualizowane"
-            );
-          } catch (err) {
-            el("admin-gang-tools-status").textContent =
-              err.message || "Nie udało się zmienić przypięcia.";
-
-            await runtimeLoaderFinish(
-              "❌ Aktualizacja nieudana"
-            );
-          }
-        };
-      });
 
     announcementsBox
       .querySelectorAll("[data-delete-announcement]")
@@ -8810,7 +8842,7 @@ function renderAdminAiDumpPreview(payload) {
   const errors=Array.isArray(payload&&payload.errors)?payload.errors:[];
   const warnings=Array.isArray(payload&&payload.warnings)?payload.warnings:[];
   const summary=`<div class="panel" style="margin-bottom:10px"><div class="panel-body">
-    <b>🤖 Rozliczenie Wysypiska AI</b><br>
+    <b>♻️ Rozliczenie Wysypiska All Inclusive</b><br>
     Stan rankingu: <b>${escapeHtml(formatAdminDate(payload.closeDate))}</b> · minimum: <b>${Number(payload.dailyMinimum)||20} pkt/dzień</b><br>
     Gracze: <b>${Number(payload.rosterCount)||0}</b> · znalezieni: <b>${Number(payload.matchedCount)||0}</b>
   </div></div>`;
@@ -9219,6 +9251,11 @@ function setupAdmin() {
         }
       }
     );
+
+  el("admin-announcement-preview")?.addEventListener("click",()=>{
+    const box=el("admin-announcement-preview-box"),text=el("admin-announcement-text")?.value.trim()||"Wpisz treść ogłoszenia, aby zobaczyć podgląd.";
+    if(!box)return;box.hidden=false;box.innerHTML=`<strong>📌 Ważne ogłoszenie</strong><div style="margin-top:7px;white-space:pre-wrap">${escapeHtml(text)}</div><small class="muted" style="display:block;margin-top:8px">Taką treść gracz zobaczy w popupie i skróconą w powiadomieniu telefonu.</small>`;
+  });
 
   el("admin-announcement-form")
     ?.addEventListener(

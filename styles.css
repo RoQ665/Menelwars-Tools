@@ -27,6 +27,12 @@ main{max-width:760px;margin:auto;padding:12px}
 .map-row{display:flex;justify-content:space-between;gap:10px;padding:11px 8px;border-bottom:1px solid #e4d7c2}.map-row:last-child{border-bottom:0}.map-row span{font-weight:700}.map-row .unknown{color:#946800}
 .muted,.empty{color:#786b5c}.empty{text-align:center;padding:24px 8px}
 footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
+.announcement-popup-backdrop{position:fixed;inset:0;z-index:10020;background:rgba(24,18,12,.72);display:grid;place-items:center;padding:18px}
+.announcement-popup{width:min(520px,100%);max-height:85vh;overflow:auto;background:#fffaf0;border:2px solid #c89938;border-radius:16px;box-shadow:0 18px 60px rgba(0,0,0,.35);padding:20px}
+.announcement-popup h2{margin:0 0 10px;color:#6f3e12}.announcement-popup-body{white-space:pre-wrap;line-height:1.5}
+.announcement-popup-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.notification-settings{margin-top:10px}.notification-settings label{display:flex;align-items:center;gap:8px;font-weight:700}.notification-settings input{width:auto}
+#admin-announcement-preview-box{margin-top:8px;padding:12px;border:2px solid #c89938;border-radius:12px;background:#fff8e5;white-space:pre-wrap}
 [hidden]{display:none!important}
 
 .submit-form{display:grid;gap:10px}
