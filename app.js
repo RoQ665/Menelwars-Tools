@@ -2922,6 +2922,60 @@ function mapRenderRouteResult() {
   // WPŁATY GANGU — LOGOWANIE + CHRONIONE DANE
   // ============================================================
 
+  function formatPaymentsDateTime(value) {
+    const text = String(value || "").trim();
+    if (!text) return "—";
+
+    const display = /^(\d{2})\.(\d{2})\.(\d{4}),\s*(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+    if (display) {
+      return `${display[1]}.${display[2]}.${display[3]} ${display[4]}:${display[5]}${display[6] ? `:${display[6]}` : ""}`;
+    }
+
+    const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+    if (dateOnly) return `${dateOnly[3]}.${dateOnly[2]}.${dateOnly[1]}`;
+
+    const date = new Date(text);
+    return Number.isFinite(date.getTime())
+      ? date.toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"})
+      : text;
+  }
+
+  function formatSaldo(value) {
+    return Number(value).toLocaleString("pl-PL",{minimumFractionDigits:0,maximumFractionDigits:2});
+  }
+
+  function paymentsRankBadge(index) {
+    const position = index + 1;
+    if (position === 1) return `<span class="rank-badge gold">1</span>`;
+    if (position === 2) return `<span class="rank-badge silver">2</span>`;
+    if (position === 3) return `<span class="rank-badge bronze">3</span>`;
+    return `<span class="rank-badge normal">${position}</span>`;
+  }
+
+  function paymentsRow(player,index=0) {
+    const saldo = Number(player.saldo) || 0;
+    let stateClass = "zero", status = "🟢 Na bieżąco", amount = "0 zł";
+    if (saldo < 0) {
+      stateClass = "debt";
+      status = "🔴 Dług";
+      amount = `-${formatSaldo(Math.abs(saldo))} zł`;
+    } else if (saldo > 0) {
+      stateClass = "credit";
+      status = "🔵 Nadpłata";
+      amount = `+${formatSaldo(saldo)} zł`;
+    }
+    return `
+      <div class="finance-player-row ${stateClass} ranked-payment-row">
+        <div class="payment-rank">${paymentsRankBadge(index)}</div>
+        <div class="payment-main">
+          <div class="finance-name">${escapeHtml(player.nick)}</div>
+          <div class="finance-meta"><span>${status}</span></div>
+        </div>
+        <div class="payment-total">${amount}</div>
+      </div>
+    `;
+  }
+
   function gangToken() {
     return playerAccountSessionToken() || "";
   }
