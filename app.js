@@ -17,7 +17,8 @@
     builds:true,
     garden:true,
     gangContent:true,
-    distillery:true
+    distillery:true,
+    payments:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -3946,6 +3947,11 @@ function mapRenderRouteResult() {
       new URLSearchParams(location.search).get("migrationBackend") === "distillery";
   }
 
+  function cloudflarePaymentsEnabled() {
+    return CLOUDFLARE_FEATURES.payments ||
+      new URLSearchParams(location.search).get("migrationBackend") === "payments";
+  }
+
   function cloudflareSessionToken() {
     return localStorage.getItem(CLOUDFLARE_SESSION_KEY) || "";
   }
@@ -5462,6 +5468,13 @@ async function loadAccountAdminPermissions(
     action,
     data={}
   ) {
+    if (cloudflarePaymentsEnabled() && action === "companySetSalaryWaiver") {
+      return cloudflareApi("/company/salary-waiver",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{waived:Boolean(data.waived),requestId:makeRecipeNonce()}
+      });
+    }
     // Aktywacja tożsamości jest od v18 wspólna dla całego Gangu.
     if (
       action ===
@@ -6507,11 +6520,9 @@ const goal = payload && payload.goal;
 
     try {
 
-      const payload =
-        await jsonp(
-          "payments",
-          {token}
-        );
+      const payload = cloudflarePaymentsEnabled()
+        ? await cloudflareApi("/payments",{token:await cloudflareEnsureSession()})
+        : await jsonp("payments",{token});
 
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
         return null;
@@ -7226,8 +7237,13 @@ async function adminPostAction(action, data={}) {
       adminClearReservation:[`/admin/distillery/reservations/${encodeURIComponent(data.recipeKey||"")}/clear`,data],
       adminClearAllReservations:["/admin/distillery/reservations/*/clear",data]
     };
+    const financeRoutes={
+      adminSetCompanyIncome:["/admin/company/income",{income:Number(data.income)}],
+      adminActivateCompanySalaryPlan:["/admin/company/activate-plan",{}]
+    };
     const cloudRoute=(cloudflareGangContentEnabled()&&gangContentRoutes[action]) ||
-      (cloudflareDistilleryEnabled()&&distilleryRoutes[action]);
+      (cloudflareDistilleryEnabled()&&distilleryRoutes[action]) ||
+      (cloudflarePaymentsEnabled()&&financeRoutes[action]);
     const result = cloudRoute
       ? await cloudflareApi(cloudRoute[0],{
           method:"POST",token:await cloudflareEnsureSession(),body:{...cloudRoute[1],requestId:makeRecipeNonce()}
@@ -9259,11 +9275,9 @@ async function loadAdminPlayers() {
 
   try {
 
-    const payload =
-      await jsonp(
-        "adminPaymentsStatus",
-        {token}
-      );
+    const payload = cloudflarePaymentsEnabled()
+      ? await cloudflareApi("/admin/payments",{token:await cloudflareEnsureSession()})
+      : await jsonp("adminPaymentsStatus",{token});
 
 
     if (
@@ -10161,11 +10175,9 @@ async function loadAdminPaymentsStatus() {
 
   try {
 
-    const payload =
-      await jsonp(
-        "adminPaymentsStatus",
-        {token}
-      );
+    const payload = cloudflarePaymentsEnabled()
+      ? await cloudflareApi("/admin/payments",{token:await cloudflareEnsureSession()})
+      : await jsonp("adminPaymentsStatus",{token});
 
     if (
       !payload ||
@@ -10454,39 +10466,28 @@ async function importAdminPayments() {
   );
 
   try {
-    let sendError = null;
-
-    try {
-      await timedBackendPost(
-        "adminImportPayments",
-        {
-          action:"adminImportPayments",
-          token,
-          nonce,
-          report
-        }
-      );
-    } catch (err) {
-      // Nie powtarzamy POST. Import jest idempotentny po nonce; nawet po
-      // timeoutcie sprawdzamy wynik tego samego żądania.
-      sendError = err;
-    }
-
     let payload = null;
-
-    for (let i=0; i<24; i++) {
-      if (i > 0) await new Promise(resolve => setTimeout(resolve,700));
-
-      payload = await jsonp(
-        "adminImportPaymentsResult",
-        {token,nonce}
-      );
-
-      if (!payload || !payload.pending) break;
-    }
-
-    if (!payload || payload.pending) {
-      throw sendError || new Error("Serwer nie zwrócił wyniku zapisu.");
+    if (cloudflarePaymentsEnabled()) {
+      payload = await cloudflareApi("/admin/payments/import",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{report,requestId:nonce}
+      });
+    } else {
+      let sendError = null;
+      try {
+        await timedBackendPost("adminImportPayments",{action:"adminImportPayments",token,nonce,report});
+      } catch (err) {
+        sendError = err;
+      }
+      for (let i=0; i<24; i++) {
+        if (i > 0) await new Promise(resolve => setTimeout(resolve,700));
+        payload = await jsonp("adminImportPaymentsResult",{token,nonce});
+        if (!payload || !payload.pending) break;
+      }
+      if (!payload || payload.pending) {
+        throw sendError || new Error("Serwer nie zwrócił wyniku zapisu.");
+      }
     }
 
     if (!payload.ok) {
