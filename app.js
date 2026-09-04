@@ -7364,10 +7364,9 @@ async function adminPostAction(action, data={}) {
     // Dashboard jest odświeżany dopiero po potwierdzeniu requestId.
     // Jego chwilowy błąd nie unieważnia już potwierdzonego zapisu.
     try {
-      const dashboard = await jsonp(
-        "adminDashboardStatus",
-        {token,confirmAt:Date.now()}
-      );
+      const dashboard = cloudflareAccountAdminEnabled()
+        ? await loadAdminDashboardStatus()
+        : await jsonp("adminDashboardStatus",{token,confirmAt:Date.now()});
 
       if (dashboard && dashboard.ok) {
         applyAdminDashboardStatus(dashboard);
@@ -7807,8 +7806,9 @@ async function loadAdminGangTools() {
   const status = el("admin-gang-tools-status");
 
   try {
-    const payload =
-      await jsonp("adminGangTools",{token});
+    const payload = cloudflareAccountAdminEnabled()
+      ? {ok:true,reservations:[],goal:null,announcements:[]}
+      : await jsonp("adminGangTools",{token});
 
     if (!payload || !payload.ok) {
       throw new Error(
@@ -8211,7 +8211,9 @@ async function loadAdminDashboardStatus() {
   if (!token) return null;
 
   const requestPromise = (async () => {
-    let payload = await jsonp("adminDashboardStatus",{token});
+    let payload = cloudflareAccountAdminEnabled()
+      ? {ok:true,pendingSubmissions:0,companyChanges:0,totalAttention:0}
+      : await jsonp("adminDashboardStatus",{token});
     if (cloudflareDistilleryEnabled()) {
       const distillery=await cloudflareApi("/admin/distillery",{token:await cloudflareEnsureSession()});
       const previousPending=Math.max(0,Number(payload&&payload.pendingSubmissions)||0);
@@ -8398,11 +8400,9 @@ async function checkAdminAccess() {
 
   try {
 
-    const result =
-      await jsonp(
-        "adminTest",
-        {token}
-      );
+    const result = cloudflareAccountAdminEnabled()
+      ? await cloudflareApi("/auth/account",{token:await cloudflareEnsureSession()})
+      : await jsonp("adminTest",{token});
 
     if (
       !result ||
