@@ -8823,7 +8823,16 @@ async function importAdminAiDump() {
   if(button)button.disabled=true;
   if(status)status.textContent="Sprawdzanie i zapisywanie rankingu...";
   try {
-    const payload=await cloudflareApi("/admin/ai-dump/import",{method:"POST",token:await cloudflareEnsureSession(),body:{report,requestId:makeNonce()}});
+    const token=await cloudflareEnsureSession(),requestId=makeNonce();
+    const save=()=>cloudflareApi("/admin/ai-dump/import",{method:"POST",token,body:{report,requestId}});
+    let payload;
+    try {
+      payload=await save();
+    } catch(error) {
+      if(!/failed to fetch|network|abort/i.test(String(error&&error.message||"")))throw error;
+      await new Promise(resolve=>setTimeout(resolve,500));
+      payload=await save();
+    }
     if(payload.preview)renderAdminAiDumpPreview(payload.preview);
     if(status)status.textContent=`✅ ${payload.message||"Ranking został zapisany."}`;
     if(el("admin-ai-dump-report"))el("admin-ai-dump-report").value="";
