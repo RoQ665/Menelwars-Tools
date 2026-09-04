@@ -2936,6 +2936,22 @@ function mapRenderRouteResult() {
     return Array.from(bytes, b => b.toString(16).padStart(2,"0")).join("");
   }
 
+  function showPaymentsLogin(message="") {
+    const status=el("payments-login-status");
+    if (status) status.textContent=message;
+    showToolView("gang-gate-view","gang");
+    el("gang-tabs").hidden=true;
+  }
+
+  function showPaymentsContent() {
+    el("gang-tabs").hidden=false;
+    showToolView("payments-view","gang");
+  }
+
+  function playerAccountSessionToken() {
+    return localStorage.getItem(PLAYER_ACCOUNT_SESSION_KEY) || "";
+  }
+
   // ============================================================
   // v20.74 — POMIAR CZASÓW REQUESTÓW
   // ============================================================
