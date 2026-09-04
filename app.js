@@ -2954,6 +2954,7 @@ function mapRenderRouteResult() {
 
   function paymentsRow(player,index=0) {
     const saldo = Number(player.saldo) || 0;
+    const aiSaldo = Number(player.aiDumpBalance) || 0;
     let stateClass = "zero", status = "🟢 Na bieżąco", amount = "0 zł";
     if (saldo < 0) {
       stateClass = "debt";
@@ -2970,6 +2971,10 @@ function mapRenderRouteResult() {
         <div class="payment-main">
           <div class="finance-name">${escapeHtml(player.nick)}</div>
           <div class="finance-meta"><span>${status}</span></div>
+          <div class="finance-meta ai-dump-payment ${aiSaldo < 0 ? "debt" : aiSaldo > 0 ? "credit" : "zero"}">
+            <span>🤖 Wysypisko AI: ${aiSaldo < 0 ? "Dług" : aiSaldo > 0 ? "Nadpłata" : "Na bieżąco"}</span>
+            <strong>${aiSaldo > 0 ? "+" : ""}${formatSaldo(aiSaldo)} pkt</strong>
+          </div>
         </div>
         <div class="payment-total">${amount}</div>
       </div>
@@ -8785,6 +8790,53 @@ async function importAdminPayments() {
     }
   }
 }
+
+function renderAdminAiDumpPreview(payload) {
+  const result=el("admin-ai-dump-result");
+  if(!result)return;
+  const players=Array.isArray(payload&&payload.players)?payload.players:[];
+  const errors=Array.isArray(payload&&payload.errors)?payload.errors:[];
+  const warnings=Array.isArray(payload&&payload.warnings)?payload.warnings:[];
+  const summary=`<div class="panel" style="margin-bottom:10px"><div class="panel-body">
+    <b>🤖 Rozliczenie Wysypiska AI</b><br>
+    Stan rankingu: <b>${escapeHtml(formatAdminDate(payload.closeDate))}</b> · minimum: <b>${Number(payload.dailyMinimum)||20} pkt/dzień</b><br>
+    Gracze: <b>${Number(payload.rosterCount)||0}</b> · znalezieni: <b>${Number(payload.matchedCount)||0}</b>
+  </div></div>`;
+  const messages=[
+    ...errors.map(message=>`<div style="color:#9b2d2d;margin:4px 0">❌ ${escapeHtml(message)}</div>`),
+    ...warnings.map(message=>`<div style="color:#8a6500;margin:4px 0">⚠️ ${escapeHtml(message)}</div>`)
+  ].join("");
+  const rows=players.map(player=>{
+    const balance=Number(player.newBalance)||0,bad=player.status==="error"||player.status==="missing";
+    return `<div style="border:1px solid ${bad?"#e3b2b2":"#bad7ba"};background:${bad?"#fff1f1":"#eef7ee"};border-radius:8px;padding:8px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(player.nick)}</strong><strong>${balance>0?"+":""}${formatSaldo(balance)} pkt</strong></div>
+      <div class="muted">${player.status==="missing"?"Brak w rankingu":`Nowe punkty: +${formatSaldo(player.delta)} · obowiązek: -${formatSaldo(player.obligation)} (${Number(player.chargedDays)||0} dni)`}</div>
+      ${player.previousTotal!=null&&player.currentTotal!=null?`<div class="muted">Historycznie: ${formatSaldo(player.previousTotal)} → ${formatSaldo(player.currentTotal)} pkt</div>`:""}
+    </div>`;
+  }).join("");
+  result.innerHTML=summary+messages+rows;
+}
+
+async function importAdminAiDump() {
+  const report=el("admin-ai-dump-report")?.value.trim()||"",status=el("admin-ai-dump-status"),button=el("admin-ai-dump-save");
+  if(!report){if(status)status.textContent="Wklej pełny ranking Historycznie.";return;}
+  if(button)button.disabled=true;
+  if(status)status.textContent="Sprawdzanie i zapisywanie rankingu...";
+  try {
+    const payload=await cloudflareApi("/admin/ai-dump/import",{method:"POST",token:await cloudflareEnsureSession(),body:{report,requestId:makeNonce()}});
+    if(payload.preview)renderAdminAiDumpPreview(payload.preview);
+    if(status)status.textContent=`✅ ${payload.message||"Ranking został zapisany."}`;
+    if(el("admin-ai-dump-report"))el("admin-ai-dump-report").value="";
+    invalidateAppCache("gang-finance");
+    await Promise.allSettled([loadAdminPaymentsStatus(),loadPayments({background:true,force:true})]);
+  } catch(error) {
+    if(error&&error.payload&&error.payload.preview)renderAdminAiDumpPreview(error.payload.preview);
+    if(status)status.textContent=`❌ ${error&&error.message?error.message:"Nie udało się zapisać rankingu."}`;
+  } finally {
+    if(button)button.disabled=false;
+  }
+}
+
 function setupAdmin() {
 
   el("admin-refresh")
@@ -8821,6 +8873,9 @@ function setupAdmin() {
     "click",
     importAdminPayments
   );
+
+  el("admin-ai-dump-save")
+    ?.addEventListener("click",importAdminAiDump);
 
   el("admin-copy-daily-report")
     ?.addEventListener(
