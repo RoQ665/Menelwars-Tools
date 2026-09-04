@@ -17031,6 +17031,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
       if (pwaReloadingForUpdate) return;
       pwaReloadingForUpdate = true;
+      history.replaceState(null,"",location.pathname);
       location.reload();
     });
 

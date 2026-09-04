@@ -1,16 +1,16 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v22.44";
-// Jednorazowa naprawa bardzo starych instalacji PWA, które nie pokazały
-// banera aktualizacji i nadal serwują app.js v21.58.
-const FORCE_LEGACY_RECOVERY = true;
+const CACHE = "menelwars-tools-v22.45";
+// Małe aktualizacje Toola aktywują się automatycznie. Strona nasłuchuje
+// controllerchange i po przejęciu sterowania wraca do świeżej strony głównej.
+const AUTO_ACTIVATE_UPDATE = true;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=22.44",
+  "./styles.css?v=22.45",
   "./data.js?v=21.05",
-  "./app.js?v=22.44",
-  "./item-catalog.js?v=22.44",
+  "./app.js?v=22.45",
+  "./item-catalog.js?v=22.45",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
@@ -45,9 +45,7 @@ async function cacheCoreBestEffort() {
 self.addEventListener("install",event => {
   event.waitUntil((async () => {
     await cacheCoreBestEffort();
-    // Tylko ten release naprawczy omija oczekiwanie. Kolejne aktualizacje
-    // pozostaną ręczne, przez banner „Odśwież”.
-    if (FORCE_LEGACY_RECOVERY) await self.skipWaiting();
+    if (AUTO_ACTIVATE_UPDATE) await self.skipWaiting();
   })());
 });
 
@@ -66,10 +64,6 @@ self.addEventListener("activate",event => {
         .map(key => caches.delete(key))
     );
     await self.clients.claim();
-    if (FORCE_LEGACY_RECOVERY) {
-      const clients = await self.clients.matchAll({type:"window",includeUncontrolled:true});
-      await Promise.allSettled(clients.map(client => client.navigate(client.url)));
-    }
   })());
 });
 
