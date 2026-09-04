@@ -16471,7 +16471,10 @@ function setupAdmin() {
             homeAccountState.className="submit-info";
             homeAccountState.textContent="⏳ Weryfikuję sesję w tle — możesz już korzystać z Toola.";
           }
-          statusPromise.then(updateHomeAccountState).catch(()=>updateHomeAccountState(null));
+          statusPromise.then(result=>{
+            updateHomeAccountState(result);
+            if(result) void checkImportantAnnouncement();
+          }).catch(()=>updateHomeAccountState(null));
           return;
         }
         account=earlyResult;
@@ -16484,6 +16487,7 @@ function setupAdmin() {
     }
 
     updateHomeAccountState(account);
+    if(account) void checkImportantAnnouncement();
   }
 
 
