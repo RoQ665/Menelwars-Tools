@@ -16,7 +16,8 @@
     achievements:true,
     builds:true,
     garden:true,
-    gangContent:true
+    gangContent:true,
+    distillery:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -350,7 +351,7 @@ function mapRenderRouteResult() {
   let recipeRanking = [];
 
   function backendConfigured() {
-    return /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(BACKEND_URL);
+    return cloudflareDistilleryEnabled() || /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(BACKEND_URL);
   }
 
   function allRecipes() {
@@ -1082,6 +1083,24 @@ function mapRenderRouteResult() {
         );
 
       const nonce = makeRecipeNonce();
+
+      if (cloudflareDistilleryEnabled()) {
+        criticalOperationStart(
+          "🔬 Rezerwuję recepturę…",
+          "Zapisuję rezerwację i czekam na potwierdzenie serwera."
+        );
+        const result=await cloudflareApi("/distillery/reservations",{
+          method:"POST",
+          token:await cloudflareEnsureSession(),
+          body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program}
+        });
+        if (result.ownerToken) saveReservationOwner(recipe,result.ownerToken,result.reservation);
+        showRecipeActionNotice(result.message||"✅ Receptura zarezerwowana na 24 godziny.","success");
+        achievementTrack(["distillery_reserve"]);
+        await fetchApprovedRecipes({force:true});
+        return;
+      }
+
       let sendError = null;
 
       criticalOperationStart(
@@ -1260,6 +1279,19 @@ function mapRenderRouteResult() {
 
     try {
       let sendError = null;
+
+      if (cloudflareDistilleryEnabled()) {
+        const result=await cloudflareApi("/distillery/reservations/submit",{
+          method:"POST",
+          token:await cloudflareEnsureSession(),
+          body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program,litry}
+        });
+        if (!result||!result.ok) throw new Error(result&&result.error||"Nie udało się wysłać wyniku.");
+        showRecipeActionNotice("✅ Wynik został wysłany do weryfikacji.","success");
+        achievementTrack(["distillery_result"]);
+        await fetchApprovedRecipes({force:true});
+        return;
+      }
 
       try {
         await timedBackendPost(
@@ -2316,6 +2348,23 @@ function mapRenderRouteResult() {
     try {
       let sendError = null;
 
+      if (cloudflareDistilleryEnabled()) {
+        const result=await cloudflareApi("/distillery/submissions",{
+          method:"POST",
+          token:await cloudflareEnsureSession(),
+          body:{requestId:nonce,items:[{...payload,uwagi:payload.uwagi||"Ręczne zgłoszenie z MenelWars Tools."}]}
+        });
+        if (Number(result.insertedCount)>0) status.innerHTML="✅ Zgłoszenie wysłane do weryfikacji.";
+        else if (Number(result.skippedKnown)>0) status.innerHTML="✅ Ten sam wynik jest już potwierdzony w bazie.";
+        else if (Number(result.skippedPending)>0) status.innerHTML="ℹ️ Identyczne zgłoszenie już czeka na weryfikację.";
+        else status.innerHTML="✅ Zgłoszenie zostało sprawdzone przez serwer.";
+        el("submit-liters").value="";
+        el("submit-notes").value="";
+        if (Number(result.insertedCount)>0) achievementTrack(["distillery_result"]);
+        await fetchApprovedRecipes({force:true});
+        return;
+      }
+
       try {
         await timedBackendPost(
           "submitRecipeBatch",
@@ -2689,6 +2738,25 @@ function mapRenderRouteResult() {
 
     try {
       let sendError = null;
+
+      if (cloudflareDistilleryEnabled()) {
+        const result=await cloudflareApi("/distillery/submissions",{
+          method:"POST",
+          token:await cloudflareEnsureSession(),
+          body:{requestId:nonce,items}
+        });
+        status.textContent=
+          `✅ Zapisano ${Number(result.insertedCount)||0} zgłoszeń do weryfikacji. `+
+          `Pominięto: ${Number(result.skippedKnown)||0} już znanych, `+
+          `${Number(result.skippedPending)||0} już oczekujących. `+
+          (Number(result.rejectedCount)?`Odrzucono ${Number(result.rejectedCount)} błędnych.`:"");
+        el("recipe-batch-text").value="";
+        recipeBatchPreviewRows=[];
+        renderRecipeBatchPreview();
+        if (Number(result.insertedCount)>0) achievementTrack(["distillery_import"]);
+        await fetchApprovedRecipes({force:true});
+        return;
+      }
 
       try {
         await timedBackendPost(
@@ -3111,6 +3179,34 @@ function mapRenderRouteResult() {
     // nie pokazujemy fałszywego "brak badań" podczas requestu.
     if (distilleryDataLoaded) {
       renderAll();
+    }
+
+    if (cloudflareDistilleryEnabled()) {
+      approvedRecipesInFlight = (async () => {
+        const timingStartedAt=requestTimingNow();
+        try {
+          const payload=await cloudflareApi("/distillery",{token:await cloudflareEnsureSession()});
+          remoteApproved=payload&&payload.recipes&&typeof payload.recipes==="object" ? payload.recipes : {};
+          recipeReservations=payload&&payload.reservations&&typeof payload.reservations==="object" ? payload.reservations : {};
+          recipeRanking=Array.isArray(payload&&payload.ranking) ? payload.ranking : [];
+          localStorage.setItem(REMOTE_KEY,JSON.stringify(remoteApproved));
+          approvedRecipesRequestState="ready";
+          approvedRecipesFetchedAt=Date.now();
+          recordRequestTiming("approvedRecipes",requestTimingNow()-timingStartedAt,true,"GET");
+          return true;
+        } catch(err) {
+          approvedRecipesRequestState="error";
+          recordRequestTiming("approvedRecipes",requestTimingNow()-timingStartedAt,false,"GET");
+          if (err&&err.status===401&&activeToolModule==="distillery") showModuleAccountGate("distillery");
+          console.warn("[MenelWars Tools] Destylarnia Cloudflare:",err);
+          return false;
+        } finally {
+          renderAll();
+          updateSubmissionInfo();
+          distilleryDataLoaded=true;
+        }
+      })();
+      return approvedRecipesInFlight.finally(()=>{approvedRecipesInFlight=null;});
     }
 
     approvedRecipesInFlight = new Promise(resolve => {
@@ -3816,6 +3912,10 @@ function mapRenderRouteResult() {
     return new URLSearchParams(location.search).get("migrationTest") === "gang-content";
   }
 
+  function cloudflareDistilleryTestEnabled() {
+    return new URLSearchParams(location.search).get("migrationTest") === "distillery";
+  }
+
   function cloudflareAchievementsEnabled() {
     return CLOUDFLARE_FEATURES.achievements ||
       new URLSearchParams(location.search).get("migrationBackend") === "achievements";
@@ -3839,6 +3939,11 @@ function mapRenderRouteResult() {
   function cloudflareGangContentEnabled() {
     return CLOUDFLARE_FEATURES.gangContent ||
       new URLSearchParams(location.search).get("migrationBackend") === "gang-content";
+  }
+
+  function cloudflareDistilleryEnabled() {
+    return CLOUDFLARE_FEATURES.distillery ||
+      new URLSearchParams(location.search).get("migrationBackend") === "distillery";
   }
 
   function cloudflareSessionToken() {
@@ -7117,8 +7222,13 @@ async function adminPostAction(action, data={}) {
       adminSetGangPollStatus:[`/admin/polls/${encodeURIComponent(data.pollId||"")}/status`,data],
       adminDeleteGangPoll:[`/admin/polls/${encodeURIComponent(data.pollId||"")}/delete`,data]
     };
-    const cloudRoute=gangContentRoutes[action];
-    const result = cloudflareGangContentEnabled() && cloudRoute
+    const distilleryRoutes={
+      adminClearReservation:[`/admin/distillery/reservations/${encodeURIComponent(data.recipeKey||"")}/clear`,data],
+      adminClearAllReservations:["/admin/distillery/reservations/*/clear",data]
+    };
+    const cloudRoute=(cloudflareGangContentEnabled()&&gangContentRoutes[action]) ||
+      (cloudflareDistilleryEnabled()&&distilleryRoutes[action]);
+    const result = cloudRoute
       ? await cloudflareApi(cloudRoute[0],{
           method:"POST",token:await cloudflareEnsureSession(),body:{...cloudRoute[1],requestId:makeRecipeNonce()}
         })
@@ -7128,7 +7238,7 @@ async function adminPostAction(action, data={}) {
           {token}
         );
 
-    if (cloudflareGangContentEnabled() && cloudRoute) {
+    if (cloudflareGangContentEnabled() && gangContentRoutes[action]) {
       gangGoalCache=null;
       gangGoalCacheAt=0;
       gangAnnouncementsCache=null;
@@ -7596,11 +7706,15 @@ async function loadAdminGangTools() {
     const gangContentPayload=cloudflareGangContentEnabled()
       ? await cloudflareApi("/admin/gang-content",{token:await cloudflareEnsureSession()})
       : null;
+    const distilleryPayload=cloudflareDistilleryEnabled()
+      ? await cloudflareApi("/admin/distillery",{token:await cloudflareEnsureSession()})
+      : null;
     renderAdminGangTools(gangContentPayload ? {
       ...payload,
       goal:gangContentPayload.goal,
-      announcements:gangContentPayload.announcements
-    } : payload);
+      announcements:gangContentPayload.announcements,
+      reservations:distilleryPayload ? distilleryPayload.reservations : payload.reservations
+    } : distilleryPayload ? {...payload,reservations:distilleryPayload.reservations} : payload);
     loadAdminPolls();
 
     if (status) status.textContent = "";
@@ -7982,7 +8096,13 @@ async function loadAdminDashboardStatus() {
   if (!token) return null;
 
   const requestPromise = (async () => {
-    const payload = await jsonp("adminDashboardStatus",{token});
+    let payload = await jsonp("adminDashboardStatus",{token});
+    if (cloudflareDistilleryEnabled()) {
+      const distillery=await cloudflareApi("/admin/distillery",{token:await cloudflareEnsureSession()});
+      const previousPending=Math.max(0,Number(payload&&payload.pendingSubmissions)||0);
+      const pendingSubmissions=Math.max(0,Number(distillery&&distillery.count)||0);
+      payload={...payload,pendingSubmissions,totalAttention:Math.max(0,Number(payload&&payload.totalAttention)||0)-previousPending+pendingSubmissions};
+    }
     if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch) || adminToken() !== token) {
       return null;
     }
@@ -8254,7 +8374,7 @@ function adminSubmissionCard(item) {
 
   return `
     <div
-      data-submission-row="${item.row}"
+      data-submission-row="${escapeHtml(item.row)}"
       style="
         border:1px solid #d8c7aa;
         border-radius:8px;
@@ -8317,7 +8437,7 @@ function adminSubmissionCard(item) {
           type="button"
           data-admin-action="${approveAction}"
           data-correction="${item.correction ? "1" : "0"}"
-          data-row="${item.row}"
+          data-row="${escapeHtml(item.row)}"
           style="
             flex:1;
             background:#eaf6ea;
@@ -8329,7 +8449,7 @@ function adminSubmissionCard(item) {
         <button
           type="button"
           data-admin-action="ODRZUCONE"
-          data-row="${item.row}"
+          data-row="${escapeHtml(item.row)}"
           style="
             flex:1;
             background:#fff0f0;
@@ -8449,7 +8569,7 @@ async function setAdminSubmissionStatus(
     Array.isArray(submissionsBeforeMutation.submissions)
   ) {
     const submissionsAfterMutation = submissionsBeforeMutation.submissions.filter(
-      item => Number(item && item.row) !== Number(row)
+      item => String(item && item.row) !== String(row)
     );
     adminSubmissionsCache = Object.assign({}, submissionsBeforeMutation, {
       submissions: submissionsAfterMutation,
@@ -8480,17 +8600,25 @@ async function setAdminSubmissionStatus(
 
   try {
 
-    await confirmedAdminMutationPost(
-      "adminSetSubmissionStatus",
-      {
-        action:"adminSetSubmissionStatus",
-        token,
-        row,
-        status:newStatus,
-        correction:Boolean(correction)
-      },
-      {token}
-    );
+    if (cloudflareDistilleryEnabled()) {
+      await cloudflareApi(`/admin/distillery/submissions/${encodeURIComponent(row)}/status`,{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{requestId:makeRecipeNonce(),status:newStatus,correction:Boolean(correction)}
+      });
+    } else {
+      await confirmedAdminMutationPost(
+        "adminSetSubmissionStatus",
+        {
+          action:"adminSetSubmissionStatus",
+          token,
+          row,
+          status:newStatus,
+          correction:Boolean(correction)
+        },
+        {token}
+      );
+    }
 
 
     // Backend v20.19 robi SpreadsheetApp.flush()
@@ -8891,10 +9019,9 @@ async function fetchAdminSubmissionsPayload(options={}) {
   }
 
   const requestPromise = (async () => {
-      const payload = await jsonp(
-        "adminSubmissions",
-        {token}
-      );
+      const payload = cloudflareDistilleryEnabled()
+        ? await cloudflareApi("/admin/distillery",{token:await cloudflareEnsureSession()})
+        : await jsonp("adminSubmissions",{token});
 
       if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch) || adminToken() !== token) {
         return null;
@@ -9027,10 +9154,7 @@ async function loadAdminSubmissions(options={}) {
       "click",
       () => {
 
-        const row =
-          Number(
-            button.dataset.row
-          );
+        const row = button.dataset.row;
 
         const newStatus =
           button.dataset.adminAction;
