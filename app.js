@@ -18,7 +18,8 @@
     garden:true,
     gangContent:true,
     distillery:true,
-    payments:true
+    payments:true,
+    moduleAccess:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -2899,7 +2900,9 @@ function mapRenderRouteResult() {
       if (!moduleAccessPolicyInFlight) {
         moduleAccessPolicyInFlight = (async () => {
           try {
-            const payload = await jsonp("moduleAccessPolicy",{});
+            const payload = cloudflareModuleAccessEnabled()
+              ? await cloudflareApi("/module-access-policy")
+              : await jsonp("moduleAccessPolicy",{});
             if (payload && payload.ok && payload.policy) {
               moduleAccessPolicyCache = {
                 distillery:Boolean(payload.policy.distillery),
@@ -2927,7 +2930,9 @@ function mapRenderRouteResult() {
 
     moduleAccessPolicyInFlight = (async () => {
       try {
-        const payload = await jsonp("moduleAccessPolicy",{});
+        const payload = cloudflareModuleAccessEnabled()
+          ? await cloudflareApi("/module-access-policy")
+          : await jsonp("moduleAccessPolicy",{});
         if (payload && payload.ok && payload.policy) {
           moduleAccessPolicyCache = {
             distillery:Boolean(payload.policy.distillery),
@@ -3950,6 +3955,10 @@ function mapRenderRouteResult() {
   function cloudflarePaymentsEnabled() {
     return CLOUDFLARE_FEATURES.payments ||
       new URLSearchParams(location.search).get("migrationBackend") === "payments";
+  }
+
+  function cloudflareModuleAccessEnabled() {
+    return CLOUDFLARE_FEATURES.moduleAccess || false;
   }
 
   function cloudflareSessionToken() {
@@ -7241,9 +7250,13 @@ async function adminPostAction(action, data={}) {
       adminSetCompanyIncome:["/admin/company/income",{income:Number(data.income)}],
       adminActivateCompanySalaryPlan:["/admin/company/activate-plan",{}]
     };
+    const accessRoutes={
+      adminSetModuleAccess:["/admin/module-access-policy",data]
+    };
     const cloudRoute=(cloudflareGangContentEnabled()&&gangContentRoutes[action]) ||
       (cloudflareDistilleryEnabled()&&distilleryRoutes[action]) ||
-      (cloudflarePaymentsEnabled()&&financeRoutes[action]);
+      (cloudflarePaymentsEnabled()&&financeRoutes[action]) ||
+      (cloudflareModuleAccessEnabled()&&accessRoutes[action]);
     const result = cloudRoute
       ? await cloudflareApi(cloudRoute[0],{
           method:"POST",token:await cloudflareEnsureSession(),body:{...cloudRoute[1],requestId:makeRecipeNonce()}
