@@ -5,25 +5,7 @@
   const D = window.ROQ_DATA;
   const PROGRAMS = [1,2,3,4,5];
 
-  // ============================================================
-  // WKLEJ TU URL WEB APP Z GOOGLE APPS SCRIPT
-  // Musi kończyć się na /exec
-  // ============================================================
-  const BACKEND_URL = "https://script.google.com/macros/s/AKfycby8rjCO9HuRtQvQvFoF-OkjFhfnfcS1bTIag0V9LCSJykW6c8k5IZVH8K3pSVFH66ZBKQ/exec";
   const CLOUDFLARE_API_URL = "https://menelwars-tools-api.juniorbest1991.workers.dev/api/v1";
-  const CLOUDFLARE_FEATURES = Object.freeze({
-    gangDemand:true,
-    achievements:true,
-    builds:true,
-    garden:true,
-    gangContent:true,
-    distillery:true,
-    payments:true,
-    moduleAccess:true,
-    accountAdmin:true,
-    accountAuth:true
-  });
-
   const STORAGE_KEY = "roq_tools_premium_v1";
   const REMOTE_KEY = "roq_tools_remote_approved_v1";
   const NICK_KEY = "roq_tools_submitter_nick_v1";
@@ -352,7 +334,7 @@ function mapRenderRouteResult() {
   let recipeRanking = [];
 
   function backendConfigured() {
-    return cloudflareDistilleryEnabled() || /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(BACKEND_URL);
+    return Boolean(CLOUDFLARE_API_URL);
   }
 
   function allRecipes() {
@@ -2534,7 +2516,6 @@ function mapRenderRouteResult() {
 
   // ============================================================
   // AUTOMATYCZNE POBIERANIE ZATWIERDZONYCH RECEPTUR
-  // JSONP omija ograniczenia CORS Apps Script.
   // ============================================================
 
   let approvedRecipesInFlight = null;
@@ -2869,13 +2850,6 @@ function mapRenderRouteResult() {
   }
 
   function fetchApprovedRecipes(options={}) {
-    if (!backendConfigured()) {
-      approvedRecipesRequestState = "error";
-      renderAll();
-      distilleryDataLoaded = true;
-      return Promise.resolve(false);
-    }
-
     if (approvedRecipesInFlight) {
       return approvedRecipesInFlight;
     }
@@ -2897,231 +2871,43 @@ function mapRenderRouteResult() {
       renderAll();
     }
 
-    if (cloudflareDistilleryEnabled()) {
-      approvedRecipesInFlight = (async () => {
-        const timingStartedAt=requestTimingNow();
-        try {
-          const payload=await cloudflareApi("/distillery",{token:await cloudflareEnsureSession()});
-          remoteApproved=payload&&payload.recipes&&typeof payload.recipes==="object" ? payload.recipes : {};
-          recipeReservations=payload&&payload.reservations&&typeof payload.reservations==="object" ? payload.reservations : {};
-          recipeRanking=Array.isArray(payload&&payload.ranking) ? payload.ranking : [];
-          localStorage.setItem(REMOTE_KEY,JSON.stringify(remoteApproved));
-          approvedRecipesRequestState="ready";
-          approvedRecipesFetchedAt=Date.now();
-          recordRequestTiming("approvedRecipes",requestTimingNow()-timingStartedAt,true,"GET");
-          return true;
-        } catch(err) {
-          approvedRecipesRequestState="error";
-          recordRequestTiming("approvedRecipes",requestTimingNow()-timingStartedAt,false,"GET");
-          if (err&&err.status===401&&activeToolModule==="distillery") showModuleAccountGate("distillery");
-          console.warn("[MenelWars Tools] Destylarnia Cloudflare:",err);
-          return false;
-        } finally {
-          renderAll();
-          updateSubmissionInfo();
-          distilleryDataLoaded=true;
+    approvedRecipesInFlight = (async () => {
+      const timingStartedAt=requestTimingNow();
+      try {
+        const payload=await cloudflareApi("/distillery",{
+          token:await cloudflareEnsureSession()
+        });
+        remoteApproved=payload&&payload.recipes&&typeof payload.recipes==="object"
+          ? payload.recipes
+          : {};
+        recipeReservations=payload&&payload.reservations&&typeof payload.reservations==="object"
+          ? payload.reservations
+          : {};
+        recipeRanking=Array.isArray(payload&&payload.ranking) ? payload.ranking : [];
+        localStorage.setItem(REMOTE_KEY,JSON.stringify(remoteApproved));
+        approvedRecipesRequestState="ready";
+        approvedRecipesFetchedAt=Date.now();
+        recordRequestTiming("approvedRecipes",requestTimingNow()-timingStartedAt,true,"GET");
+        return true;
+      } catch(err) {
+        approvedRecipesRequestState="error";
+        recordRequestTiming("approvedRecipes",requestTimingNow()-timingStartedAt,false,"GET");
+        if (err&&err.status===401&&activeToolModule==="distillery") {
+          showModuleAccountGate("distillery");
         }
-      })();
-      return approvedRecipesInFlight.finally(()=>{approvedRecipesInFlight=null;});
-    }
-
-    approvedRecipesInFlight = new Promise(resolve => {
-      const timingStartedAt =
-        requestTimingNow();
-
-      const callbackName =
-        "roqApproved_" +
-        Date.now() +
-        "_" +
-        Math.floor(Math.random()*100000);
-
-      const script =
-        document.createElement("script");
-
-      let settled = false;
-      let timingRecorded = false;
-      let lateCleanupTimer = null;
-
-      const recordTiming = ok => {
-        if (timingRecorded) return;
-        timingRecorded = true;
-
-        recordRequestTiming(
-          "approvedRecipes",
-          requestTimingNow() - timingStartedAt,
-          ok,
-          "GET"
-        );
-      };
-
-      const leaveSafeNoopCallback = () => {
-        window[callbackName] = () => {};
-      };
-
-      const removeLateCallback = () => {
-        script.remove();
-        try { delete window[callbackName]; }
-        catch { leaveSafeNoopCallback(); }
-      };
-
-      const cleanupCompleted = () => {
-        clearTimeout(timeout);
-
-        if (lateCleanupTimer) {
-          clearTimeout(lateCleanupTimer);
-          lateCleanupTimer = null;
-        }
-
-        script.remove();
-
-        try {
-          delete window[callbackName];
-        } catch {
-          leaveSafeNoopCallback();
-        }
-      };
-
-      const timeout =
-        setTimeout(
-          () => {
-            if (settled) return;
-            settled = true;
-
-            approvedRecipesRequestState = "error";
-            distilleryDataLoaded = true;
-
-            recordTiming(false);
-            renderAll();
-
-            lateCleanupTimer =
-              setTimeout(() => {
-                removeLateCallback();
-              }, JSONP_LATE_GRACE_MS);
-
-            resolve(false);
-          },
-          JSONP_TIMEOUT_MS
-        );
-
-      window[callbackName] =
-        payload => {
-          if (settled) {
-            if (lateCleanupTimer) {
-              clearTimeout(lateCleanupTimer);
-              lateCleanupTimer = null;
-            }
-
-            script.remove();
-            setTimeout(removeLateCallback,0);
-            return;
-          }
-
-          settled = true;
-          clearTimeout(timeout);
-
-          let ok = false;
-
-          try {
-            if (
-              payload &&
-              payload.authRequired
-            ) {
-              approvedRecipesRequestState =
-                "error";
-
-              if (
-                activeToolModule ===
-                "distillery"
-              ) {
-                showModuleAccountGate(
-                  "distillery"
-                );
-              }
-            } else if (
-              payload &&
-              payload.ok &&
-              payload.recipes &&
-              typeof payload.recipes === "object"
-            ) {
-              remoteApproved = payload.recipes;
-
-              recipeReservations =
-                payload.reservations &&
-                typeof payload.reservations === "object"
-                  ? payload.reservations
-                  : {};
-
-              recipeRanking =
-                Array.isArray(payload.ranking)
-                  ? payload.ranking
-                  : [];
-
-              localStorage.setItem(
-                REMOTE_KEY,
-                JSON.stringify(remoteApproved)
-              );
-
-              ok = true;
-              approvedRecipesFetchedAt = Date.now();
-            }
-          } catch (err) {
-            console.warn(
-              "[MenelWars Tools] Destylarnia:",
-              err
-            );
-          }
-
-          approvedRecipesRequestState =
-            ok ? "ready" : "error";
-
-          renderAll();
-          updateSubmissionInfo();
-          distilleryDataLoaded = true;
-
-          recordTiming(ok);
-          cleanupCompleted();
-          resolve(ok);
-        };
-
-      script.onerror = () => {
-        if (settled) {
-          script.remove();
-          setTimeout(removeLateCallback,0);
-          return;
-        }
-
-        settled = true;
-        clearTimeout(timeout);
-
-        approvedRecipesRequestState = "error";
-        distilleryDataLoaded = true;
-
-        recordTiming(false);
+        console.warn("[MenelWars Tools] Destylarnia Cloudflare:",err);
+        return false;
+      } finally {
         renderAll();
-        cleanupCompleted();
-        resolve(false);
-      };
+        updateSubmissionInfo();
+        distilleryDataLoaded=true;
+      }
+    })();
 
-      script.src =
-        BACKEND_URL +
-        "?action=approved" +
-        "&sessionToken=" +
-        encodeURIComponent(
-          playerAccountSessionToken()
-        ) +
-        "&callback=" +
-        encodeURIComponent(callbackName) +
-        "&_=" +
-        Date.now();
-
-      document.head.appendChild(script);
-    });
-
-    return approvedRecipesInFlight.finally(() => {
-      approvedRecipesInFlight = null;
+    return approvedRecipesInFlight.finally(()=>{
+      approvedRecipesInFlight=null;
     });
   }
-
 
   // ============================================================
   // WPŁATY GANGU — LOGOWANIE + CHRONIONE DANE
@@ -3270,406 +3056,6 @@ function mapRenderRouteResult() {
   };
 
 
-  const JSONP_TIMEOUT_MS = 20 * 1000;
-  const JSONP_LATE_GRACE_MS = 60 * 1000;
-
-  function jsonpOnce(action, params={}) {
-
-    const timingStartedAt =
-      requestTimingNow();
-
-    return new Promise((resolve, reject) => {
-
-      const callbackName =
-        "mwJsonp_" +
-        Date.now() +
-        "_" +
-        Math.floor(Math.random()*1000000);
-
-      const script =
-        document.createElement("script");
-
-      let settled = false;
-      let lateCleanupTimer = null;
-
-      const leaveSafeNoopCallback = () => {
-        // Jeżeli Apps Script odpowie bardzo późno, callback nadal istnieje.
-        // Dzięki temu nie dostajemy "mwJsonp_xxx is not defined".
-        window[callbackName] = () => {};
-      };
-
-      const removeLateCallback = () => {
-        script.remove();
-        try { delete window[callbackName]; }
-        catch { leaveSafeNoopCallback(); }
-      };
-
-      const cleanupCompleted = () => {
-        clearTimeout(timeout);
-
-        if (lateCleanupTimer) {
-          clearTimeout(lateCleanupTimer);
-          lateCleanupTimer = null;
-        }
-
-        script.remove();
-
-        try {
-          delete window[callbackName];
-        } catch {
-          leaveSafeNoopCallback();
-        }
-      };
-
-      const timeout =
-        setTimeout(() => {
-          if (settled) return;
-          settled = true;
-
-          recordRequestTiming(
-            action,
-            requestTimingNow() - timingStartedAt,
-            false,
-            "GET"
-          );
-
-          // Nie usuwamy od razu tagu <script> ani callbacku.
-          // Apps Script może odpowiedzieć już po naszym limicie.
-          lateCleanupTimer =
-            setTimeout(() => {
-              removeLateCallback();
-            }, JSONP_LATE_GRACE_MS);
-
-          reject(
-            new Error(
-              "Przekroczono czas odpowiedzi serwera."
-            )
-          );
-        }, JSONP_TIMEOUT_MS);
-
-      window[callbackName] = payload => {
-        if (settled) {
-          if (lateCleanupTimer) {
-            clearTimeout(lateCleanupTimer);
-            lateCleanupTimer = null;
-          }
-
-          script.remove();
-          setTimeout(removeLateCallback,0);
-          return;
-        }
-
-        settled = true;
-        clearTimeout(timeout);
-
-        recordRequestTiming(
-          action,
-          requestTimingNow() - timingStartedAt,
-          Boolean(!payload || payload.ok !== false),
-          "GET"
-        );
-
-        cleanupCompleted();
-        resolve(payload);
-      };
-
-      script.onerror = () => {
-        if (settled) {
-          script.remove();
-          setTimeout(removeLateCallback,0);
-          return;
-        }
-
-        settled = true;
-        clearTimeout(timeout);
-
-        recordRequestTiming(
-          action,
-          requestTimingNow() - timingStartedAt,
-          false,
-          "GET"
-        );
-
-        cleanupCompleted();
-
-        reject(
-          new Error(
-            "Błąd połączenia z serwerem."
-          )
-        );
-      };
-
-      const query =
-        new URLSearchParams({
-          action,
-          ...params,
-          callback: callbackName,
-          _: String(Date.now())
-        });
-
-      script.src =
-        BACKEND_URL + "?" + query.toString();
-
-      document.head.appendChild(script);
-    });
-  }
-
-  const JSONP_SAFE_RETRY_ACTIONS = new Set([
-    "moduleAccessPolicy"
-  ]);
-
-  function jsonpShouldRetry(action) {
-    // Retry jest dozwolony WYŁĄCZNIE dla jawnie sklasyfikowanych odczytów.
-    // Nieznana/nowa akcja domyślnie nie jest ponawiana, więc przypadkowy
-    // mutujący GET nie może zostać wykonany drugi raz po zgubionej odpowiedzi.
-    return JSONP_SAFE_RETRY_ACTIONS.has(String(action || ""));
-  }
-
-  async function jsonp(action,params={},options={}) {
-    const retry =
-      options.retry === false
-        ? false
-        : jsonpShouldRetry(action);
-
-    try {
-      return await jsonpOnce(action,params);
-    } catch (err) {
-      if (!retry) throw err;
-      await new Promise(resolve => setTimeout(resolve,250));
-      return jsonpOnce(action,params);
-    }
-  }
-
-
-  function formatPaymentsDateTime(value) {
-
-    const text =
-      String(value || "").trim();
-
-    if (!text) {
-      return "—";
-    }
-
-    // Backend może zwrócić gotowy zapis w strefie skryptu.
-    const display =
-      /^(\d{2})\.(\d{2})\.(\d{4}),\s*(\d{2}):(\d{2})(?::(\d{2}))?$/
-        .exec(text);
-
-    if (display) {
-      return (
-        `${display[1]}.${display[2]}.${display[3]} ` +
-        `${display[4]}:${display[5]}` +
-        (display[6] ? `:${display[6]}` : "")
-      );
-    }
-
-    // Stary format YYYY-MM-DD.
-    const dateOnly =
-      /^(\d{4})-(\d{2})-(\d{2})$/
-        .exec(text);
-
-    if (dateOnly) {
-      return `${dateOnly[3]}.${dateOnly[2]}.${dateOnly[1]}`;
-    }
-
-    // ISO — fallback.
-    const date =
-      new Date(text);
-
-    if (Number.isFinite(date.getTime())) {
-      return date.toLocaleString(
-        "pl-PL",
-        {
-          day:"2-digit",
-          month:"2-digit",
-          year:"numeric",
-          hour:"2-digit",
-          minute:"2-digit",
-          second:"2-digit"
-        }
-      );
-    }
-
-    return text;
-  }
-
-  function formatSaldo(value) {
-
-    return Number(value).toLocaleString(
-      "pl-PL",
-      {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 2
-      }
-    );
-  }
-
-  function paymentsShare(value) {
-
-    const share =
-      Math.max(
-        0,
-        Number(value) || 0
-      );
-
-    return (share * 100)
-      .toFixed(2)
-      .replace(".", ",") + "%";
-  }
-
-  function paymentsRankBadge(index) {
-    const position = index + 1;
-
-    if (position === 1) {
-      return `<span class="rank-badge gold">1</span>`;
-    }
-
-    if (position === 2) {
-      return `<span class="rank-badge silver">2</span>`;
-    }
-
-    if (position === 3) {
-      return `<span class="rank-badge bronze">3</span>`;
-    }
-
-    return `<span class="rank-badge normal">${position}</span>`;
-  }
-
-  function paymentsRow(player,index=0) {
-
-    const saldo = Number(player.saldo) || 0;
-
-    let stateClass = "zero";
-    let status = "🟢 Na bieżąco";
-    let amount = "0 zł";
-
-    if (saldo < 0) {
-      stateClass = "debt";
-      status = "🔴 Dług";
-      amount = "-" + formatSaldo(Math.abs(saldo)) + " zł";
-    } else if (saldo > 0) {
-      stateClass = "credit";
-      status = "🔵 Nadpłata";
-      amount = "+" + formatSaldo(saldo) + " zł";
-    }
-
-    return `
-      <div class="finance-player-row ${stateClass} ranked-payment-row">
-        <div class="payment-rank">
-          ${paymentsRankBadge(index)}
-        </div>
-
-        <div class="payment-main">
-          <div class="finance-name">
-            ${escapeHtml(player.nick)}
-          </div>
-
-          <div class="finance-meta">
-            <span>${status}</span>
-          </div>
-        </div>
-
-        <div class="payment-total">
-          ${amount}
-        </div>
-      </div>
-    `;
-  }
-
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
-  function showPaymentsLogin(message="") {
-    el("payments-login-status").textContent = message;
-    showToolView("gang-gate-view", "gang");
-    el("gang-tabs").hidden = true;
-  }
-
-  function showPaymentsContent() {
-    el("gang-tabs").hidden = false;
-    showToolView("payments-view", "gang");
-  }
-
-  function playerAccountSessionToken() {
-    return localStorage.getItem(PLAYER_ACCOUNT_SESSION_KEY) || "";
-  }
-
-  function cloudflareGangDemandTestEnabled() {
-    return new URLSearchParams(location.search).get("migrationTest") === "gang-demand";
-  }
-
-  function cloudflareAchievementTestEnabled() {
-    return new URLSearchParams(location.search).get("migrationTest") === "achievements";
-  }
-
-  function cloudflareBuildTestEnabled() {
-    return new URLSearchParams(location.search).get("migrationTest") === "builds";
-  }
-
-  function cloudflareGardenTestEnabled() {
-    return new URLSearchParams(location.search).get("migrationTest") === "garden";
-  }
-
-  function cloudflareGangContentTestEnabled() {
-    return new URLSearchParams(location.search).get("migrationTest") === "gang-content";
-  }
-
-  function cloudflareDistilleryTestEnabled() {
-    return new URLSearchParams(location.search).get("migrationTest") === "distillery";
-  }
-
-  function cloudflareAchievementsEnabled() {
-    return CLOUDFLARE_FEATURES.achievements ||
-      new URLSearchParams(location.search).get("migrationBackend") === "achievements";
-  }
-
-  function cloudflareGangDemandEnabled() {
-    return CLOUDFLARE_FEATURES.gangDemand ||
-      new URLSearchParams(location.search).get("migrationBackend") === "gang-demand";
-  }
-
-  function cloudflareBuildsEnabled() {
-    return CLOUDFLARE_FEATURES.builds ||
-      new URLSearchParams(location.search).get("migrationBackend") === "builds";
-  }
-
-  function cloudflareGardenEnabled() {
-    return CLOUDFLARE_FEATURES.garden ||
-      new URLSearchParams(location.search).get("migrationBackend") === "garden";
-  }
-
-  function cloudflareGangContentEnabled() {
-    return CLOUDFLARE_FEATURES.gangContent ||
-      new URLSearchParams(location.search).get("migrationBackend") === "gang-content";
-  }
-
-  function cloudflareDistilleryEnabled() {
-    return CLOUDFLARE_FEATURES.distillery ||
-      new URLSearchParams(location.search).get("migrationBackend") === "distillery";
-  }
-
-  function cloudflarePaymentsEnabled() {
-    return CLOUDFLARE_FEATURES.payments ||
-      new URLSearchParams(location.search).get("migrationBackend") === "payments";
-  }
-
-  function cloudflareModuleAccessEnabled() {
-    return CLOUDFLARE_FEATURES.moduleAccess || false;
-  }
-
-  function cloudflareAccountAdminEnabled() {
-    return CLOUDFLARE_FEATURES.accountAdmin || false;
-  }
-
-  function cloudflareAccountAuthEnabled() {
-    return CLOUDFLARE_FEATURES.accountAuth || false;
-  }
 
   function cloudflareSessionToken() {
     return localStorage.getItem(CLOUDFLARE_SESSION_KEY) || "";
@@ -3763,40 +3149,13 @@ function mapRenderRouteResult() {
     return result.sort((left,right)=>left[0].localeCompare(right[0]));
   }
 
-  async function testCloudflareAchievements(account,status) {
-    if (!cloudflareAchievementTestEnabled() || !account || !status) return;
-    status.textContent="🧪 Synchronizuję i porównuję osiągnięcia na obu serwerach…";
-    try {
-      const token=await cloudflareEnsureSession();
-      await cloudflareApi("/achievements/legacy-sync",{
-        method:"POST",
-        token,
-        body:{
-          legacySessionToken:playerAccountSessionToken(),
-          requestId:makeRecipeNonce()
-        }
-      });
-      const cloudPayload=await cloudflareApi("/achievements",{token});
-      const legacyEntries=achievementComparisonEntries(account.achievements||{});
-      const cloudEntries=achievementComparisonEntries(cloudPayload.achievements||{});
-      const cloudMap=new Map(cloudEntries);
-      const missing=legacyEntries.filter(([id,timestamp])=>cloudMap.get(id)!==timestamp);
-      if (missing.length) {
-        throw new Error(`nie zgadza się ${missing.length} zapisów (${missing.slice(0,3).map(item=>item[0]).join(", ")}).`);
-      }
-      status.textContent=`✅ Test Cloudflare udany — zgodne ${legacyEntries.length} zapisów; nowy serwer ma łącznie ${cloudEntries.length}.`;
-    } catch(err) {
-      status.textContent=`❌ Test osiągnięć Cloudflare: ${err&&err.message ? err.message : "nie udało się porównać danych."}`;
-    }
-  }
-
   let cloudflareAchievementCache=null;
   let cloudflareAchievementCacheAt=0;
   let cloudflareAchievementCacheToken="";
   let cloudflareAchievementSyncInFlight=null;
 
   async function cloudflareAchievementsForAccount(account,options={}) {
-    if (!cloudflareAchievementsEnabled() || !account) return account&&account.achievements||{};
+    if (!account) return {};
     const legacySessionToken=playerAccountSessionToken();
     const sessionEpoch=playerAccountSessionEpoch;
     const cacheFresh=
@@ -3810,11 +3169,7 @@ function mapRenderRouteResult() {
     if (cloudflareAchievementSyncInFlight) return cloudflareAchievementSyncInFlight;
     const request=(async()=>{
       const token=await cloudflareEnsureSession();
-      const result=cloudflareAccountAuthEnabled()
-        ? await cloudflareApi("/achievements",{token})
-        : await cloudflareApi("/achievements/legacy-sync",{
-            method:"POST",token,body:{legacySessionToken,requestId:makeRecipeNonce()}
-          });
+      const result=await cloudflareApi("/achievements",{token});
       if (!playerAccountSessionIsCurrent(legacySessionToken,sessionEpoch)) return {};
       const unlocked=result&&(result.achievements||result.unlocked)||{};
       cloudflareAchievementCache=unlocked;
@@ -3935,62 +3290,21 @@ function mapRenderRouteResult() {
   }
 
   async function playerAccountPostAction(action,data={}) {
-    const nonce = makeRecipeNonce();
-    if (cloudflareAccountAuthEnabled()) {
-      const routes={
-        playerAccountLogin:["/auth/login",{nick:data.nick,password:data.password},false],
-        playerAccountActivate:["/auth/activate",{nick:data.nick,code:data.code,newPassword:data.newPassword},false],
-        playerAccountResetWithCode:["/auth/reset",{nick:data.nick,code:data.code,newPassword:data.newPassword},false],
-        playerAccountChangePassword:["/auth/change-password",{currentPassword:data.currentPassword,newPassword:data.newPassword},true],
-        playerAccountLogoutOtherSessions:["/auth/logout-others",{},true],
-        playerAccountLogout:["/auth/logout",{},true]
-      };
-      const route=routes[action];
-      if (route) {
-        const token=route[2] ? (cloudflareSessionToken()||playerAccountSessionToken()) : "";
-        const result=await cloudflareApi(route[0],{method:"POST",token,body:route[1]});
-        if (result&&result.session&&result.session.token) {
-          setPlayerAccountSessionToken(result.session.token);
-          setCloudflareSessionToken(result.session.token);
-        }
-        return result;
-      }
-    }
-    let sendError = null;
-
-    try {
-      await timedBackendPost(
-        action,
-        {
-          action,
-          nonce,
-          ...data
-        }
-      );
-    } catch (err) {
-      // Nie ponawiamy POST. Backend pamięta wynik pod tym samym nonce.
-      sendError = err;
-    }
-
-    let result = null;
-    for (let i=0;i<20;i++) {
-      if (i > 0) await new Promise(resolve => setTimeout(resolve,650));
-      try {
-        result = await jsonp("playerAccountActionResult",{nonce});
-      } catch (err) {
-        if (i === 19 && !sendError) sendError = err;
-        continue;
-      }
-      if (result && !result.pending) break;
-    }
-
-    if (!result || result.pending) {
-      throw sendError || new Error("Serwer nie zwrócił wyniku operacji.");
-    }
-    if (!result.ok) {
-      const err = new Error(result.error || "Operacja nie powiodła się.");
-      err.data = result;
-      throw err;
+    const routes={
+      playerAccountLogin:["/auth/login",{nick:data.nick,password:data.password},false],
+      playerAccountActivate:["/auth/activate",{nick:data.nick,code:data.code,newPassword:data.newPassword},false],
+      playerAccountResetWithCode:["/auth/reset",{nick:data.nick,code:data.code,newPassword:data.newPassword},false],
+      playerAccountChangePassword:["/auth/change-password",{currentPassword:data.currentPassword,newPassword:data.newPassword},true],
+      playerAccountLogoutOtherSessions:["/auth/logout-others",{},true],
+      playerAccountLogout:["/auth/logout",{},true]
+    };
+    const route=routes[action];
+    if (!route) throw new Error("Nieznana operacja Konta.");
+    const token=route[2] ? (cloudflareSessionToken()||playerAccountSessionToken()) : "";
+    const result=await cloudflareApi(route[0],{method:"POST",token,body:route[1]});
+    if (result&&result.session&&result.session.token) {
+      setPlayerAccountSessionToken(result.session.token);
+      setCloudflareSessionToken(result.session.token);
     }
     return result;
   }
@@ -4001,149 +3315,33 @@ function mapRenderRouteResult() {
   let accountStatusInFlight = null;
 
   async function playerAccountStatus(options={}) {
-    const token = playerAccountSessionToken();
-    const sessionEpoch = playerAccountSessionEpoch;
-
+    const token=playerAccountSessionToken();
     if (!token) {
-      cachedAccountStatus = null;
-      cachedAccountStatusAt = 0;
-      cachedAccountStatusToken = "";
+      cachedAccountStatus=null;
+      cachedAccountStatusAt=0;
+      cachedAccountStatusToken="";
       return null;
     }
 
-    const force = Boolean(options.force);
-    const strict = Boolean(options.strict);
-
-    if (cloudflareAccountAuthEnabled()) {
-      try {
-        const cloudToken=cloudflareSessionToken()||await cloudflareEnsureSession();
-        const result=await cloudflareApi("/auth/account",{token:cloudToken});
-        if (cloudToken!==token) {
-          localStorage.setItem(PLAYER_ACCOUNT_SESSION_KEY,cloudToken);
-          playerAccountSessionEpoch++;
-        }
-        cachedAccountStatus=result;
-        cachedAccountStatusAt=Date.now();
-        cachedAccountStatusToken=cloudToken;
-        setCloudflareSessionToken(cloudToken);
-        updateHomeAccountState(result);
-        return result;
-      } catch(err) {
-        if (err&&err.status===401) setPlayerAccountSessionToken("");
-        if (strict) throw err;
-        return null;
+    const strict=Boolean(options.strict);
+    try {
+      const cloudToken=cloudflareSessionToken()||await cloudflareEnsureSession();
+      const result=await cloudflareApi("/auth/account",{token:cloudToken});
+      if (cloudToken!==token) {
+        localStorage.setItem(PLAYER_ACCOUNT_SESSION_KEY,cloudToken);
+        playerAccountSessionEpoch++;
       }
+      cachedAccountStatus=result;
+      cachedAccountStatusAt=Date.now();
+      cachedAccountStatusToken=cloudToken;
+      setCloudflareSessionToken(cloudToken);
+      updateHomeAccountState(result);
+      return result;
+    } catch(err) {
+      if (err&&err.status===401) setPlayerAccountSessionToken("");
+      if (strict) throw err;
+      return null;
     }
-
-    const hasCachedAccount =
-      Boolean(
-        cachedAccountStatus &&
-        cachedAccountStatusToken === token
-      );
-    const cachedAccountFresh =
-      hasCachedAccount &&
-      Date.now() - cachedAccountStatusAt < 5 * 60 * 1000;
-
-    if (!force && cachedAccountFresh) {
-      return cachedAccountStatus;
-    }
-
-    // Po wygaśnięciu cache nie blokujemy nawigacji.
-    // Zwracamy ostatni poprawny status i odnawiamy go w tle.
-    if (!force && !strict && hasCachedAccount) {
-      if (!accountStatusInFlight) {
-        const requestPromise = (async () => {
-          try {
-            const result = await jsonp(
-              "playerAccountStatus",
-              {sessionToken:token}
-            );
-
-            if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
-              return null;
-            }
-
-            if (!result || !result.ok || !result.authenticated) {
-              cachedAccountStatus = null;
-              cachedAccountStatusAt = 0;
-              cachedAccountStatusToken = "";
-              setPlayerAccountSessionToken("");
-              return null;
-            }
-
-            cachedAccountStatus = result;
-            cachedAccountStatusAt = Date.now();
-            cachedAccountStatusToken = token;
-            updateHomeAccountState(result);
-            return result;
-          } catch (err) {
-            return cachedAccountStatusToken === token
-              ? cachedAccountStatus
-              : null;
-          } finally {
-            if (accountStatusInFlight === requestPromise) {
-              accountStatusInFlight = null;
-            }
-          }
-        })();
-        accountStatusInFlight = requestPromise;
-      }
-      accountStatusInFlight.catch(() => {});
-      return cachedAccountStatus;
-    }
-
-    if (!force && accountStatusInFlight) {
-      return accountStatusInFlight;
-    }
-
-    const requestPromise = (async () => {
-      try {
-        const result =
-          await jsonp(
-            "playerAccountStatus",
-            {sessionToken:token}
-          );
-
-        if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
-          return null;
-        }
-
-        if (
-          !result ||
-          !result.ok ||
-          !result.authenticated
-        ) {
-          cachedAccountStatus = null;
-          cachedAccountStatusAt = 0;
-          cachedAccountStatusToken = "";
-          setPlayerAccountSessionToken("");
-          return null;
-        }
-
-        cachedAccountStatus = result;
-        cachedAccountStatusAt = Date.now();
-        cachedAccountStatusToken = token;
-        updateHomeAccountState(result);
-        return result;
-
-      } catch (err) {
-        // Dla kontroli dostępu można wymusić fail-closed: jeśli świeże
-        // potwierdzenie sesji się nie udało, nie otwieramy modułu tylko na
-        // podstawie nawet poprawnego wcześniej cache.
-        if (strict) return null;
-        return cachedAccountStatusToken === token
-          ? cachedAccountStatus
-          : null;
-      } finally {
-        if (accountStatusInFlight === requestPromise) {
-          accountStatusInFlight = null;
-        }
-      }
-    })();
-
-    accountStatusInFlight = requestPromise;
-
-    return requestPromise;
   }
 
   let accountViewRenderInFlight = null;
@@ -4362,12 +3560,10 @@ function mapRenderRouteResult() {
     }
 
     let achievementSyncError=null;
-    if (cloudflareAchievementsEnabled()) {
-      try {
-        await cloudflareAchievementsForAccount(account,{force:forceRefresh});
-      } catch(err) {
-        achievementSyncError=err;
-      }
+    try {
+      await cloudflareAchievementsForAccount(account,{force:forceRefresh});
+    } catch(err) {
+      achievementSyncError=err;
     }
 
     // Konto staje się źródłem tożsamości dla obecnych funkcji.
@@ -4404,10 +3600,7 @@ function mapRenderRouteResult() {
 
     if (achievementSyncError) {
       status.textContent=`⚠️ Nie udało się odświeżyć osiągnięć z Cloudflare: ${achievementSyncError.message||"błąd połączenia"}. Pokazuję ostatnie dostępne dane.`;
-    } else if (new URLSearchParams(location.search).get("migrationBackend")==="achievements") {
-      status.textContent="✅ Osiągnięcia zostały odczytane z Cloudflare.";
     }
-    testCloudflareAchievements(account,status).catch(()=>{});
 
     if (account.admin) {
       // Badge panelu Admina ma być aktualny już na ekranie Konta,
@@ -6170,70 +5363,6 @@ function criticalOperationFinish() {
   document.documentElement.classList.remove("critical-operation-active");
 }
 
-async function timedBackendPost(
-  action,
-  body,
-  options={}
-) {
-  const startedAt = requestTimingNow();
-  const timeoutMs =
-    Math.max(3000,Number(options.timeoutMs) || 20000);
-
-  const controller =
-    typeof AbortController !== "undefined"
-      ? new AbortController()
-      : null;
-
-  const timer =
-    controller
-      ? setTimeout(() => controller.abort(),timeoutMs)
-      : null;
-
-  try {
-    // Krytyczny zapis POST nigdy nie jest automatycznie ponawiany.
-    // Potwierdzenie wyniku odbywa się osobnym odczytem po nonce/requestId.
-    const result = await fetch(
-      BACKEND_URL,
-      {
-        method:"POST",
-        mode:"no-cors",
-        cache:"no-store",
-        signal:controller ? controller.signal : undefined,
-        headers:{
-          "Content-Type":"text/plain;charset=UTF-8"
-        },
-        body:JSON.stringify(body)
-      }
-    );
-
-    recordRequestTiming(
-      action,
-      requestTimingNow() - startedAt,
-      true,
-      "POST"
-    );
-
-    return result;
-
-  } catch (err) {
-    recordRequestTiming(
-      action,
-      requestTimingNow() - startedAt,
-      false,
-      "POST"
-    );
-
-    if (err && err.name === "AbortError") {
-      throw new Error("Przekroczono czas wysyłania zapisu do serwera.");
-    }
-
-    throw err;
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
-
-
 async function confirmedAdminMutationPost(
   action,
   body,
@@ -7656,7 +6785,7 @@ async function setAdminSubmissionStatus(
     loadingText;
 
   // Kafelek znika od razu, ale zachowujemy jego lokalną kopię. Dzięki temu
-  // nie blokujemy administratora na czas odpowiedzi Apps Script, a przy
+  // nie blokujemy administratora na czas odpowiedzi serwera, a przy
   // błędzie możemy bezpiecznie przywrócić dokładnie tę samą listę.
   const submissionsBeforeMutation = adminSubmissionsCache;
   adminPendingSubmissionRows.add(String(row));
@@ -7896,25 +7025,6 @@ function renderGangDemandGlobal(payload) {
   box.querySelectorAll("[data-gang-demand-close]").forEach(button=>button.addEventListener("click",()=>gangDemandCloseGlobal(button.dataset.gangDemandClose,button.textContent.includes("Usuń"))));
 }
 
-async function testCloudflareGangDemandGlobal(appsPayload) {
-  if (!cloudflareGangDemandTestEnabled()) return;
-  const status=el("gang-demand-status");
-  if (status) status.textContent="🧪 Porównuję dane ze starym i nowym serwerem…";
-  try {
-    const token=await cloudflareEnsureSession();
-    const cloudPayload=await cloudflareApi("/gang/demands",{token});
-    const legacyEntries=Array.isArray(appsPayload&&appsPayload.entries) ? appsPayload.entries : [];
-    const cloudEntries=Array.isArray(cloudPayload&&cloudPayload.entries) ? cloudPayload.entries : [];
-    const legacyIds=legacyEntries.map(entry=>String(entry.id)).sort();
-    const cloudIds=cloudEntries.map(entry=>String(entry.id)).sort();
-    const same=legacyIds.length===cloudIds.length && legacyIds.every((id,index)=>id===cloudIds[index]);
-    if (!same) throw new Error(`Bazy nie są zgodne: Apps Script ${legacyIds.length}, Cloudflare ${cloudIds.length}.`);
-    if (status) status.textContent=`✅ Test Cloudflare udany — obie bazy mają te same ${cloudIds.length} aktywne wpisy.`;
-  } catch(err) {
-    if (status) status.textContent=`❌ Test Cloudflare: ${err&&err.message ? err.message : "nie udało się porównać danych."}`;
-  }
-}
-
 async function loadGangDemandGlobal(options={}) {
   if (gangDemandLoadInFlightGlobal) return gangDemandLoadInFlightGlobal;
   if (gangDemandCacheGlobal && !options.force) {
@@ -7960,7 +7070,6 @@ async function loadGangDemandGlobal(options={}) {
       renderGangDemandAdminToolsGlobal();
       refreshGangDemandChoicesIfOpenGlobal();
       syncGangDemandAdminFromAccountGlobal(token);
-      testCloudflareGangDemandGlobal(payload).catch(()=>{});
       return payload;
     } catch(err) {
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return null;
@@ -12766,33 +11875,6 @@ function setupAdmin() {
         statCaps:item.statCaps
       }))
     ]).sort((left,right)=>left[0].localeCompare(right[0]));
-  }
-
-  async function testCloudflareBuilds(legacyResult) {
-    if (!cloudflareBuildTestEnabled()) return;
-    const status=el("build-save-status");
-    if (status) status.textContent="🧪 Porównuję buildy na obu serwerach…";
-    try {
-      const hasAccount=Boolean(playerAccountSessionToken());
-      const token=hasAccount ? await cloudflareEnsureSession() : "";
-      const cloudResult=await cloudflareApi("/builds",{token});
-      const compareScope=(label,legacyItems,cloudItems)=>{
-        const legacyEntries=buildComparisonEntries(legacyItems);
-        const cloudEntries=buildComparisonEntries(cloudItems);
-        const cloudMap=new Map(cloudEntries);
-        const differences=legacyEntries.filter(([id,value])=>cloudMap.get(id)!==value);
-        const extra=cloudEntries.filter(([id])=>!new Map(legacyEntries).has(id));
-        if (differences.length || extra.length) {
-          throw new Error(`${label}: ${differences.length} brakujących lub różnych i ${extra.length} dodatkowych.`);
-        }
-        return legacyEntries.length;
-      };
-      const publicCount=compareScope("publiczne",legacyResult.publicBuilds,cloudResult.publicBuilds);
-      const mineCount=compareScope("moje",legacyResult.myBuilds,cloudResult.myBuilds);
-      if (status) status.textContent=`✅ Test Cloudflare: zgodne ${publicCount} publiczne i ${mineCount} własnych buildów.`;
-    } catch(err) {
-      if (status) status.textContent=`❌ Test buildów Cloudflare: ${err&&err.message ? err.message : "nie udało się porównać danych."}`;
-    }
   }
 
   async function fetchBuildLists(force=false) {
