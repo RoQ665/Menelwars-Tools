@@ -2899,9 +2899,7 @@ function mapRenderRouteResult() {
       if (!moduleAccessPolicyInFlight) {
         moduleAccessPolicyInFlight = (async () => {
           try {
-            const payload = cloudflareModuleAccessEnabled()
-              ? await cloudflareApi("/module-access-policy")
-              : await jsonp("moduleAccessPolicy",{});
+            const payload = await cloudflareApi("/module-access-policy");
             if (payload && payload.ok && payload.policy) {
               moduleAccessPolicyCache = {
                 distillery:Boolean(payload.policy.distillery),
@@ -2929,9 +2927,7 @@ function mapRenderRouteResult() {
 
     moduleAccessPolicyInFlight = (async () => {
       try {
-        const payload = cloudflareModuleAccessEnabled()
-          ? await cloudflareApi("/module-access-policy")
-          : await jsonp("moduleAccessPolicy",{});
+        const payload = await cloudflareApi("/module-access-policy");
         if (payload && payload.ok && payload.policy) {
           moduleAccessPolicyCache = {
             distillery:Boolean(payload.policy.distillery),
@@ -4937,12 +4933,9 @@ async function fetchAccountAdminPlayers(
   }
 
   const requestPromise = (async () => {
-        const result = cloudflareAccountAdminEnabled()
-          ? await cloudflareApi("/admin/accounts",{token:await cloudflareEnsureSession()})
-          : await jsonp(
-              "accountAdminPlayers",
-              {sessionToken:token}
-            );
+        const result = await cloudflareApi("/admin/accounts",{
+          token:await cloudflareEnsureSession()
+        });
 
         if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
           return null;
@@ -5287,80 +5280,14 @@ async function loadAccountAdminPermissions(
     action,
     data={}
   ) {
-    if (cloudflarePaymentsEnabled() && action === "companySetSalaryWaiver") {
-      return cloudflareApi("/company/salary-waiver",{
-        method:"POST",
-        token:await cloudflareEnsureSession(),
-        body:{waived:Boolean(data.waived),requestId:makeRecipeNonce()}
-      });
+    if (action !== "companySetSalaryWaiver") {
+      throw new Error("Nieznana operacja Spółki.");
     }
-    const nonce =
-      makeRecipeNonce();
-
-    let sendError = null;
-
-    try {
-      await timedBackendPost(
-        action,
-        {
-          action,
-          nonce,
-          ...data
-        }
-      );
-    } catch (err) {
-      sendError = err;
-    }
-
-    let result = null;
-
-    for (
-      let attempt=0;
-      attempt<20;
-      attempt++
-    ) {
-      if (attempt > 0) {
-        await new Promise(
-          resolve => setTimeout(resolve,650)
-        );
-      }
-
-      try {
-        result =
-          await jsonp(
-            "companySalaryActionResult",
-            {nonce}
-          );
-      } catch (err) {
-        if (attempt === 19 && !sendError) sendError = err;
-        continue;
-      }
-
-      if (
-        result &&
-        !result.pending
-      ) {
-        break;
-      }
-    }
-
-    if (
-      !result ||
-      result.pending
-    ) {
-      throw sendError || new Error(
-        "Serwer nie zwrócił wyniku operacji."
-      );
-    }
-
-    if (!result.ok) {
-      throw new Error(
-        result.error ||
-        "Operacja nie powiodła się."
-      );
-    }
-
-    return result;
+    return cloudflareApi("/company/salary-waiver",{
+      method:"POST",
+      token:await cloudflareEnsureSession(),
+      body:{waived:Boolean(data.waived),requestId:makeRecipeNonce()}
+    });
   }
 
   async function companySalaryIdentityStatus() {
@@ -5428,12 +5355,9 @@ async function loadAccountAdminPermissions(
     }
 
     const requestPromise = (async () => {
-        const payload = cloudflareGangContentEnabled()
-          ? await cloudflareApi("/gang/polls",{token:await cloudflareEnsureSession()})
-          : await jsonp("gangPolls",{
-              sessionToken: token,
-              identityToken: token
-            });
+        const payload = await cloudflareApi("/gang/polls",{
+          token:await cloudflareEnsureSession()
+        });
 
         if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
           return null;
@@ -6003,9 +5927,9 @@ const goal = payload && payload.goal;
       const token = gangToken();
       if (!token) return null;
 
-      const payload = cloudflareGangContentEnabled()
-        ? await cloudflareApi("/gang/goal",{token:await cloudflareEnsureSession()})
-        : await jsonp("gangGoal",{sessionToken:token});
+      const payload = await cloudflareApi("/gang/goal",{
+        token:await cloudflareEnsureSession()
+      });
       if (!payload || !payload.ok) {
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać celu.");
       }
@@ -6032,9 +5956,9 @@ const goal = payload && payload.goal;
       const token = gangToken();
       if (!token) return null;
 
-      const payload = cloudflareGangContentEnabled()
-        ? await cloudflareApi("/gang/announcements",{token:await cloudflareEnsureSession()})
-        : await jsonp("gangAnnouncements",{sessionToken:token});
+      const payload = await cloudflareApi("/gang/announcements",{
+        token:await cloudflareEnsureSession()
+      });
       if (!payload || !payload.ok) {
         throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać ogłoszeń.");
       }
@@ -6177,9 +6101,9 @@ const goal = payload && payload.goal;
 
     try {
 
-      const payload = cloudflarePaymentsEnabled()
-        ? await cloudflareApi("/payments",{token:await cloudflareEnsureSession()})
-        : await jsonp("payments",{token});
+      const payload = await cloudflareApi("/payments",{
+        token:await cloudflareEnsureSession()
+      });
 
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
         return null;
@@ -6873,9 +6797,7 @@ async function adminPostAction(action, data={}) {
     // Dashboard jest odświeżany dopiero po potwierdzeniu requestId.
     // Jego chwilowy błąd nie unieważnia już potwierdzonego zapisu.
     try {
-      const dashboard = cloudflareAccountAdminEnabled()
-        ? await loadAdminDashboardStatus()
-        : await jsonp("adminDashboardStatus",{token,confirmAt:Date.now()});
+      const dashboard = await loadAdminDashboardStatus();
 
       if (dashboard && dashboard.ok) {
         applyAdminDashboardStatus(dashboard);
@@ -7315,9 +7237,7 @@ async function loadAdminGangTools() {
   const status = el("admin-gang-tools-status");
 
   try {
-    const payload = cloudflareAccountAdminEnabled()
-      ? {ok:true,reservations:[],goal:null,announcements:[]}
-      : await jsonp("adminGangTools",{token});
+    const payload = {ok:true,reservations:[],goal:null,announcements:[]};
 
     if (!payload || !payload.ok) {
       throw new Error(
@@ -7327,12 +7247,12 @@ async function loadAdminGangTools() {
       );
     }
 
-    const gangContentPayload=cloudflareGangContentEnabled()
-      ? await cloudflareApi("/admin/gang-content",{token:await cloudflareEnsureSession()})
-      : null;
-    const distilleryPayload=cloudflareDistilleryEnabled()
-      ? await cloudflareApi("/admin/distillery",{token:await cloudflareEnsureSession()})
-      : null;
+    const gangContentPayload=await cloudflareApi("/admin/gang-content",{
+      token:await cloudflareEnsureSession()
+    });
+    const distilleryPayload=await cloudflareApi("/admin/distillery",{
+      token:await cloudflareEnsureSession()
+    });
     renderAdminGangTools(gangContentPayload ? {
       ...payload,
       goal:gangContentPayload.goal,
@@ -7498,17 +7418,14 @@ async function loadAdminBuilds() {
   const count = el("admin-builds-count");
   const status = el("admin-builds-status");
 
-  if ((!token && !cloudflareBuildsEnabled()) || !box) return;
+  if (!box) return;
 
   if (status) status.textContent = "Pobieranie publicznych buildów...";
 
   try {
-    const payload = cloudflareBuildsEnabled()
-      ? await cloudflareApi("/admin/builds",{token:await cloudflareEnsureSession()})
-      : await jsonp(
-          "adminBuilds",
-          {token}
-        );
+    const payload = await cloudflareApi("/admin/builds",{
+      token:await cloudflareEnsureSession()
+    });
 
     if (!payload || !payload.ok) {
       throw new Error(
@@ -7582,18 +7499,11 @@ async function loadAdminBuilds() {
           );
 
           try {
-            if (cloudflareBuildsEnabled()) {
-              await cloudflareApi(`/admin/builds/${encodeURIComponent(id)}/delete`,{
-                method:"POST",
-                token:await cloudflareEnsureSession(),
-                body:{requestId:makeRecipeNonce()}
-              });
-            } else {
-              await adminPostAction(
-                "adminDeleteBuild",
-                {id}
-              );
-            }
+            await cloudflareApi(`/admin/builds/${encodeURIComponent(id)}/delete`,{
+              method:"POST",
+              token:await cloudflareEnsureSession(),
+              body:{requestId:makeRecipeNonce()}
+            });
 
             if (status) {
               status.textContent =
@@ -7720,15 +7630,13 @@ async function loadAdminDashboardStatus() {
   if (!token) return null;
 
   const requestPromise = (async () => {
-    let payload = cloudflareAccountAdminEnabled()
-      ? {ok:true,pendingSubmissions:0,companyChanges:0,totalAttention:0}
-      : await jsonp("adminDashboardStatus",{token});
-    if (cloudflareDistilleryEnabled()) {
-      const distillery=await cloudflareApi("/admin/distillery",{token:await cloudflareEnsureSession()});
-      const previousPending=Math.max(0,Number(payload&&payload.pendingSubmissions)||0);
-      const pendingSubmissions=Math.max(0,Number(distillery&&distillery.count)||0);
-      payload={...payload,pendingSubmissions,totalAttention:Math.max(0,Number(payload&&payload.totalAttention)||0)-previousPending+pendingSubmissions};
-    }
+    let payload = {ok:true,pendingSubmissions:0,companyChanges:0,totalAttention:0};
+    const distillery=await cloudflareApi("/admin/distillery",{
+      token:await cloudflareEnsureSession()
+    });
+    const previousPending=Math.max(0,Number(payload&&payload.pendingSubmissions)||0);
+    const pendingSubmissions=Math.max(0,Number(distillery&&distillery.count)||0);
+    payload={...payload,pendingSubmissions,totalAttention:Math.max(0,Number(payload&&payload.totalAttention)||0)-previousPending+pendingSubmissions};
     if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch) || adminToken() !== token) {
       return null;
     }
@@ -7909,9 +7817,9 @@ async function checkAdminAccess() {
 
   try {
 
-    const result = cloudflareAccountAdminEnabled()
-      ? await cloudflareApi("/auth/account",{token:await cloudflareEnsureSession()})
-      : await jsonp("adminTest",{token});
+    const result = await cloudflareApi("/auth/account",{
+      token:await cloudflareEnsureSession()
+    });
 
     if (
       !result ||
@@ -8478,9 +8386,9 @@ async function loadGangDemandGlobal(options={}) {
     const sessionEpoch=playerAccountSessionEpoch;
     if (!token) { if (box) box.innerHTML='<div class="empty">🔒 Zaloguj się, aby zobaczyć zapotrzebowanie ekipy.</div>'; return null; }
     try {
-      const payload=cloudflareGangDemandEnabled()
-        ? await cloudflareApi("/gang/demands",{token:await cloudflareEnsureSession()})
-        : await jsonp("gangDemand",{sessionToken:token,_:options.force?Date.now():""},{retry:false});
+      const payload=await cloudflareApi("/gang/demands",{
+        token:await cloudflareEnsureSession()
+      });
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return null;
       if (!payload||!payload.ok) throw new Error(payload&&payload.error ? payload.error : "Nie udało się pobrać zapotrzebowania.");
       gangDemandCacheGlobal=payload;
@@ -8521,13 +8429,9 @@ async function gangDemandCloseGlobal(id,isDelete) {
   const status=el("gang-demand-status");
   if (status) status.textContent="⏳ Zapisuję zmianę…";
   try {
-    if (cloudflareGangDemandEnabled()) {
-      await cloudflareApi(`/gang/demands/${encodeURIComponent(id)}/close`,{
-        method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce(),delete:Boolean(isDelete)}
-      });
-    } else {
-      await playerAccountPostAction("gangDemandClose",{sessionToken:playerAccountSessionToken(),id,delete:Boolean(isDelete)});
-    }
+    await cloudflareApi(`/gang/demands/${encodeURIComponent(id)}/close`,{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce(),delete:Boolean(isDelete)}
+    });
     if (status) status.textContent="✅ Wpis usunięty z aktywnego zapotrzebowania.";
     gangDemandCacheGlobal=null;
     await loadGangDemandGlobal({force:true});
@@ -8540,13 +8444,9 @@ async function gangDemandSetTradableGlobal(itemId,blocked) {
   if (!gangDemandAdminGlobal || !itemId) return;
   if (status) status.textContent=blocked ? `⏳ Oznaczam „${item.name}” jako niewymienialny…` : `⏳ Przywracam „${item.name}” do wyboru…`;
   try {
-    if (cloudflareGangDemandEnabled()) {
-      await cloudflareApi(`/gang/demand-items/${itemId}/block`,{
-        method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce(),blocked:Boolean(blocked)}
-      });
-    } else {
-      await playerAccountPostAction("gangDemandSetTradable",{sessionToken:playerAccountSessionToken(),itemId,blocked:Boolean(blocked)});
-    }
+    await cloudflareApi(`/gang/demand-items/${itemId}/block`,{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce(),blocked:Boolean(blocked)}
+    });
     gangDemandCacheGlobal=null;
     const confirmedPayload=await loadGangDemandGlobal({force:true});
     if (!confirmedPayload || !Array.isArray(confirmedPayload.blockedItemIds)) {
@@ -8585,13 +8485,9 @@ function setupGangDemand() {
     if (status) status.textContent="⏳ Dodaję zapotrzebowanie…";
     try {
       const demandData={itemId,amount:Number(el("gang-demand-amount").value),note:el("gang-demand-note").value};
-      if (cloudflareGangDemandEnabled()) {
-        await cloudflareApi("/gang/demands",{
-          method:"POST",token:await cloudflareEnsureSession(),body:{...demandData,requestId:makeRecipeNonce()}
-        });
-      } else {
-        await playerAccountPostAction("gangDemandAdd",{sessionToken:playerAccountSessionToken(),...demandData});
-      }
+      await cloudflareApi("/gang/demands",{
+        method:"POST",token:await cloudflareEnsureSession(),body:{...demandData,requestId:makeRecipeNonce()}
+      });
       achievementTrack(["gang_demand"]);
       form.reset();
       el("gang-demand-amount").value="1";
@@ -8643,9 +8539,9 @@ async function fetchAdminSubmissionsPayload(options={}) {
   }
 
   const requestPromise = (async () => {
-      const payload = cloudflareDistilleryEnabled()
-        ? await cloudflareApi("/admin/distillery",{token:await cloudflareEnsureSession()})
-        : await jsonp("adminSubmissions",{token});
+      const payload = await cloudflareApi("/admin/distillery",{
+        token:await cloudflareEnsureSession()
+      });
 
       if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch) || adminToken() !== token) {
         return null;
@@ -8883,9 +8779,9 @@ async function loadAdminPlayers() {
 
   try {
 
-    const payload = cloudflarePaymentsEnabled()
-      ? await cloudflareApi("/admin/payments",{token:await cloudflareEnsureSession()})
-      : await jsonp("adminPaymentsStatus",{token});
+    const payload = await cloudflareApi("/admin/payments",{
+      token:await cloudflareEnsureSession()
+    });
 
 
     if (
@@ -9783,9 +9679,9 @@ async function loadAdminPaymentsStatus() {
 
   try {
 
-    const payload = cloudflarePaymentsEnabled()
-      ? await cloudflareApi("/admin/payments",{token:await cloudflareEnsureSession()})
-      : await jsonp("adminPaymentsStatus",{token});
+    const payload = await cloudflareApi("/admin/payments",{
+      token:await cloudflareEnsureSession()
+    });
 
     if (
       !payload ||
@@ -10074,29 +9970,11 @@ async function importAdminPayments() {
   );
 
   try {
-    let payload = null;
-    if (cloudflarePaymentsEnabled()) {
-      payload = await cloudflareApi("/admin/payments/import",{
-        method:"POST",
-        token:await cloudflareEnsureSession(),
-        body:{report,requestId:nonce}
-      });
-    } else {
-      let sendError = null;
-      try {
-        await timedBackendPost("adminImportPayments",{action:"adminImportPayments",token,nonce,report});
-      } catch (err) {
-        sendError = err;
-      }
-      for (let i=0; i<24; i++) {
-        if (i > 0) await new Promise(resolve => setTimeout(resolve,700));
-        payload = await jsonp("adminImportPaymentsResult",{token,nonce});
-        if (!payload || !payload.pending) break;
-      }
-      if (!payload || payload.pending) {
-        throw sendError || new Error("Serwer nie zwrócił wyniku zapisu.");
-      }
-    }
+    const payload = await cloudflareApi("/admin/payments/import",{
+      method:"POST",
+      token:await cloudflareEnsureSession(),
+      body:{report,requestId:nonce}
+    });
 
     if (!payload.ok) {
       if (payload.preview) {
@@ -13177,50 +13055,19 @@ function setupAdmin() {
   async function buildPostAction(payload) {
     if (!backendConfigured()) throw new Error("Backend nie jest skonfigurowany.");
 
-    if (cloudflareBuildsEnabled()) {
-      const hasAccount=Boolean(playerAccountSessionToken());
-      const token=hasAccount ? await cloudflareEnsureSession() : "";
-      if (payload.action === "buildDelete") {
-        return cloudflareApi(`/builds/${encodeURIComponent(payload.id)}/delete`,{
-          method:"POST",
-          token,
-          body:{requestId:payload.nonce}
-        });
-      }
-      const body=Object.assign({},payload,{requestId:payload.nonce});
-      delete body.action;
-      delete body.sessionToken;
-      return cloudflareApi("/builds",{method:"POST",token,body});
+    const hasAccount=Boolean(playerAccountSessionToken());
+    const token=hasAccount ? await cloudflareEnsureSession() : "";
+    if (payload.action === "buildDelete") {
+      return cloudflareApi(`/builds/${encodeURIComponent(payload.id)}/delete`,{
+        method:"POST",
+        token,
+        body:{requestId:payload.nonce}
+      });
     }
-
-    let sendError = null;
-
-    try {
-      await timedBackendPost(
-        payload.action || "buildAction",
-        payload
-      );
-    } catch (err) {
-      sendError = err;
-    }
-
-    let result = null;
-    for (let attempt=0; attempt<20; attempt++) {
-      if (attempt) await new Promise(resolve=>setTimeout(resolve,650));
-      try {
-        result = await jsonp("buildActionResult",{nonce:payload.nonce});
-      } catch (err) {
-        if (attempt === 19 && !sendError) sendError = err;
-        continue;
-      }
-      if (result && !result.pending) break;
-    }
-
-    if (!result || result.pending) {
-      throw sendError || new Error("Serwer nie zwrócił wyniku operacji.");
-    }
-    if (!result.ok) throw new Error(result.error || "Nie udało się zapisać buildu.");
-    return result;
+    const body=Object.assign({},payload,{requestId:payload.nonce});
+    delete body.action;
+    delete body.sessionToken;
+    return cloudflareApi("/builds",{method:"POST",token,body});
   }
 
   function buildValidateBeforeSave(isPublic) {
@@ -13416,16 +13263,8 @@ function setupAdmin() {
     const token=playerAccountSessionToken();
     const sessionEpoch=playerAccountSessionEpoch;
     const requestPromise=(async()=>{ try {
-      let result;
-      if (cloudflareBuildsEnabled()) {
-        const cloudToken=token ? await cloudflareEnsureSession() : "";
-        result=await cloudflareApi("/builds",{token:cloudToken});
-      } else {
-        result = await jsonp("builds",{
-          sessionToken:token
-        });
-        await testCloudflareBuilds(result);
-      }
+      const cloudToken=token ? await cloudflareEnsureSession() : "";
+      const result=await cloudflareApi("/builds",{token:cloudToken});
 
       if (!playerAccountSessionIsCurrent(token,sessionEpoch)) return false;
 
@@ -14335,54 +14174,29 @@ function setupAdmin() {
 
   async function gardenPostAction(action,payload) {
     const nonce=makeRecipeNonce();
-    if (cloudflareGardenEnabled()) {
-      const routes={
-        gardenStart:"/garden/start",
-        gardenFinish:"/garden/finish",
-        gardenCancel:"/garden/cancel",
-        gardenPhase:"/garden/phase",
-        gardenCheck:"/garden/check"
-      };
-      const path=routes[action];
-      if (!path) throw new Error("Nieznana operacja Ogrodu.");
-      let token="";
-      if (playerAccountSessionToken()) token=await cloudflareEnsureSession();
-      try {
-        return await cloudflareApi(path,{
-          method:"POST",
-          token,
-          body:{...payload,requestId:nonce}
-        });
-      } catch (err) {
-        // Duplikat ustawienia i prośba o potwierdzenie korekty są oczekiwanymi
-        // odpowiedziami formularza, nie awarią transportu.
-        if (err&&err.payload&&(err.payload.duplicate||err.payload.correctionRequired)) return err.payload;
-        throw err;
-      }
-    }
-    let sendError=null;
+    const routes={
+      gardenStart:"/garden/start",
+      gardenFinish:"/garden/finish",
+      gardenCancel:"/garden/cancel",
+      gardenPhase:"/garden/phase",
+      gardenCheck:"/garden/check"
+    };
+    const path=routes[action];
+    if (!path) throw new Error("Nieznana operacja Ogrodu.");
+    let token="";
+    if (playerAccountSessionToken()) token=await cloudflareEnsureSession();
     try {
-      await timedBackendPost(action,Object.assign({},payload,{action,nonce}));
+      return await cloudflareApi(path,{
+        method:"POST",
+        token,
+        body:{...payload,requestId:nonce}
+      });
     } catch (err) {
-      // Brak odpowiedzi POST nie oznacza, że Apps Script nie wykonał zapisu.
-      // Nie ponawiamy mutacji; pytamy o ten sam nonce.
-      sendError=err;
+      // Duplikat ustawienia i prośba o potwierdzenie korekty są oczekiwanymi
+      // odpowiedziami formularza, nie awarią transportu.
+      if (err&&err.payload&&(err.payload.duplicate||err.payload.correctionRequired)) return err.payload;
+      throw err;
     }
-    let result=null;
-    for (let attempt=0;attempt<24;attempt++) {
-      if (attempt) await new Promise(resolve=>setTimeout(resolve,650));
-      try {
-        result=await jsonp("gardenActionResult",{nonce});
-      } catch (err) {
-        if (attempt===23 && !sendError) sendError=err;
-        continue;
-      }
-      if (result && !result.pending) break;
-    }
-    if (!result || result.pending) {
-      throw sendError || new Error("Serwer nie potwierdził zapisu Ogrodu.");
-    }
-    return result;
   }
 
   const achievementTrackCompleted = new Set();
@@ -14398,21 +14212,17 @@ function setupAdmin() {
     if (!wanted.length) return {ok:true,unlocked};
     wanted.forEach(id=>achievementTrackCompleted.add(`${sessionToken}:${id}`));
     try {
-      const result=cloudflareAchievementsEnabled()
-        ? await cloudflareApi("/achievements/track",{
-            method:"POST",
-            token:await cloudflareEnsureSession(),
-            body:{ids:wanted,requestId:makeRecipeNonce()}
-          })
-        : await playerAccountPostAction("achievementTrack",{sessionToken,ids:wanted});
+      const result=await cloudflareApi("/achievements/track",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{ids:wanted,requestId:makeRecipeNonce()}
+      });
       if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch)) return null;
       if (result.unlocked) {
         if (cachedAccountStatus) cachedAccountStatus.achievements=result.unlocked;
-        if (cloudflareAchievementsEnabled()) {
-          cloudflareAchievementCache=result.unlocked;
-          cloudflareAchievementCacheAt=Date.now();
-          cloudflareAchievementCacheToken=sessionToken;
-        }
+        cloudflareAchievementCache=result.unlocked;
+        cloudflareAchievementCacheAt=Date.now();
+        cloudflareAchievementCacheToken=sessionToken;
       }
       return result;
     } catch (err) {
@@ -14432,22 +14242,17 @@ function setupAdmin() {
     if (achievementAiWinCompleted.has(completionKey)) return null;
     achievementAiWinCompleted.add(completionKey);
     try {
-      const payload={sessionToken,presetId,ownLevel,runs,wins};
-      const result=cloudflareAchievementsEnabled()
-        ? await cloudflareApi("/achievements/ai-win",{
-            method:"POST",
-            token:await cloudflareEnsureSession(),
-            body:{presetId,ownLevel,runs,wins,requestId:makeRecipeNonce()}
-          })
-        : await playerAccountPostAction("achievementAiWin",payload);
+      const result=await cloudflareApi("/achievements/ai-win",{
+        method:"POST",
+        token:await cloudflareEnsureSession(),
+        body:{presetId,ownLevel,runs,wins,requestId:makeRecipeNonce()}
+      });
       if (!playerAccountSessionIsCurrent(sessionToken,sessionEpoch)) return null;
       if (result.unlocked) {
         if (cachedAccountStatus) cachedAccountStatus.achievements=result.unlocked;
-        if (cloudflareAchievementsEnabled()) {
-          cloudflareAchievementCache=result.unlocked;
-          cloudflareAchievementCacheAt=Date.now();
-          cloudflareAchievementCacheToken=sessionToken;
-        }
+        cloudflareAchievementCache=result.unlocked;
+        cloudflareAchievementCacheAt=Date.now();
+        cloudflareAchievementCacheToken=sessionToken;
       }
       return result;
     } catch (err) {
@@ -15404,31 +15209,13 @@ function setupAdmin() {
     ) {
       return true;
     }
-    const payload = cloudflareGardenEnabled()
-      ? await cloudflareApi("/garden")
-      : await jsonp("gardenData",{
-          sessionToken:playerAccountSessionToken() || ""
-        });
+    const payload = await cloudflareApi("/garden");
     if (!payload || !payload.ok) {
       if (payload && payload.authRequired) {
         await showModuleAccountGate("garden");
         return false;
       }
       throw new Error(payload && payload.error ? payload.error : "Nie udało się pobrać Ogrodu.");
-    }
-    if (cloudflareGardenTestEnabled() && !cloudflareGardenEnabled()) {
-      const status=el("garden-action-status");
-      try {
-        const cloudPayload=await cloudflareApi("/garden");
-        const legacySnapshot=gardenMigrationSnapshot(payload);
-        const cloudSnapshot=gardenMigrationSnapshot(cloudPayload);
-        if (JSON.stringify(legacySnapshot)!==JSON.stringify(cloudSnapshot)) {
-          throw new Error("dane obu serwerów różnią się");
-        }
-        if (status) status.textContent=`✅ Test Cloudflare: zgodne ${legacySnapshot.active.length} aktywne, ${legacySnapshot.results.length} wyników i ${legacySnapshot.phases.length} zdarzeń.`;
-      } catch (err) {
-        if (status) status.textContent=`❌ Test Ogrodu Cloudflare: ${err&&err.message?err.message:"nie udało się porównać danych."}`;
-      }
     }
     const serverPhases=Array.isArray(payload.phases) ? payload.phases : [];
     const phases=gardenPendingPhase
@@ -17386,11 +17173,9 @@ function setupAdmin() {
       }
 
       try {
-        const payload =
-          await jsonp(
-            "gangMenuStatus",
-            {sessionToken:token}
-          );
+        const payload=await cloudflareApi("/gang/menu-status",{
+          token:await cloudflareEnsureSession()
+        });
 
         if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
           return null;
