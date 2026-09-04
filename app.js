@@ -19,7 +19,8 @@
     gangContent:true,
     distillery:true,
     payments:true,
-    moduleAccess:true
+    moduleAccess:true,
+    accountAdmin:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -3961,6 +3962,10 @@ function mapRenderRouteResult() {
     return CLOUDFLARE_FEATURES.moduleAccess || false;
   }
 
+  function cloudflareAccountAdminEnabled() {
+    return CLOUDFLARE_FEATURES.accountAdmin || false;
+  }
+
   function cloudflareSessionToken() {
     return localStorage.getItem(CLOUDFLARE_SESSION_KEY) || "";
   }
@@ -4971,13 +4976,12 @@ async function fetchAccountAdminPlayers(
   }
 
   const requestPromise = (async () => {
-        const result =
-          await jsonp(
-            "accountAdminPlayers",
-            {
-              sessionToken:token
-            }
-          );
+        const result = cloudflareAccountAdminEnabled()
+          ? await cloudflareApi("/admin/accounts",{token:await cloudflareEnsureSession()})
+          : await jsonp(
+              "accountAdminPlayers",
+              {sessionToken:token}
+            );
 
         if (!playerAccountSessionIsCurrent(token,sessionEpoch)) {
           return null;
@@ -7150,6 +7154,26 @@ async function confirmedAdminMutationPost(
     ...body,
     requestId
   };
+
+  if (cloudflareAccountAdminEnabled()) {
+    const nick=String(body.nick||"").trim();
+    const encodedNick=encodeURIComponent(nick);
+    if (action === "accountAdminSetPermission") {
+      return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
+        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"admin",enabled:Boolean(body.enabled)}
+      });
+    }
+    if (action === "accountAdminSetOfficer") {
+      return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
+        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"officer",enabled:Boolean(body.enabled)}
+      });
+    }
+    if (action === "accountAdminLogoutAll") {
+      return cloudflareApi(`/admin/accounts/${encodedNick}/logout-all`,{
+        method:"POST",token:await cloudflareEnsureSession(),body:{requestId}
+      });
+    }
+  }
 
   let transportError = null;
 
