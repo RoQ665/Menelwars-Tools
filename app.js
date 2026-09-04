@@ -337,6 +337,15 @@ function mapRenderRouteResult() {
     return Boolean(CLOUDFLARE_API_URL);
   }
 
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
   function allRecipes() {
 
     const out = [];
