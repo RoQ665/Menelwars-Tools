@@ -20,7 +20,8 @@
     distillery:true,
     payments:true,
     moduleAccess:true,
-    accountAdmin:true
+    accountAdmin:true,
+    accountAuth:true
   });
 
   const STORAGE_KEY = "roq_tools_premium_v1";
@@ -3966,6 +3967,10 @@ function mapRenderRouteResult() {
     return CLOUDFLARE_FEATURES.accountAdmin || false;
   }
 
+  function cloudflareAccountAuthEnabled() {
+    return CLOUDFLARE_FEATURES.accountAuth || false;
+  }
+
   function cloudflareSessionToken() {
     return localStorage.getItem(CLOUDFLARE_SESSION_KEY) || "";
   }
@@ -3995,6 +4000,7 @@ function mapRenderRouteResult() {
         const error=new Error(payload&&payload.error ? payload.error : `Nowy serwer zwrócił błąd ${response.status}.`);
         error.status=response.status;
         error.payload=payload;
+        error.data=payload;
         throw error;
       }
       return payload;
@@ -4230,6 +4236,26 @@ function mapRenderRouteResult() {
 
   async function playerAccountPostAction(action,data={}) {
     const nonce = makeRecipeNonce();
+    if (cloudflareAccountAuthEnabled()) {
+      const routes={
+        playerAccountLogin:["/auth/login",{nick:data.nick,password:data.password},false],
+        playerAccountActivate:["/auth/activate",{nick:data.nick,code:data.code,newPassword:data.newPassword},false],
+        playerAccountResetWithCode:["/auth/reset",{nick:data.nick,code:data.code,newPassword:data.newPassword},false],
+        playerAccountChangePassword:["/auth/change-password",{currentPassword:data.currentPassword,newPassword:data.newPassword},true],
+        playerAccountLogoutOtherSessions:["/auth/logout-others",{},true],
+        playerAccountLogout:["/auth/logout",{},true]
+      };
+      const route=routes[action];
+      if (route) {
+        const token=route[2] ? (cloudflareSessionToken()||playerAccountSessionToken()) : "";
+        const result=await cloudflareApi(route[0],{method:"POST",token,body:route[1]});
+        if (result&&result.session&&result.session.token) {
+          setPlayerAccountSessionToken(result.session.token);
+          setCloudflareSessionToken(result.session.token);
+        }
+        return result;
+      }
+    }
     let sendError = null;
 
     try {
@@ -4287,6 +4313,22 @@ function mapRenderRouteResult() {
 
     const force = Boolean(options.force);
     const strict = Boolean(options.strict);
+
+    if (cloudflareAccountAuthEnabled()) {
+      try {
+        const result=await cloudflareApi("/auth/account",{token:cloudflareSessionToken()||token});
+        cachedAccountStatus=result;
+        cachedAccountStatusAt=Date.now();
+        cachedAccountStatusToken=token;
+        setCloudflareSessionToken(token);
+        updateHomeAccountState(result);
+        return result;
+      } catch(err) {
+        if (err&&err.status===401) setPlayerAccountSessionToken("");
+        if (strict) throw err;
+        return null;
+      }
+    }
 
     const hasCachedAccount =
       Boolean(
@@ -7288,7 +7330,8 @@ async function adminPostAction(action, data={}) {
       adminSetModuleAccess:["/admin/module-access-policy",data]
     };
     const rosterRoutes={
-      adminRenamePlayer:[`/admin/roster/${encodeURIComponent(data.oldNick||"")}/rename`,{newNick:data.newNick}]
+      adminRenamePlayer:[`/admin/roster/${encodeURIComponent(data.oldNick||"")}/rename`,{newNick:data.newNick}],
+      adminGenerateSalaryClaimCode:[`/admin/accounts/${encodeURIComponent(data.nick||"")}/access-code`,{}]
     };
     const cloudRoute=(cloudflareGangContentEnabled()&&gangContentRoutes[action]) ||
       (cloudflareDistilleryEnabled()&&distilleryRoutes[action]) ||
