@@ -7173,6 +7173,16 @@ async function confirmedAdminMutationPost(
         method:"POST",token:await cloudflareEnsureSession(),body:{requestId}
       });
     }
+    if (action === "adminAddPlayer") {
+      return cloudflareApi("/admin/roster",{
+        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,nick}
+      });
+    }
+    if (action === "adminDeletePlayer") {
+      return cloudflareApi(`/admin/roster/${encodedNick}/delete`,{
+        method:"POST",token:await cloudflareEnsureSession(),body:{requestId,confirmationNick:body.confirmationNick}
+      });
+    }
   }
 
   let transportError = null;
@@ -7277,10 +7287,14 @@ async function adminPostAction(action, data={}) {
     const accessRoutes={
       adminSetModuleAccess:["/admin/module-access-policy",data]
     };
+    const rosterRoutes={
+      adminRenamePlayer:[`/admin/roster/${encodeURIComponent(data.oldNick||"")}/rename`,{newNick:data.newNick}]
+    };
     const cloudRoute=(cloudflareGangContentEnabled()&&gangContentRoutes[action]) ||
       (cloudflareDistilleryEnabled()&&distilleryRoutes[action]) ||
       (cloudflarePaymentsEnabled()&&financeRoutes[action]) ||
-      (cloudflareModuleAccessEnabled()&&accessRoutes[action]);
+      (cloudflareModuleAccessEnabled()&&accessRoutes[action]) ||
+      (cloudflareAccountAdminEnabled()&&rosterRoutes[action]);
     const result = cloudRoute
       ? await cloudflareApi(cloudRoute[0],{
           method:"POST",token:await cloudflareEnsureSession(),body:{...cloudRoute[1],requestId:makeRecipeNonce()}
