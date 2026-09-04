@@ -28,11 +28,8 @@
   const REMOTE_KEY = "roq_tools_remote_approved_v1";
   const NICK_KEY = "roq_tools_submitter_nick_v1";
   const RESERVATION_OWNER_KEY = "roq_recipe_reservation_owners_v1";
-  const COMPANY_SALARY_IDENTITY_KEY = "menelwars_company_salary_identity_v1";
-  const PLAYER_IDENTITY_KEY = "menelwars_player_identity_v1";
   const PLAYER_ACCOUNT_SESSION_KEY = "menelwars_player_account_session_v1";
   const CLOUDFLARE_SESSION_KEY = "menelwars_cloudflare_session_v1";
-  const GANG_TOKEN_KEY = "menelwars_tools_gang_token_v1";
   const ADMIN_TOKEN_KEY = "menelwars_tools_admin_token_v1";
   const COMPANY_INCOME_KEY = "menelwars_tools_company_income_v1";
 
@@ -3423,14 +3420,6 @@ function mapRenderRouteResult() {
     return playerAccountSessionToken() || "";
   }
 
-  function setGangToken(token) {
-    if (token) {
-      localStorage.setItem(GANG_TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(GANG_TOKEN_KEY);
-    }
-  }
-
   function makeNonce() {
     if (crypto && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
@@ -4635,39 +4624,6 @@ function mapRenderRouteResult() {
         finally { clearActionLoading(button); }
       });
 
-      el("account-bootstrap-code-open")?.addEventListener("click",()=>{
-        el("account-bootstrap-code-panel").hidden=!el("account-bootstrap-code-panel").hidden;
-      });
-
-      el("account-bootstrap-generate-code")?.addEventListener("click",async event=>{
-        const button=event.currentTarget;
-        const nick=el("account-bootstrap-code-nick").value.trim();
-        const password=el("account-bootstrap-old-password").value;
-        const resultBox=el("account-bootstrap-code-result");
-
-        if (!nick || !password) {
-          status.textContent="Podaj nick i dotychczasowe hasło Admina.";
-          return;
-        }
-
-        setActionLoading(button,status,"Generowanie kodu...");
-
-        try {
-          const result=await playerAccountPostAction(
-            "playerAccountBootstrapGenerateCode",
-            {nick,legacyAdminPassword:password}
-          );
-
-          resultBox.hidden=false;
-          resultBox.innerHTML=`Kod dla: <b>${escapeHtml(result.nick)}</b><strong>${escapeHtml(result.code)}</strong><span class="muted">Jednorazowy · ważny 24 godziny</span>`;
-          status.textContent="✅ Kod został wygenerowany. Użyj go jako hasła przy pierwszym logowaniu.";
-        } catch(err) {
-          status.textContent=err.message || "Nie udało się wygenerować kodu.";
-        } finally {
-          clearActionLoading(button);
-        }
-      });
-
       el("account-reset-open")?.addEventListener("click",()=>{
         el("account-reset-panel").hidden=!el("account-reset-panel").hidden;
       });
@@ -4704,7 +4660,6 @@ function mapRenderRouteResult() {
     }
 
     // Konto staje się źródłem tożsamości dla obecnych funkcji.
-    setPlayerIdentityToken && setPlayerIdentityToken(playerAccountSessionToken());
 
     const profileMedals=achievementCategoryMedals(account.achievements || {});
     const overallMedal=achievementOverallMedal(account.achievements || {});
@@ -4823,48 +4778,7 @@ function mapRenderRouteResult() {
     el("account-logout")?.addEventListener("click",async ()=>{
       try { await playerAccountPostAction("playerAccountLogout",{sessionToken:playerAccountSessionToken()}); } catch(err) {}
       setPlayerAccountSessionToken("");
-      if (typeof setGangToken === "function") setGangToken("");
       await renderAccountView();
-    });
-
-    el("account-bootstrap-admin")?.addEventListener("click",async event=>{
-      const button=event.currentTarget;
-      const password=el("account-bootstrap-password")?.value || "";
-      if (!password) { status.textContent="Wpisz dotychczasowe hasło Admina."; return; }
-      setActionLoading(button,status,"Nadawanie uprawnień...");
-      criticalOperationStart(
-        "🛠 Nadaję pierwszego Admina…",
-        "Zapisuję uprawnienie i potwierdzam je świeżym odczytem konta."
-      );
-      try {
-        let sendError=null;
-        try {
-          await timedBackendPost(
-            "playerAccountBootstrapAdmin",
-            {
-              action:"playerAccountBootstrapAdmin",
-              legacyAdminPassword:password,
-              sessionToken:playerAccountSessionToken()
-            }
-          );
-        } catch(err) {
-          sendError=err;
-        }
-
-        await new Promise(resolve=>setTimeout(resolve,400));
-        const refreshed=await playerAccountStatus({force:true});
-        if (!refreshed || !refreshed.admin) {
-          throw sendError || new Error(
-            "Nie udało się nadać uprawnień. Sprawdź stare hasło Admina."
-          );
-        }
-        status.textContent="✅ Konto otrzymało uprawnienia administratora.";
-        await renderAccountView();
-      } catch(err) { status.textContent=err.message || "Nie udało się nadać uprawnień."; }
-      finally {
-        criticalOperationFinish();
-        clearActionLoading(button);
-      }
     });
 
     el("account-admin-open")?.addEventListener("click",()=>{
@@ -5369,161 +5283,6 @@ async function loadAccountAdminPermissions(
     }
   }
 
-  function playerIdentityToken() {
-    const current =
-      localStorage.getItem(
-        PLAYER_IDENTITY_KEY
-      ) || "";
-
-    if (current) return current;
-
-    const legacy =
-      localStorage.getItem(
-        COMPANY_SALARY_IDENTITY_KEY
-      ) || "";
-
-    if (legacy) {
-      localStorage.setItem(
-        PLAYER_IDENTITY_KEY,
-        legacy
-      );
-    }
-
-    return legacy;
-  }
-
-  function setPlayerIdentityToken(token) {
-    if (token) {
-      localStorage.setItem(
-        PLAYER_IDENTITY_KEY,
-        token
-      );
-
-      // zgodność z v17 — moduł pensji używał starego klucza
-      localStorage.setItem(
-        COMPANY_SALARY_IDENTITY_KEY,
-        token
-      );
-    } else {
-      localStorage.removeItem(
-        PLAYER_IDENTITY_KEY
-      );
-
-      localStorage.removeItem(
-        COMPANY_SALARY_IDENTITY_KEY
-      );
-    }
-  }
-
-  function companySalaryIdentityToken() {
-    return playerAccountSessionToken() || playerIdentityToken();
-  }
-
-  function setCompanySalaryIdentityToken(token) {
-    setPlayerIdentityToken(token);
-  }
-
-  async function playerIdentityStatus() {
-    const token =
-      playerIdentityToken();
-
-    if (!token) return null;
-
-    try {
-      const result =
-        await jsonp(
-          "playerIdentityStatus",
-          {identityToken:token}
-        );
-
-      if (
-        !result ||
-        !result.ok ||
-        !result.authenticated
-      ) {
-        setPlayerIdentityToken("");
-        return null;
-      }
-
-      return result;
-    } catch (err) {
-      return null;
-    }
-  }
-
-  async function playerIdentityPostAction(
-    action,
-    data={}
-  ) {
-    const nonce =
-      makeRecipeNonce();
-
-    let sendError = null;
-
-    try {
-      await timedBackendPost(
-        action,
-        {
-          action,
-          nonce,
-          ...data
-        }
-      );
-    } catch (err) {
-      sendError = err;
-    }
-
-    let result = null;
-
-    for (
-      let attempt=0;
-      attempt<20;
-      attempt++
-    ) {
-      if (attempt > 0) {
-        await new Promise(
-          resolve => setTimeout(resolve,650)
-        );
-      }
-
-      try {
-        result =
-          await jsonp(
-            "playerIdentityActionResult",
-            {nonce}
-          );
-      } catch (err) {
-        if (attempt === 19 && !sendError) sendError = err;
-        continue;
-      }
-
-      if (
-        result &&
-        !result.pending
-      ) {
-        break;
-      }
-    }
-
-    if (
-      !result ||
-      result.pending
-    ) {
-      throw sendError || new Error(
-        "Serwer nie zwrócił wyniku operacji."
-      );
-    }
-
-    if (!result.ok) {
-      throw new Error(
-        result.error ||
-        "Operacja nie powiodła się."
-      );
-    }
-
-    return result;
-  }
-
   async function companySalaryPostAction(
     action,
     data={}
@@ -5535,17 +5294,6 @@ async function loadAccountAdminPermissions(
         body:{waived:Boolean(data.waived),requestId:makeRecipeNonce()}
       });
     }
-    // Aktywacja tożsamości jest od v18 wspólna dla całego Gangu.
-    if (
-      action ===
-      "companyClaimSalaryIdentity"
-    ) {
-      return playerIdentityPostAction(
-        "playerClaimIdentity",
-        data
-      );
-    }
-
     const nonce =
       makeRecipeNonce();
 
@@ -5629,151 +5377,6 @@ async function loadAccountAdminPermissions(
       nick:account.nick,
       expiresAt:account.expiresAt
     };
-  }
-
-  async function renderPlayerIdentitySettings() {
-    const box =
-      el("player-identity-box");
-
-    const status =
-      el("player-identity-status");
-
-    if (!box) return;
-
-    const identity =
-      await playerIdentityStatus();
-
-    if (!identity) {
-      box.innerHTML = `
-        <div class="identity-card">
-          <b>🔐 Potwierdź swoją tożsamość</b>
-
-          <p class="muted">
-            Jednorazowy kod otrzymasz od administratora.
-            Po aktywacji to urządzenie będzie mogło korzystać z funkcji przypisanych do Twojego nicku.
-          </p>
-
-          <div class="salary-identity-grid">
-            <label>
-              <span>Twój nick</span>
-              <input
-                id="player-identity-nick"
-                type="text"
-                maxlength="40"
-                placeholder="np. RoQ">
-            </label>
-
-            <label>
-              <span>Kod aktywacyjny</span>
-              <input
-                id="player-identity-code"
-                type="text"
-                maxlength="12"
-                autocomplete="one-time-code"
-                placeholder="XXXXXXXX">
-            </label>
-
-            <button
-              id="player-identity-claim"
-              class="primary-btn"
-              type="button">
-              🔓 Aktywuj
-            </button>
-          </div>
-        </div>
-      `;
-
-      el("player-identity-claim")
-        ?.addEventListener(
-          "click",
-          async event => {
-            const button =
-              event.currentTarget;
-
-            const nick =
-              el("player-identity-nick")
-                .value.trim();
-
-            const code =
-              el("player-identity-code")
-                .value.trim();
-
-            if (!nick || !code) {
-              status.textContent =
-                "Podaj nick i kod aktywacyjny.";
-              return;
-            }
-
-            setActionLoading(
-              button,
-              status,
-              "Aktywowanie..."
-            );
-
-            try {
-              const result =
-                await playerIdentityPostAction(
-                  "playerClaimIdentity",
-                  {nick,code}
-                );
-
-              setPlayerIdentityToken(
-                result.token
-              );
-
-              status.textContent =
-                `✅ To urządzenie zostało przypisane do: ${result.nick}.`;
-
-              await renderPlayerIdentitySettings();
-
-            } catch (err) {
-              status.textContent =
-                err.message ||
-                "Nie udało się aktywować dostępu.";
-            } finally {
-              clearActionLoading(button);
-            }
-          }
-        );
-
-      return;
-    }
-
-    box.innerHTML = `
-      <div class="identity-card identity-ok">
-        <b>👤 Tożsamość gracza</b>
-
-        <div style="margin-top:6px">
-          Zalogowany jako:
-          <strong>${escapeHtml(identity.nick)}</strong>
-        </div>
-
-        <div class="muted" style="margin-top:4px">
-          ✅ To urządzenie jest potwierdzone.
-        </div>
-
-        <button
-          id="player-identity-logout"
-          class="logout-btn"
-          type="button"
-          style="margin-top:8px">
-          🔒 Odłącz tożsamość
-        </button>
-      </div>
-    `;
-
-    el("player-identity-logout")
-      ?.addEventListener(
-        "click",
-        async () => {
-          setPlayerIdentityToken("");
-
-          status.textContent =
-            "Tożsamość została odłączona na tym urządzeniu.";
-
-          await renderPlayerIdentitySettings();
-        }
-      );
   }
 
   function pollPercent(
@@ -6005,15 +5608,9 @@ async function loadAccountAdminPermissions(
               try {
                 const pollId=button.dataset.pollId;
                 const optionIndex=Number(button.dataset.pollOption);
-                if (cloudflareGangContentEnabled()) {
-                  await cloudflareApi(`/gang/polls/${encodeURIComponent(pollId)}/vote`,{
-                    method:"POST",token:await cloudflareEnsureSession(),body:{optionIndex,requestId:makeRecipeNonce()}
-                  });
-                } else {
-                  await playerIdentityPostAction("gangPollVote",{
-                    identityToken:playerAccountSessionToken(),pollId,optionIndex
-                  });
-                }
+                await cloudflareApi(`/gang/polls/${encodeURIComponent(pollId)}/vote`,{
+                  method:"POST",token:await cloudflareEnsureSession(),body:{optionIndex,requestId:makeRecipeNonce()}
+                });
 
                 invalidateGangPollsCache();
                 await loadGangPolls({force:true});
@@ -6594,7 +6191,6 @@ const goal = payload && payload.goal;
           payload &&
           String(payload.error || "").toLowerCase().includes("brak dostępu")
         ) {
-          setGangToken("");
           setPlayerAccountSessionToken("");
 
           el("gang-tabs").hidden =
@@ -6643,93 +6239,6 @@ const goal = payload && payload.goal;
       if (paymentsLoadInFlight === requestPromise) {
         paymentsLoadInFlight = null;
       }
-    }
-  }
-
-  async function loginToPayments(event) {
-
-    event.preventDefault();
-
-    const password =
-      el("payments-password").value;
-
-    const status =
-      el("payments-login-status");
-
-    if (!password) {
-      status.textContent = "Wpisz hasło gangu.";
-      return;
-    }
-
-    if (!backendConfigured()) {
-      status.textContent = "Backend nie jest skonfigurowany.";
-      return;
-    }
-
-    const nonce = makeNonce();
-
-    status.textContent = "Sprawdzanie hasła...";
-
-    try {
-      let sendError = null;
-
-      try {
-        await timedBackendPost(
-          "gangLogin",
-          {
-            action:"gangLogin",
-            nonce,
-            password
-          }
-        );
-      } catch (err) {
-        sendError = err;
-      }
-
-      let result = null;
-
-      for (let i=0; i<12; i++) {
-
-        await new Promise(
-          resolve => setTimeout(resolve, 500)
-        );
-
-        result =
-          await jsonp(
-            "gangLoginResult",
-            {nonce}
-          );
-
-        if (!result || !result.pending) {
-          break;
-        }
-      }
-
-      if (!result || result.pending) {
-        throw sendError || new Error(
-          "Serwer nie zwrócił wyniku logowania. Spróbuj ponownie."
-        );
-      }
-
-      if (!result.ok || !result.token) {
-        status.textContent =
-          result.error || "Nieprawidłowe hasło.";
-        return;
-      }
-
-      setGangToken(result.token);
-      el("payments-password").value = "";
-      status.textContent = "";
-
-      await loadPayments();
-      achievementTrack(["gang_login"]);
-
-    } catch (err) {
-
-      status.textContent =
-        err && err.message
-          ? err.message
-          : "Nie udało się zalogować.";
     }
   }
 
