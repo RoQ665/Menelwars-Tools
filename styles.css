@@ -2751,7 +2751,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .garden-plots.six-plots{grid-template-columns:repeat(3,minmax(0,1fr))}
 .garden-plot{position:relative;overflow:visible;appearance:none;border:1px solid var(--border,#d8d8d8);border-radius:14px;background:var(--card,#fff);padding:8px;min-width:0;text-align:center;cursor:pointer;color:inherit}
 .garden-plot.active{outline:2px solid var(--accent,#7467ef);outline-offset:1px}
-.garden-plot-visual{height:112px;border-radius:11px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:linear-gradient(#b9d9e7 0 45%,#88a66a 45% 52%,#60472f 52% 100%)}
+.garden-plot-visual{height:132px;border-radius:11px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:linear-gradient(#b9d9e7 0 45%,#88a66a 45% 52%,#60472f 52% 100%)}
 .garden-plot-visual::after{content:"";position:absolute;left:10%;right:10%;bottom:10px;height:36px;border-radius:50%;background:radial-gradient(ellipse at center,#7a593a 0 58%,#563c28 60% 100%);box-shadow:inset 0 4px 8px rgba(255,255,255,.08)}
 .garden-plant-art{position:relative;z-index:1;font-size:46px;line-height:1;transform:translateY(14px)}
 .garden-plot.empty .garden-plant-art{display:none}
@@ -2775,7 +2775,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .garden-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .garden-actions button{flex:1 1 180px;min-height:44px}
 .garden-plot.growing .garden-plot-visual{background:linear-gradient(#b9d9e7 0 45%,#8cab70 45% 52%,#60472f 52% 100%)}
-@media (max-width:700px){.garden-plots,.garden-plots.six-plots{grid-template-columns:repeat(2,minmax(0,1fr))}.garden-plot-visual{height:100px}.garden-number-wrap input{width:68px}}
+@media (max-width:700px){.garden-plots,.garden-plots.six-plots{grid-template-columns:repeat(2,minmax(0,1fr))}.garden-plot-visual{height:118px}.garden-number-wrap input{width:68px}}
 
 /* v20.87 — Ogród dodaje czwarty moduł publiczny. */
 #main-tabs .main-tabs-public{grid-template-columns:repeat(4,minmax(0,1fr))!important}
