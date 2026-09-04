@@ -4316,11 +4316,16 @@ function mapRenderRouteResult() {
 
     if (cloudflareAccountAuthEnabled()) {
       try {
-        const result=await cloudflareApi("/auth/account",{token:cloudflareSessionToken()||token});
+        const cloudToken=cloudflareSessionToken()||await cloudflareEnsureSession();
+        const result=await cloudflareApi("/auth/account",{token:cloudToken});
+        if (cloudToken!==token) {
+          localStorage.setItem(PLAYER_ACCOUNT_SESSION_KEY,cloudToken);
+          playerAccountSessionEpoch++;
+        }
         cachedAccountStatus=result;
         cachedAccountStatusAt=Date.now();
-        cachedAccountStatusToken=token;
-        setCloudflareSessionToken(token);
+        cachedAccountStatusToken=cloudToken;
+        setCloudflareSessionToken(cloudToken);
         updateHomeAccountState(result);
         return result;
       } catch(err) {
