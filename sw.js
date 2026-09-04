@@ -1,16 +1,16 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v22.45";
-// Małe aktualizacje Toola aktywują się automatycznie. Strona nasłuchuje
-// controllerchange i po przejęciu sterowania wraca do świeżej strony głównej.
-const AUTO_ACTIVATE_UPDATE = true;
+const CACHE = "menelwars-tools-v22.46";
+// Jednorazowy most z wersji 22.45. Przy następnym wydaniu wraca na false,
+// a o automacie decyduje już strona: samoczynnie tylko na ekranie głównym.
+const FORCE_THIS_RELEASE = true;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=22.45",
+  "./styles.css?v=22.46",
   "./data.js?v=21.05",
-  "./app.js?v=22.45",
-  "./item-catalog.js?v=22.45",
+  "./app.js?v=22.46",
+  "./item-catalog.js?v=22.46",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
@@ -45,7 +45,7 @@ async function cacheCoreBestEffort() {
 self.addEventListener("install",event => {
   event.waitUntil((async () => {
     await cacheCoreBestEffort();
-    if (AUTO_ACTIVATE_UPDATE) await self.skipWaiting();
+    if (FORCE_THIS_RELEASE) await self.skipWaiting();
   })());
 });
 

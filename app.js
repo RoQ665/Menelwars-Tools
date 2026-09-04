@@ -17027,6 +17027,16 @@ fetchModuleAccessPolicy().catch(()=>{});
     document.body.appendChild(banner);
   }
 
+  function handlePwaUpdateReady(registration) {
+    if (!registration || !registration.waiting) return;
+    const home=activeToolModule==="" && el("home-view") && !el("home-view").hidden;
+    if (home) {
+      registration.waiting.postMessage({type:"SKIP_WAITING"});
+      return;
+    }
+    showPwaUpdateBanner(registration);
+  }
+
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
       if (pwaReloadingForUpdate) return;
@@ -17040,9 +17050,7 @@ fetchModuleAccessPolicy().catch(()=>{});
       .then(registration => {
         registration.update().catch(()=>{});
 
-        if (registration.waiting) {
-          showPwaUpdateBanner(registration);
-        }
+        if (registration.waiting) handlePwaUpdateReady(registration);
 
         registration.addEventListener("updatefound",()=>{
           const worker = registration.installing;
@@ -17053,7 +17061,7 @@ fetchModuleAccessPolicy().catch(()=>{});
               worker.state === "installed" &&
               navigator.serviceWorker.controller
             ) {
-              showPwaUpdateBanner(registration);
+              handlePwaUpdateReady(registration);
             }
           });
         });
