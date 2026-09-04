@@ -5566,6 +5566,7 @@ async function adminPostAction(action, data={}) {
     const financeRoutes={
       adminSetCompanyIncome:["/admin/company/income",{income:Number(data.income)}],
       adminSetCompanyAiDumpRate:["/admin/company/ai-dump-rate",{pointValue:Number(data.pointValue)}],
+      adminSetPaymentsDailyMinimum:["/admin/payments/daily-minimum",{amount:Number(data.amount)}],
       adminActivateCompanySalaryPlan:["/admin/company/activate-plan",{}]
     };
     const accessRoutes={
@@ -8000,7 +8001,7 @@ function buildAdminDailyReport(payload) {
 🟢 0 — wszystko na bieżąco
 🔵 wartość dodatnia — wkład w firmę
 
-Każdego dnia naliczany jest wymóg 2 000 zł.
+Każdego dnia naliczany jest wymóg ${companyMoney(payload&&payload.paymentDailyMinimum||2000)} zł.
 Nadpłata przechodzi na kolejne dni i jednocześnie stanowi wkład w firmę.
 
 🏢 Od 30 000 zł wkładu gracz kwalifikuje się do udziału w spółce.
@@ -8479,6 +8480,9 @@ async function loadAdminPaymentsStatus() {
     adminPaymentsSnapshot =
       payload;
 
+    const dailyMinimumInput=el("admin-payments-daily-minimum");
+    if(dailyMinimumInput)dailyMinimumInput.value=String(Number(payload.paymentDailyMinimum)||2000);
+
     renderAdminCompanyPlan(
       payload
     );
@@ -8899,6 +8903,22 @@ function setupAdmin() {
       "click",
       copyAdminDailyReport
     );
+
+  el("admin-payments-daily-minimum")
+    ?.addEventListener("change",async event=>{
+      const input=event.target;
+      const amount=Math.max(0,Number(String(input.value||"").replace(/\s+/g,"").replace(",","."))||0);
+      input.disabled=true;
+      try {
+        const result=await adminPostAction("adminSetPaymentsDailyMinimum",{amount:String(amount)});
+        await loadAdminPaymentsStatus();
+        await runtimeLoaderFinish(`✅ Składka ${companyMoney(result.amount)} zł od ${formatAdminDate(result.effectiveFrom)}`);
+      } catch(err) {
+        const status=el("admin-status");
+        if(status)status.textContent=err&&err.message?err.message:"Nie udało się zapisać dziennej składki.";
+        await runtimeLoaderFinish("❌ Aktualizacja nieudana");
+      } finally { input.disabled=false; }
+    });
 
   el("admin-company-income")
     ?.addEventListener(
