@@ -3795,6 +3795,16 @@ function mapRenderRouteResult() {
         closeAllAdminSections();
         setupAdminAccordionLazyLoad();
 
+        // Panel jest dołączany pod kartą konta, więc po jego pokazaniu nagłówek
+        // może znaleźć się poza dolną krawędzią ekranu. Przewijamy dopiero po
+        // przeliczeniu układu, aby trafić dokładnie w początek panelu.
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          panel.scrollIntoView({
+            behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+            block:"start"
+          });
+        }));
+
         const adminNeedsRequest =
           !adminWarmLoadedAt ||
           Date.now() - adminWarmLoadedAt >= 30000;
