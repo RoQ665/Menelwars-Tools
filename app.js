@@ -4093,6 +4093,10 @@ async function loadAccountAdminPermissions(
                     ${player.officer ? "✅ Oficer" : "Nadaj Oficera"}
                   </button>
 
+                  <button type="button" data-account-garden-plots="${escapeHtml(player.nick)}" data-max-plots="${Number(player.gardenMaxPlots)===6?6:4}">
+                    ${Number(player.gardenMaxPlots)===6?"🏡 Domek · 6 grządek":"🌱 4 grządki"}
+                  </button>
+
                   <button
                     data-account-logout="${escapeHtml(player.nick)}">
                     🚫 Wyloguj
@@ -4188,6 +4192,17 @@ async function loadAccountAdminPermissions(
               }
             };
         });
+
+      holder.querySelectorAll("[data-account-garden-plots]").forEach(button=>{
+        button.onclick=async()=>{
+          const current=Number(button.dataset.maxPlots)===6?6:4,next=current===6?4:6;
+          criticalOperationStart("🏡 Zmieniam limit Ogrodu…",next===6?"Potwierdzam Domek letniskowy i odblokowuję 6 grządek.":"Przywracam podstawowy limit 4 grządek.");
+          try{
+            await confirmedAdminMutationPost("accountAdminSetGardenPlots",{nick:button.dataset.accountGardenPlots,maxPlots:next},{token:playerAccountSessionToken()});
+            accountAdminPlayersCacheAt=0;await loadAccountAdminPermissions({force:true});
+          }finally{criticalOperationFinish();}
+        };
+      });
 
       holder
         .querySelectorAll(
@@ -5568,6 +5583,11 @@ async function confirmedAdminMutationPost(
   if (action === "accountAdminSetOfficer") {
     return cloudflareApi(`/admin/accounts/${encodedNick}/permission`,{
       method:"POST",token:await cloudflareEnsureSession(),body:{requestId,permission:"officer",enabled:Boolean(body.enabled)}
+    });
+  }
+  if(action==="accountAdminSetGardenPlots"){
+    return cloudflareApi(`/admin/accounts/${encodedNick}/garden-plots`,{
+      method:"POST",token:await cloudflareEnsureSession(),body:{requestId,maxPlots:Number(body.maxPlots)}
     });
   }
   if (action === "accountAdminLogoutAll") {
@@ -12662,7 +12682,7 @@ function setupAdmin() {
   // ============================================================
 
   const GARDEN_LOCAL_KEY = "menelwars_garden_plots_v1";
-  let gardenData = {active:[],results:[],phases:[],plants:["Cebula"]};
+  let gardenData = {active:[],results:[],phases:[],plants:["Cebula"],maxPlots:4};
   let gardenSelectedPlot = 1;
   let gardenResultsSelectedPlant = "";
   let gardenLiveRefreshInFlight = null;
@@ -13750,7 +13770,10 @@ function setupAdmin() {
         return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}:${growingMinute}`;
       }).join("|");
 
-    host.innerHTML = [1,2,3,4].map(plot => {
+    const maxPlots=Number(gardenData.maxPlots)===6?6:4;
+    if(gardenSelectedPlot>maxPlots)gardenSelectedPlot=1;
+    host.classList.toggle("six-plots",maxPlots===6);
+    host.innerHTML = Array.from({length:maxPlots},(_,index)=>index+1).map(plot => {
       const active = gardenOwnExperimentForPlot(plot);
       const summary = active ? gardenPhaseSummary(active) : null;
       const growingFor = active
@@ -14092,7 +14115,9 @@ function setupAdmin() {
     ) {
       return true;
     }
-    const payload = await cloudflareApi("/garden");
+    let token="";
+    if(playerAccountSessionToken())token=await cloudflareEnsureSession();
+    const payload = await cloudflareApi("/garden",{token});
     if (!payload || !payload.ok) {
       if (payload && payload.authRequired) {
         await showModuleAccountGate("garden");
@@ -14106,6 +14131,7 @@ function setupAdmin() {
       : serverPhases;
     const nextGardenData = {
       plants:Array.isArray(payload.plants) ? payload.plants : ["Cebula"],
+      maxPlots:Number(payload.maxPlots)===6?6:4,
       active:Array.isArray(payload.active) ? payload.active : [],
       results:Array.isArray(payload.results) ? payload.results : [],
       phases
