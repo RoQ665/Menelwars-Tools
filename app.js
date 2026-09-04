@@ -17006,13 +17006,22 @@ fetchModuleAccessPolicy().catch(()=>{});
       <button type="button" class="primary-btn">Odśwież</button>
     `;
 
-    banner.querySelector("button")?.addEventListener("click",()=>{
+    banner.querySelector("button")?.addEventListener("click",async event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      const button=event.currentTarget;
+      button.disabled=true;
+      button.textContent="Odświeżam…";
+      try { await registration.update(); } catch {}
       const waiting = registration.waiting;
       if (!waiting) {
         location.reload();
         return;
       }
       waiting.postMessage({type:"SKIP_WAITING"});
+      // Safari/tryb PWA nie zawsze emituje controllerchange od razu.
+      // Awaryjne przeładowanie nie pozwala pozostawić martwego przycisku.
+      setTimeout(()=>location.reload(),2500);
     });
 
     document.body.appendChild(banner);

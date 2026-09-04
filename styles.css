@@ -3419,9 +3419,27 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   align-items:center;
   justify-content:space-between;
 }
-.pwa-update-banner button{white-space:nowrap}
+.pwa-update-banner button{
+  white-space:nowrap;
+  flex:0 0 auto;
+  min-width:96px;
+  min-height:44px;
+  position:relative;
+  z-index:1;
+  pointer-events:auto;
+  touch-action:manipulation;
+}
 
 @media(max-width:600px){
+  .pwa-update-banner{
+    left:10px;
+    right:10px;
+    bottom:max(10px,env(safe-area-inset-bottom));
+    width:auto;
+    transform:none;
+    align-items:stretch;
+  }
+  .pwa-update-banner span{align-self:center;min-width:0}
   .garden-phase-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .garden-phase-option{min-height:112px}
   .garden-race-row{grid-template-columns:1fr}
