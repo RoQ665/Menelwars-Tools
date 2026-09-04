@@ -4077,8 +4077,7 @@ async function loadAccountAdminPermissions(
                       ${player.accountActive ? "aktywne" : "nieaktywne"}
                       · Sesje:
                       ${Number(player.sessions) || 0}
-                      <br>Ostatnia aktywność:
-                      ${player.lastActivity ? escapeHtml(formatPaymentsDateTime(new Date(Number(player.lastActivity)).toISOString())) : "nigdy"}
+                      <br>Ostatnio korzystał: ${escapeHtml(adminLastActivityLabel(player.lastActivity))}
                     </small>
                   </div>
 
@@ -6486,6 +6485,18 @@ async function loadAdminDashboardStatus() {
       adminDashboardStatusInFlight = null;
     }
   }
+}
+
+function adminLastActivityLabel(value) {
+  const time=Number(value);
+  if(!Number.isFinite(time)||time<=0)return "Nigdy";
+  const today=new Date();today.setHours(0,0,0,0);
+  const activity=new Date(time);activity.setHours(0,0,0,0);
+  const days=Math.max(0,Math.round((today-activity)/86400000));
+  if(days===0)return "Dziś";
+  if(days===1)return "Wczoraj";
+  if(days<=30)return `${days} dni temu`;
+  return `Ponad 30 dni temu (${activity.toLocaleDateString("pl-PL")})`;
 }
 
 async function loadAdminSection(
