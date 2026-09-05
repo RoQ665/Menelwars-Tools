@@ -14748,7 +14748,7 @@ function setupAdmin() {
         gardenRenderComboStatus();
         hideStartOverlay();
 
-        const who = active.map(item=>item.nick).filter(Boolean).join(", ") || "Inna osoba";
+        const who = active.map(item=>item.nick).filter(Boolean).join(", ") || "Inny gracz";
         const accepted = window.confirm(`${who} bada już to ustawienie.\n\nInformacja o rezerwacji jest pokazana nad przyciskiem. Czy mimo to chcesz rozpocząć własną uprawę?`);
         if (!accepted) {
           if (status) status.textContent = "";
