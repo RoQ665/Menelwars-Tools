@@ -125,6 +125,7 @@
     const reset=()=>{
       experimentalUiMark('[data-module="garden"], [data-module="distillery"], [data-module="gang"], [data-module="builds"]');
       experimentalUiMark('[data-subtab="payments-view"], [data-subtab="demand-view"], [data-subtab="optimizer-view"]');
+      experimentalUiMark('[data-gang-menu-target="payments-view"], [data-gang-menu-target="demand-view"]');
     };
     if (!active) { reset(); return; }
 
@@ -167,6 +168,8 @@
     experimentalUiMark('[data-subtab="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-subtab="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś zgłosił przedmiot":"");
     experimentalUiMark('[data-subtab="optimizer-view"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja kończy się w ciągu godziny":"");
+    experimentalUiMark('[data-gang-menu-target="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
+    experimentalUiMark('[data-gang-menu-target="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś zgłosił Twój przedmiot":"");
   }
 
   const COMPANY_MIN_CONTRIBUTION = 30000;
