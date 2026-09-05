@@ -14,6 +14,137 @@
   const CLOUDFLARE_SESSION_KEY = "menelwars_cloudflare_session_v1";
   const ADMIN_TOKEN_KEY = "menelwars_tools_admin_token_v1";
   const COMPANY_INCOME_KEY = "menelwars_tools_company_income_v1";
+  const EXPERIMENTAL_UI_KEY = "menelwars_tools_experimental_ui_v1";
+  let experimentalUiWarmInFlight=null;
+  let experimentalUiWarmAt=0;
+
+  function experimentalUiAllowed(account=cachedAccountStatus) {
+    return Boolean(
+      account &&
+      account.admin &&
+      cachedAccountStatusToken === playerAccountSessionToken()
+    );
+  }
+
+  function experimentalUiEnabled() {
+    return experimentalUiAllowed() && localStorage.getItem(EXPERIMENTAL_UI_KEY) === "1";
+  }
+
+  function experimentalUiApply(account=cachedAccountStatus) {
+    const allowed=experimentalUiAllowed(account);
+    const enabled=allowed && localStorage.getItem(EXPERIMENTAL_UI_KEY) === "1";
+    document.body.classList.toggle("experimental-ui",enabled);
+    const indicator=el("experimental-ui-indicator");
+    if (indicator) indicator.hidden=!enabled;
+    const toggle=el("experimental-ui-enabled");
+    if (toggle) {
+      toggle.checked=enabled;
+      toggle.disabled=!allowed;
+    }
+    experimentalUiRefreshAttention();
+    if (enabled) experimentalUiWarmAttentionData();
+  }
+
+  function experimentalUiWarmAttentionData() {
+    if (!experimentalUiEnabled()) return Promise.resolve();
+    if (experimentalUiWarmInFlight) return experimentalUiWarmInFlight;
+    if (Date.now()-experimentalUiWarmAt<2*60*1000) return Promise.resolve();
+    experimentalUiWarmInFlight=Promise.allSettled([
+      fetchApprovedRecipes({force:false}),
+      gardenFetchData({force:false}),
+      loadPayments({background:true}),
+      loadGangDemandGlobal({force:false})
+    ]).finally(()=>{
+      experimentalUiWarmAt=Date.now();
+      experimentalUiWarmInFlight=null;
+      experimentalUiRefreshAttention();
+    });
+    return experimentalUiWarmInFlight;
+  }
+
+  function experimentalUiMark(selector,level="",label="") {
+    document.querySelectorAll(selector).forEach(button=>{
+      if (level) {
+        button.dataset.attention=level;
+        button.dataset.attentionLabel=label;
+        button.title=label;
+      } else {
+        if (button.title===button.dataset.attentionLabel) button.removeAttribute("title");
+        delete button.dataset.attention;
+        delete button.dataset.attentionLabel;
+      }
+    });
+  }
+
+  function experimentalUiBuildIncomplete() {
+    try {
+      const profile=buildProfileStats(buildState);
+      const hasAnyData=Boolean(
+        buildPointsUsed()>0 ||
+        profile.bonusesConfirmed ||
+        profile.provided?.combatAttack ||
+        profile.provided?.combatDefense ||
+        profile.provided?.combatHp
+      );
+      return hasAnyData && !(
+        buildPointsUsed()>0 &&
+        profile.bonusesConfirmed &&
+        profile.provided?.combatAttack &&
+        profile.provided?.combatDefense &&
+        profile.provided?.combatHp
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function experimentalUiRefreshAttention() {
+    const active=experimentalUiEnabled();
+    const reset=()=>{
+      experimentalUiMark('[data-module="garden"], [data-module="distillery"], [data-module="gang"], [data-module="builds"]');
+      experimentalUiMark('[data-subtab="payments-view"], [data-subtab="demand-view"], [data-subtab="optimizer-view"]');
+    };
+    if (!active) { reset(); return; }
+
+    let gardenReady=false;
+    try {
+      gardenReady=(gardenData?.active||[]).some(item=>{
+        if (!item || !gardenOwnExperimentForPlot(Number(item.plot)||1)) return false;
+        return Number(item.startedAt||0)+gardenDynamicDurationMs(item)<=Date.now();
+      });
+    } catch (_) {}
+
+    let distillerySoon=false;
+    try {
+      distillerySoon=Object.values(recipeReservations||{}).some(reservation=>{
+        const left=Number(reservation?.expiresAt||0)-Date.now();
+        return accountOwnsReservation(reservation) && left>0 && left<=60*60*1000;
+      });
+    } catch (_) {}
+
+    let paymentProblem=false;
+    try {
+      const nick=normalizedPlayerNick(cachedAccountNick());
+      const own=(latestGangPayload?.players||[]).find(player=>normalizedPlayerNick(player?.nick)===nick);
+      paymentProblem=Boolean(own && (Number(own.saldo)<0 || Number(own.aiDumpBalance)<0));
+    } catch (_) {}
+
+    let demandOffer=false;
+    try {
+      const canHandle=Boolean(cachedAccountStatus?.admin || cachedAccountStatus?.officer);
+      demandOffer=canHandle && (gangDemandCacheGlobal?.entries||[]).some(entry=>
+        !entry.completed && (entry.offers||[]).some(offer=>!offer.withdrawn)
+      );
+    } catch (_) {}
+
+    experimentalUiMark('[data-module="garden"]',gardenReady?"action":"",gardenReady?"Możliwy zbiór":"");
+    experimentalUiMark('[data-module="distillery"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja kończy się w ciągu godziny":"");
+    experimentalUiMark('[data-module="builds"]',experimentalUiBuildIncomplete()?"suggestion":"",experimentalUiBuildIncomplete()?"Build do uzupełnienia":"");
+    experimentalUiMark('[data-module="gang"]',paymentProblem?"critical":demandOffer?"action":"",paymentProblem?"Sprawdź wpłaty":demandOffer?"Nowe zgłoszenie przedmiotu":"");
+    experimentalUiMark('[data-subtab="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
+    experimentalUiMark('[data-subtab="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś zgłosił przedmiot":"");
+    experimentalUiMark('[data-subtab="optimizer-view"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja kończy się w ciągu godziny":"");
+  }
 
   const COMPANY_MIN_CONTRIBUTION = 30000;
   const COMPANY_BASE_SALARY = 160;
@@ -1533,6 +1664,12 @@ function mapRenderRouteResult() {
                 isOwner &&
                 !isSubmitted;
 
+              const reservationNeedsAttention=
+                experimentalUiEnabled() &&
+                canEnterResult &&
+                Number(reservation.expiresAt||0)>Date.now() &&
+                Number(reservation.expiresAt||0)-Date.now()<=60*60*1000;
+
               return `
                 <article
                   class="unknown-card research-card ${
@@ -1547,6 +1684,7 @@ function mapRenderRouteResult() {
                       ? `data-owned-research="${escapeHtml(key(recipe.baza,recipe.drozdze,recipe.woda,recipe.program))}" style="cursor:pointer"`
                       : ""
                   }>
+                  ${reservationNeedsAttention?'<span class="experimental-card-attention" aria-label="Rezerwacja kończy się w ciągu godziny">!</span>':""}
                   <div>
                     <strong>${displayName(recipe.baza)}</strong>
                     <small>
@@ -2909,6 +3047,7 @@ function mapRenderRouteResult() {
       } finally {
         renderAll();
         updateSubmissionInfo();
+        experimentalUiRefreshAttention();
         distilleryDataLoaded=true;
       }
     })();
@@ -2955,6 +3094,7 @@ function mapRenderRouteResult() {
   function paymentsRow(player,index=0) {
     const saldo = Number(player.saldo) || 0;
     const aiSaldo = Number(player.aiDumpBalance) || 0;
+    const ownPaymentProblem=experimentalUiEnabled()&&normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick())&&(saldo<0||aiSaldo<0);
     let stateClass = "zero", status = "🟢 Na bieżąco", amount = "0 zł";
     if (saldo < 0) {
       stateClass = "debt";
@@ -2967,6 +3107,7 @@ function mapRenderRouteResult() {
     }
     return `
       <div class="finance-player-row ${stateClass} ranked-payment-row">
+        ${ownPaymentProblem?'<span class="experimental-card-attention experimental-card-attention-critical" aria-label="Dług lub brak możliwości kopania">!</span>':""}
         <div class="payment-rank">${paymentsRankBadge(index)}</div>
         <div class="payment-main">
           <div class="finance-name">${escapeHtml(player.nick)}</div>
@@ -3374,6 +3515,7 @@ function mapRenderRouteResult() {
     if (typeof adminWarmLoadedAt !== "undefined") {
       adminWarmLoadedAt = 0;
     }
+    experimentalUiApply(null);
   }
 
   async function playerAccountPostAction(action,data={}) {
@@ -3407,6 +3549,7 @@ function mapRenderRouteResult() {
       cachedAccountStatus=null;
       cachedAccountStatusAt=0;
       cachedAccountStatusToken="";
+      experimentalUiApply(null);
       return null;
     }
 
@@ -3423,6 +3566,7 @@ function mapRenderRouteResult() {
       cachedAccountStatusToken=cloudToken;
       setCloudflareSessionToken(cloudToken);
       updateHomeAccountState(result);
+      experimentalUiApply(result);
       return result;
     } catch(err) {
       if (err&&err.status===401) setPlayerAccountSessionToken("");
@@ -5063,6 +5207,7 @@ const goal = payload && payload.goal;
             )
             .join("")
         : `<div class="empty">Brak danych do wyświetlenia.</div>`;
+    experimentalUiRefreshAttention();
   }
 
   let paymentsLoadInFlight = null;
@@ -7189,12 +7334,14 @@ function renderGangDemandGlobal(payload) {
       const offerButton=!entry.completed&&!entry.isOwner&&given<amount?`<button type="button" class="gang-demand-offer" data-gang-demand-offer="${escapeHtml(entry.id)}" data-demand-remaining="${amount-given}">🤝 Mogę przekazać</button>`:"";
       const closeButton=entry.canClose&&!entry.completed?`<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete?"🗑 Usuń":"✅ Załatwione"}</button>`:"";
       const offerChips=offers.length?`<div class="gang-demand-offers">${offers.map(offer=>`<span class="gang-demand-offer-chip${offer.withdrawn?" withdrawn":""}">${escapeHtml(offer.nick)}: ${Number(offer.amount)||0}${offer.canWithdraw&&!offer.withdrawn?` <button type="button" data-demand-offer-withdraw="${escapeHtml(offer.id)}" title="Wycofaj deklarację">×</button>`:""}</span>`).join("")}</div>`:"";
-      return `<article id="demand-${escapeHtml(entry.id)}" class="gang-demand-card${entry.priority==="urgent"?" urgent":""}"><div class="gang-demand-card-main"><strong>${escapeHtml(entry.nick||"Członek Gangu")} potrzebuje ${amount} szt. ${entry.priority==="urgent"?'<span class="gang-demand-urgent">🔥 Pilne</span>':""}</strong><span class="gang-demand-card-meta">${escapeHtml(gangAnnouncementDate(entry.createdAt))}${entry.completed?" · ✅ Zrealizowane":""}</span>${blocked}${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}${!entry.completed?`<div class="gang-demand-progress" title="Zadeklarowano ${given} z ${amount}"><span style="width:${percent}%"></span></div><span class="gang-demand-card-meta">Zadeklarowano ${Math.min(amount,given)} z ${amount}</span>`:""}${offerChips}</div><div class="gang-demand-actions">${offerButton}${closeButton}</div></article>`;
+      const handlerAttention=experimentalUiEnabled()&&gangDemandAdminGlobal&&!entry.completed&&activeOffers.length>0;
+      return `<article id="demand-${escapeHtml(entry.id)}" class="gang-demand-card${entry.priority==="urgent"?" urgent":""}">${handlerAttention?'<span class="experimental-card-attention" aria-label="Ktoś zgłosił posiadanie przedmiotu">!</span>':""}<div class="gang-demand-card-main"><strong>${escapeHtml(entry.nick||"Członek Gangu")} potrzebuje ${amount} szt. ${entry.priority==="urgent"?'<span class="gang-demand-urgent">🔥 Pilne</span>':""}</strong><span class="gang-demand-card-meta">${escapeHtml(gangAnnouncementDate(entry.createdAt))}${entry.completed?" · ✅ Zrealizowane":""}</span>${blocked}${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}${!entry.completed?`<div class="gang-demand-progress" title="Zadeklarowano ${given} z ${amount}"><span style="width:${percent}%"></span></div><span class="gang-demand-card-meta">Zadeklarowano ${Math.min(amount,given)} z ${amount}</span>`:""}${offerChips}</div><div class="gang-demand-actions">${offerButton}${closeButton}</div></article>`;
     }).join("")}</div></section>`;
   }).join(""):'<div class="empty">📦 Brak wpisów w tym widoku.</div>';
   box.querySelectorAll("[data-gang-demand-close]").forEach(button=>button.addEventListener("click",()=>gangDemandCloseGlobal(button.dataset.gangDemandClose,button.textContent.includes("Usuń"))));
   box.querySelectorAll("[data-gang-demand-offer]").forEach(button=>button.addEventListener("click",()=>gangDemandOfferGlobal(button.dataset.gangDemandOffer,Number(button.dataset.demandRemaining)||1)));
   box.querySelectorAll("[data-demand-offer-withdraw]").forEach(button=>button.addEventListener("click",()=>gangDemandOfferWithdrawGlobal(button.dataset.demandOfferWithdraw)));
+  experimentalUiRefreshAttention();
 }
 
 async function loadGangDemandGlobal(options={}) {
@@ -11638,6 +11785,7 @@ function setupAdmin() {
       if (step==="3") { el("build-setup-combat-attack").value=profile.provided?.combatAttack?profile.combatAttack:""; el("build-setup-combat-defense").value=profile.provided?.combatDefense?profile.combatDefense:""; el("build-setup-combat-hp").value=profile.provided?.combatHp?profile.combatHp:""; }
       dialog.showModal();
     }));
+    experimentalUiRefreshAttention();
   }
 
 
@@ -13989,6 +14137,9 @@ function setupAdmin() {
       const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite",active.plant) : "";
       const frameBadge = "";
       const needsCheck=active && gardenNeedsModelCheck(active,summary);
+      const possibleHarvest=Boolean(active && Number(active.startedAt||0)+gardenDynamicDurationMs(active)<=Date.now());
+      const plotAttention=experimentalUiEnabled()?possibleHarvest:needsCheck;
+      const plotAttentionLabel=experimentalUiEnabled()?"Możliwy zbiór":"Czeka pytanie Tak lub Nie";
 
       return `
         <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">
@@ -13997,7 +14148,7 @@ function setupAdmin() {
             ${frameBadge}
             ${stats}
           </span>
-          ${needsCheck?'<span class="build-setup-attention garden-plot-attention" aria-label="Czeka pytanie Tak lub Nie">!</span>':""}
+          ${plotAttention?`<span class="build-setup-attention garden-plot-attention" aria-label="${plotAttentionLabel}">!</span>`:""}
           <span class="garden-plot-name">Grządka ${plot}</span>
           <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${frame===null?"bez etapu":`etap ${gardenDisplayStage(frame)}`}` : "Pusta"}</span>
         </button>`;
@@ -14353,6 +14504,7 @@ function setupAdmin() {
       gardenRenderEditor();
       gardenRenderRace();
     }
+    experimentalUiRefreshAttention();
     return true;
   }
 
@@ -16917,6 +17069,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     if (document.visibilityState !== "visible") return;
 
     const now = Date.now();
+    experimentalUiRefreshAttention();
 
     if (activeToolModule === "garden") {
       gardenUpdateClock();
@@ -16989,6 +17142,17 @@ fetchModuleAccessPolicy().catch(()=>{});
   });
 
   window.addEventListener('resize',updateMobileFormFocusState);
+
+  el("experimental-ui-enabled")?.addEventListener("change",event=>{
+    if (!experimentalUiAllowed()) {
+      event.currentTarget.checked=false;
+      return;
+    }
+    localStorage.setItem(EXPERIMENTAL_UI_KEY,event.currentTarget.checked?"1":"0");
+    experimentalUiApply();
+  });
+
+  experimentalUiApply(null);
 
   // ============================================================
   // INSTALACJA PWA
