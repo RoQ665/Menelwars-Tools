@@ -4275,7 +4275,7 @@ body.experimental-ui .experimental-ui-test-panel{display:block}
 .experimental-ui-test-grid label{display:flex;align-items:center;gap:7px;min-height:40px;padding:8px;border:1px solid #d4c09f;border-radius:9px;background:#fffaf0;font-size:12px;font-weight:700;cursor:pointer}
 .experimental-ui-test-grid input{flex:0 0 auto;width:18px;height:18px}
 
-body.experimental-ui{background-color:#f1e5cf;background-image:radial-gradient(circle at 18% 12%,rgba(255,255,255,.46) 0 1px,transparent 2px),radial-gradient(circle at 78% 34%,rgba(91,65,35,.055) 0 1px,transparent 2px);background-size:23px 23px,29px 29px}
+body.experimental-ui{min-height:100vh;background-color:#f1e5cf;background-image:radial-gradient(circle at 18% 12%,rgba(255,255,255,.46) 0 1px,transparent 2px),radial-gradient(circle at 78% 34%,rgba(91,65,35,.055) 0 1px,transparent 2px);background-size:23px 23px,29px 29px;background-attachment:fixed}
 body.experimental-ui .topbar{background:linear-gradient(180deg,#51412f 0%,#35291d 100%);box-shadow:0 3px 0 #241a12,0 7px 18px rgba(43,29,15,.3)}
 body.experimental-ui .hero,body.experimental-ui .panel{border-color:#c7ad83;box-shadow:0 2px 0 #b99d72,0 8px 22px rgba(77,52,25,.12)}
 body.experimental-ui .hero{background:linear-gradient(145deg,#fffaf0 0%,#f1e3ca 100%)}
