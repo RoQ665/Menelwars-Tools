@@ -13427,6 +13427,14 @@ function setupAdmin() {
         muted
       });
       if (!result||!result.ok) throw new Error(result&&result.error?result.error:"Nie udało się odroczyć przypomnienia.");
+      if (experimentalUiAllowed()) {
+        const testState=experimentalUiTestState();
+        if (testState.gardenReady) {
+          testState.gardenReady=false;
+          localStorage.setItem(EXPERIMENTAL_UI_TEST_KEY,JSON.stringify(testState));
+          experimentalUiSyncTestControls();
+        }
+      }
       if (status) status.textContent=muted
         ? "✅ Wykrzyknik i powiadomienia wyciszone do końca tej uprawy."
         : `✅ Przypomnę ponownie za ${hours} godz.`;
