@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=22.77">
+  <link rel="stylesheet" href="styles.css?v=22.78">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1075,14 +1075,18 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <div class="panel-body">
         <p class="muted" style="margin-top:0">Dodaj przedmiot, którego szukasz. Wpis jest widoczny dla całego Gangu, aż oznaczysz go jako załatwiony.</p>
         <form id="gang-demand-form" class="gang-demand-form">
-          <label class="gang-demand-search"><span>Przedmiot</span><input id="gang-demand-search" type="search" autocomplete="off" maxlength="100" placeholder="Kliknij i wybierz z listy albo wpisz nazwę…" required><small>Wybierz konkretny przedmiot z listy pod polem.</small></label>
+          <label class="gang-demand-search"><span>🔎 Przedmiot</span><input id="gang-demand-search" type="search" autocomplete="off" maxlength="100" placeholder="Wyszukaj i wybierz przedmiot…" required><small>Wybierz konkretną pozycję z listy wyników.</small></label>
           <div id="gang-demand-results" class="gang-demand-results" hidden></div>
           <div id="gang-demand-admin-tools" class="gang-demand-admin-tools" hidden></div>
           <input id="gang-demand-item-id" type="hidden">
-          <label><span>Ilość</span><input id="gang-demand-amount" type="number" min="1" max="9999" value="1" required></label>
-          <label><span>Uwagi (opcjonalnie)</span><input id="gang-demand-note" type="text" maxlength="180" placeholder="np. potrzebuję do zestawu"></label>
-          <label class="gang-demand-priority"><input id="gang-demand-priority" type="checkbox"> <span>🔥 Pilne</span></label>
-          <button class="primary-btn" type="submit">➕ Dodaj zapotrzebowanie</button>
+          <div class="gang-demand-details-grid">
+            <label class="gang-demand-amount-field"><span>Ilość</span><span class="gang-demand-stepper"><button type="button" data-demand-amount-step="-1" aria-label="Zmniejsz ilość">−</button><input id="gang-demand-amount" type="number" min="1" max="9999" value="1" required><button type="button" data-demand-amount-step="1" aria-label="Zwiększ ilość">+</button></span></label>
+            <label class="gang-demand-note-field"><span>Uwagi <small>(opcjonalnie)</small><b id="gang-demand-note-count">0/180</b></span><input id="gang-demand-note" type="text" maxlength="180" placeholder="Np. potrzebuję do zestawu"></label>
+          </div>
+          <div class="gang-demand-submit-row">
+            <label class="gang-demand-priority"><input id="gang-demand-priority" type="checkbox"><span class="gang-demand-priority-switch" aria-hidden="true"></span><span>🔥 Oznacz jako pilne</span></label>
+            <button class="primary-btn gang-demand-submit" type="submit">➕ Dodaj zapotrzebowanie</button>
+          </div>
         </form>
         <div id="gang-demand-status" class="submit-status"></div>
         <div class="gang-demand-filters" role="group" aria-label="Widok zapotrzebowania">
@@ -2109,7 +2113,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ · © 2026</footer>
 
 <script src="data.js?v=21.05"></script>
-  <script src="item-catalog.js?v=22.77"></script>
-  <script src="app.js?v=22.77"></script>
+  <script src="item-catalog.js?v=22.78"></script>
+  <script src="app.js?v=22.78"></script>
 </body>
 </html>

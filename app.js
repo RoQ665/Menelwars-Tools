@@ -7314,6 +7314,7 @@ function renderGangDemandChoicesGlobal(query) {
     const item=gangDemandItemGlobal(button.dataset.gangDemandItem);
     el("gang-demand-item-id").value=String(item.id);
     el("gang-demand-search").value=item.name;
+    el("gang-demand-search").classList.add("is-selected");
     box.hidden=true; box.innerHTML="";
     renderGangDemandAdminToolsGlobal();
   }));
@@ -7337,7 +7338,7 @@ function renderGangDemandAdminToolsGlobal() {
   host.hidden=!gangDemandAdminGlobal;
   if (!gangDemandAdminGlobal) { host.innerHTML=""; return; }
   const blocked=[...gangDemandBlockedIdsGlobal].map(gangDemandItemGlobal).sort((a,b)=>a.name.localeCompare(b.name,"pl"));
-  host.innerHTML=`<div class="gang-demand-admin-hint"><b>🛡️ Narzędzia Admina i Oficera</b><span>Kliknij czerwone 🚫 przy przedmiocie na liście, aby wyłączyć możliwość dodawania go do zapotrzebowania.</span></div><details><summary>🚫 Niewymienialne przedmioty: ${blocked.length}</summary><div class="gang-demand-blocked-list">${blocked.length?blocked.map(item=>`<button type="button" class="secondary-btn" data-gang-demand-unblock="${item.id}">↩️ ${escapeHtml(item.name)}</button>`).join(""):'<span class="muted">Lista jest jeszcze pusta.</span>'}</div></details>`;
+  host.innerHTML=`<details><summary>🛡️ Narzędzia Admina i Oficera</summary><div class="gang-demand-admin-hint"><span>Kliknij czerwone 🚫 przy przedmiocie na liście, aby wyłączyć możliwość dodawania go do zapotrzebowania.</span></div><details><summary>🚫 Niewymienialne przedmioty: ${blocked.length}</summary><div class="gang-demand-blocked-list">${blocked.length?blocked.map(item=>`<button type="button" class="secondary-btn" data-gang-demand-unblock="${item.id}">↩️ ${escapeHtml(item.name)}</button>`).join(""):'<span class="muted">Lista jest jeszcze pusta.</span>'}</div></details></details>`;
   host.querySelectorAll("[data-gang-demand-unblock]").forEach(button=>button.addEventListener("click",()=>gangDemandSetTradableGlobal(Number(button.dataset.gangDemandUnblock),false)));
 }
 
@@ -7368,7 +7369,8 @@ function renderGangDemandGlobal(payload) {
   const box=el("gang-demand-list");
   if (!box) return;
   const all=Array.isArray(payload&&payload.entries) ? payload.entries : [];
-  const entries=all.filter(entry=>gangDemandFilterGlobal==="completed"?entry.completed:gangDemandFilterGlobal==="mine"?!entry.completed&&(entry.isOwner||(entry.offers||[]).some(offer=>offer.isMine&&!offer.withdrawn)):!entry.completed);
+  const entries=all.filter(entry=>gangDemandFilterGlobal==="completed"?entry.completed:gangDemandFilterGlobal==="mine"?!entry.completed&&(entry.isOwner||(entry.offers||[]).some(offer=>offer.isMine&&!offer.withdrawn)):!entry.completed)
+    .sort((a,b)=>Number(b.priority==="urgent")-Number(a.priority==="urgent"));
   const groups=new Map();
   for(const entry of entries){const key=String(entry.itemId),list=groups.get(key)||[];list.push(entry);groups.set(key,list);}
   box.innerHTML=groups.size?[...groups.entries()].map(([itemId,requests])=>{
@@ -7583,9 +7585,16 @@ async function gangDemandSetTradableGlobal(itemId,blocked) {
 }
 
 function setupGangDemand() {
-  const form=el("gang-demand-form"),search=el("gang-demand-search");
+  const form=el("gang-demand-form"),search=el("gang-demand-search"),amount=el("gang-demand-amount"),note=el("gang-demand-note"),noteCount=el("gang-demand-note-count");
+  const updateNoteCount=()=>{if(noteCount)noteCount.textContent=`${String(note?.value||"").length}/180`;};
+  note?.addEventListener("input",updateNoteCount);
+  document.querySelectorAll("[data-demand-amount-step]").forEach(button=>button.addEventListener("click",()=>{
+    const next=Math.min(9999,Math.max(1,(Number(amount?.value)||1)+Number(button.dataset.demandAmountStep||0)));
+    if(amount)amount.value=String(next);
+  }));
   search?.addEventListener("input",()=>{
     el("gang-demand-item-id").value="";
+    search.classList.remove("is-selected");
     cancelAnimationFrame(gangDemandSearchFrameGlobal);
     gangDemandSearchFrameGlobal=requestAnimationFrame(()=>renderGangDemandChoicesGlobal(search.value));
   });
@@ -7608,6 +7617,8 @@ function setupGangDemand() {
       achievementTrack(["gang_demand"]);
       form.reset();
       el("gang-demand-amount").value="1";
+      search?.classList.remove("is-selected");
+      updateNoteCount();
       gangDemandCacheGlobal=null;
       if (status) status.textContent="✅ Zapotrzebowanie dodane dla całej ekipy.";
       await loadGangDemandGlobal({force:true});
