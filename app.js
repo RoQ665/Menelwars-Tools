@@ -12775,8 +12775,10 @@ function setupAdmin() {
   // ============================================================
 
   const GARDEN_LOCAL_KEY = "menelwars_garden_plots_v1";
+  const GARDEN_PLOT_VIEW_KEY = "menelwars_garden_plot_view_v1";
   let gardenData = {active:[],results:[],phases:[],plants:["Cebula"],maxPlots:4};
   let gardenSelectedPlot = 1;
+  let gardenPlotViewCount = localStorage.getItem(GARDEN_PLOT_VIEW_KEY)==="6" ? 6 : 4;
   let gardenResultsSelectedPlant = "";
   let gardenLiveRefreshInFlight = null;
   let gardenDataFetchedAt = 0;
@@ -13103,10 +13105,27 @@ function setupAdmin() {
       plant:item&&item.plant,sun:item&&item.sun,water:item&&item.water,ph:item&&item.ph
     });
     const stored=Math.max(0,Number(item&&item.estimatedReadyAt||0)-Number(item&&item.startedAt||0));
-    const duration=prediction&&Number.isFinite(Number(prediction.predictedMs))
+    // Termin zapisany dla aktywnej uprawy może zostać skorygowany przez
+    // dobrowolny raport rzeczywistego etapu, dlatego ma pierwszeństwo przed
+    // późniejszymi zmianami ogólnego modelu.
+    const duration=stored || (prediction&&Number.isFinite(Number(prediction.predictedMs))
       ? Number(prediction.predictedMs)
-      : stored || GARDEN_AUTO_MODEL_HOURS*60*60*1000;
+      : GARDEN_AUTO_MODEL_HOURS*60*60*1000);
     return Math.max(24*60*60*1000,Math.min(96*60*60*1000,Math.round(duration)));
+  }
+
+  function gardenCorrectedDurationMs(item,actualFrame,observedAt=Date.now()) {
+    const base=gardenDynamicDurationMs(item);
+    const frame=Math.max(0,Math.min(9,Math.round(Number(actualFrame)||0)));
+    const age=Math.max(60*60*1000,Number(observedAt)-Number(item&&item.startedAt||0));
+    // Obraz reprezentuje przedział etapu. Tempo liczymy z jego środka, ale
+    // pojedynczy raport tylko częściowo przesuwa prognozę; kolejne ją doprecyzują.
+    const implied=age*10/(frame+0.5);
+    const expected=gardenAutoFrame(item,observedAt);
+    const distance=Math.max(1,Math.abs(frame-expected));
+    const evidenceWeight=Math.min(0.65,0.35+distance*0.10);
+    const adjusted=base*(1-evidenceWeight)+implied*evidenceWeight;
+    return Math.max(24*60*60*1000,Math.min(96*60*60*1000,Math.round(adjusted)));
   }
 
   function gardenAutoStageMs(item) {
@@ -13273,7 +13292,7 @@ function setupAdmin() {
     }
   }
 
-  async function gardenRecordModelCheck(frame,answer) {
+  async function gardenRecordModelCheck(frame,answer,actualFrame=null) {
     const own=gardenOwnExperimentForPlot(gardenSelectedPlot);
     if (!own || !gardenUsesAutoModel(own)) return;
     const summary=gardenPhaseSummary(own);
@@ -13283,7 +13302,9 @@ function setupAdmin() {
     const pendingEventId=`local-check-${observedAt}-${Math.random().toString(36).slice(2)}`;
     gardenPendingPhase={
       experimentId:String(own.id),eventId:pendingEventId,eventType:"CHECK",
-      expectedFrame:Number(frame),answer:String(answer),observedAt,source:"AUTO_CHECK"
+      expectedFrame:Number(frame),answer:String(answer),
+      atlasFrame:actualFrame!==null&&Number.isInteger(Number(actualFrame))?Number(actualFrame):null,
+      observedAt,source:"AUTO_CHECK"
     };
     gardenData={...gardenData,phases:[...(gardenData.phases||[]),gardenPendingPhase]};
     gardenRenderPlots();
@@ -13300,13 +13321,20 @@ function setupAdmin() {
       releaseOverlay();
     },700);
     try {
+      const correctedDuration=answer==="NO" && actualFrame!==null && Number.isInteger(Number(actualFrame))
+        ? gardenCorrectedDurationMs(own,Number(actualFrame),observedAt)
+        : gardenDynamicDurationMs(own);
       const result=await gardenPostAction("gardenCheck",{
         id:own.id,ownerToken:own.ownerToken||"",sessionToken:playerAccountSessionToken()||"",
-        expectedFrame:Number(frame),answer:String(answer),estimatedDurationMs:gardenDynamicDurationMs(own)
+        expectedFrame:Number(frame),answer:String(answer),
+        actualFrame:actualFrame!==null&&Number.isInteger(Number(actualFrame))?Number(actualFrame):null,
+        estimatedDurationMs:correctedDuration
       });
       if (!result || !result.ok) throw new Error(result&&result.error?result.error:"Nie udało się zapisać odpowiedzi.");
       gardenPendingPhase=null;
-      if (status) status.textContent=answer==="YES"?"✅ Zapisano zgodność etapu.":"✅ Zapisano niezgodność etapu.";
+      if (status) status.textContent=answer==="YES"
+        ? "✅ Zapisano zgodność etapu."
+        : `✅ Zapisano rzeczywisty etap ${gardenDisplayStage(actualFrame)} i przeliczono termin.`;
       await gardenFetchData({force:true});
       const updatedOwn=gardenOwnExperimentForPlot(gardenSelectedPlot);
       const checkCount=updatedOwn ? gardenCheckStats(updatedOwn,gardenPhaseSummary(updatedOwn)).checks.length : 0;
@@ -13453,16 +13481,53 @@ function setupAdmin() {
         ? `Szacowany czas wzrostu za ${gardenFormatDuration(modelRemaining)}.`
         : "Szacowany czas wzrostu już minął · sprawdź w grze, czy można zebrać plon."
       : `Kolejny etap za ${gardenFormatDuration(stageRemaining)} · przewidywany zbiór za ${gardenFormatDuration(modelRemaining)}.`;
+    const correctionPicker=canAskForCheck&&!check
+      ? `<div class="garden-check-correction" data-garden-correction hidden>
+          <div class="garden-check-direction" data-garden-direction-step>
+            <b>Jak wygląda roślina?</b>
+            <div class="garden-phase-answer-actions">
+              <button type="button" class="secondary-btn" data-garden-direction="earlier">🌱 Jest mniej rozwinięta</button>
+              <button type="button" class="secondary-btn" data-garden-direction="later">🌿 Jest bardziej rozwinięta</button>
+            </div>
+          </div>
+          <div class="garden-check-images" data-garden-images hidden></div>
+        </div>`
+      : "";
     const report=frame===0
       ? `<div class="garden-phase-note">🌱 Etap 1 został potwierdzony przez posadzenie. Pierwsze pytanie pojawi się przy etapie 2.</div>`
       : frame===9
       ? `<div class="garden-phase-note">Etap 10 wygląda tak samo podczas dalszego wzrostu i przy gotowości. Zbierz roślinę dopiero, gdy gra pozwoli.</div>`
       : check
         ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
-        : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div></div>`;
-    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku. Tak/Nie zapisujemy z czasem serwera.</div>`;
-    tools.querySelectorAll("[data-garden-check]").forEach(button=>button.addEventListener("click",()=>{
-      gardenRecordModelCheck(frame,String(button.dataset.gardenCheck||""));
+        : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div>${correctionPicker}</div>`;
+    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku i nie powoduje dodatkowych powiadomień. Raport rzeczywistego etapu koryguje prognozę zbioru.</div>`;
+    tools.querySelector('[data-garden-check="YES"]')?.addEventListener("click",()=>{
+      gardenRecordModelCheck(frame,"YES");
+    });
+    tools.querySelector('[data-garden-check="NO"]')?.addEventListener("click",()=>{
+      const correction=tools.querySelector("[data-garden-correction]");
+      if (correction) correction.hidden=false;
+    });
+    tools.querySelectorAll("[data-garden-direction]").forEach(button=>button.addEventListener("click",()=>{
+      const earlier=button.dataset.gardenDirection==="earlier";
+      const candidates=[];
+      for (let distance=1;distance<=3;distance++) {
+        const candidate=frame+(earlier?-distance:distance);
+        if (candidate>=0&&candidate<=9) candidates.push(candidate);
+      }
+      const images=tools.querySelector("[data-garden-images]");
+      const direction=tools.querySelector("[data-garden-direction-step]");
+      if (!images) return;
+      images.innerHTML=`<b>Wybierz najbardziej podobny obraz:</b><div class="garden-check-image-grid">${candidates.map(candidate=>`<button type="button" class="garden-phase-option" data-garden-actual-frame="${candidate}" aria-label="Etap ${gardenDisplayStage(candidate)}">${gardenFrameSpriteHtml(candidate,"garden-phase-sprite",own.plant)}<b>${gardenDisplayStage(candidate)}</b></button>`).join("")}</div><button type="button" class="secondary-btn garden-check-direction-back" data-garden-direction-back>← Zmień kierunek</button>`;
+      if (direction) direction.hidden=true;
+      images.hidden=false;
+      images.querySelectorAll("[data-garden-actual-frame]").forEach(option=>option.addEventListener("click",()=>{
+        gardenRecordModelCheck(frame,"NO",Number(option.dataset.gardenActualFrame));
+      }));
+      images.querySelector("[data-garden-direction-back]")?.addEventListener("click",()=>{
+        images.hidden=true;
+        if (direction) direction.hidden=false;
+      });
     }));
   }
 
@@ -13895,10 +13960,18 @@ function setupAdmin() {
         return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}:${growingMinute}`;
       }).join("|");
 
-    const maxPlots=Number(gardenData.maxPlots)===6?6:4;
-    if(gardenSelectedPlot>maxPlots)gardenSelectedPlot=1;
-    host.classList.toggle("six-plots",maxPlots===6);
-    host.innerHTML = Array.from({length:maxPlots},(_,index)=>index+1).map(plot => {
+    const availablePlots=Number(gardenData.maxPlots)===6?6:4;
+    const highestActivePlot=gardenOwnExperimentForPlot(6)?6:gardenOwnExperimentForPlot(5)?5:0;
+    const visiblePlots=Math.min(availablePlots,Math.max(gardenPlotViewCount,highestActivePlot));
+    if(gardenSelectedPlot>visiblePlots)gardenSelectedPlot=1;
+    host.classList.toggle("six-plots",visiblePlots===6);
+    const plotToggle=document.querySelector("[data-garden-plot-toggle]");
+    if (plotToggle) {
+      const six=gardenPlotViewCount===6;
+      plotToggle.setAttribute("aria-checked",six?"true":"false");
+      plotToggle.setAttribute("aria-label",six?"Pokaż 4 grządki":"Pokaż 6 grządek");
+    }
+    host.innerHTML = Array.from({length:visiblePlots},(_,index)=>index+1).map(plot => {
       const active = gardenOwnExperimentForPlot(plot);
       const summary = active ? gardenPhaseSummary(active) : null;
       const growingFor = active
@@ -14559,6 +14632,12 @@ function setupAdmin() {
     });
     el("garden-race-sort")?.addEventListener("change",gardenRenderRace);
     el("garden-ready")?.addEventListener("click",gardenRecordReady);
+    document.querySelector("[data-garden-plot-toggle]")?.addEventListener("click",()=>{
+      gardenPlotViewCount=gardenPlotViewCount===6?4:6;
+      localStorage.setItem(GARDEN_PLOT_VIEW_KEY,String(gardenPlotViewCount));
+      gardenRenderPlots();
+      gardenRenderEditor();
+    });
     gardenRenderPlots();
     gardenRenderEditor();
 
