@@ -2757,7 +2757,7 @@ function mapRenderRouteResult() {
     if (account && account.nick) {
       box.className = "submit-info known-recipe";
       box.innerHTML =
-        `✅ Zalogowano jako <b>${escapeHtml(account.nick)}</b>${account.admin ? " · 🛠 Administrator" : ""}.`;
+        `✅ Zalogowano jako <b>${escapeHtml(account.nick)}</b>${account.admin ? " · 🛠 Administracja" : ""}.`;
     } else if (playerAccountSessionToken()) {
       box.className = "submit-info unknown-recipe";
       box.textContent = "⚠️ Nie udało się potwierdzić zapisanej sesji.";
@@ -3863,7 +3863,7 @@ function mapRenderRouteResult() {
       <div class="account-card logged">
         <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${overallMedal?`<span class="account-overall-medal ${overallMedal.tier}" title="Postęp ogólny: ${overallMedal.complete} / ${overallMedal.total} (${Math.round(overallMedal.percent)}%)"><img src="${overallMedal.medal}" alt="Medal ogólnego postępu"></span>`:""}</div>
         ${profileMedals.length?`<div class="account-achievement-medals" aria-label="Medale kategorii">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}
-        <div style="margin-top:5px">✅ Zalogowany${account.admin ? " · 🛠 Administrator" : account.officer ? " · 🎖 Oficer" : ""}</div>
+        <div style="margin-top:5px">✅ Sesja aktywna${account.admin ? " · 🛠 Administracja" : account.officer ? " · 🎖 Ranga oficerska" : ""}</div>
         <div style="margin-top:7px"><span class="account-session-stat">📱 Aktywne sesje: ${Number(account.sessionCount)||0}</span></div>
         <div class="account-actions">
           <button id="account-change-open" type="button">🔑 Zmień hasło</button>
@@ -5242,8 +5242,8 @@ const goal = payload && payload.goal;
       );
 
     const aiDumpDate = payload.aiDump && (
-      payload.aiDump.snapshotDate ||
-      payload.aiDump.updatedAt
+      payload.aiDump.updatedAt ||
+      payload.aiDump.snapshotDate
     );
     el("payments-ai-date").textContent = formatPaymentsDateTime(aiDumpDate);
 
@@ -12010,7 +12010,7 @@ function setupAdmin() {
       }
       if (status) status.textContent = "✅ Skopiowano oficjalny format buildu.";
     } catch (err) {
-      if (status) status.textContent = "⚠️ Nie mogłem użyć schowka — gotowy ciąg jest w polu powyżej.";
+      if (status) status.textContent = "⚠️ Nie udało się użyć schowka — ciąg do skopiowania jest w polu powyżej.";
     }
   }
 
@@ -14748,7 +14748,7 @@ function setupAdmin() {
         gardenRenderComboStatus();
         hideStartOverlay();
 
-        const who = active.map(item=>item.nick).filter(Boolean).join(", ") || "Inny gracz";
+        const who = active.map(item=>item.nick).filter(Boolean).join(", ") || "Inna osoba";
         const accepted = window.confirm(`${who} bada już to ustawienie.\n\nInformacja o rezerwacji jest pokazana nad przyciskiem. Czy mimo to chcesz rozpocząć własną uprawę?`);
         if (!accepted) {
           if (status) status.textContent = "";
