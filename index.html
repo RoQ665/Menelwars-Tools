@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=22.49">
+  <link rel="stylesheet" href="styles.css?v=22.50">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1636,6 +1636,25 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
         </div>
 
+        <details class="admin-accordion experimental-ui-test-panel">
+          <summary>
+            <span>🧪 Test znaczników eksperymentalnego wyglądu</span>
+            <span class="accordion-chevron">⌄</span>
+          </summary>
+          <div class="admin-accordion-body">
+            <div class="muted experimental-ui-test-description">Symulacje działają tylko na tym urządzeniu i nie zmieniają prawdziwych danych.</div>
+            <div class="experimental-ui-test-grid">
+              <label><input type="checkbox" data-experimental-ui-test="gardenReady"> Możliwy zbiór w Ogrodzie</label>
+              <label><input type="checkbox" data-experimental-ui-test="distillerySoon"> Rezerwacja Destylarni do 1 godz.</label>
+              <label><input type="checkbox" data-experimental-ui-test="paymentDebt"> Dług we wpłatach</label>
+              <label><input type="checkbox" data-experimental-ui-test="aiBlocked"> Brak możliwości kopania</label>
+              <label><input type="checkbox" data-experimental-ui-test="demandOffer"> Zgłoszenie przedmiotu przez inną osobę</label>
+              <label><input type="checkbox" data-experimental-ui-test="buildIncomplete"> Build PvP do uzupełnienia</label>
+            </div>
+            <button id="experimental-ui-test-reset" type="button" class="secondary-btn">Wyczyść wszystkie symulacje</button>
+          </div>
+        </details>
+
         <details id="admin-section-module-access" class="admin-accordion">
           <summary>
             <span>🔐 Dostęp do modułów</span>
@@ -2108,7 +2127,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ</footer>
 
 <script src="data.js?v=21.05"></script>
-  <script src="item-catalog.js?v=22.49"></script>
-  <script src="app.js?v=22.49"></script>
+  <script src="item-catalog.js?v=22.50"></script>
+  <script src="app.js?v=22.50"></script>
 </body>
 </html>

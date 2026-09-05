@@ -15,6 +15,7 @@
   const ADMIN_TOKEN_KEY = "menelwars_tools_admin_token_v1";
   const COMPANY_INCOME_KEY = "menelwars_tools_company_income_v1";
   const EXPERIMENTAL_UI_KEY = "menelwars_tools_experimental_ui_v1";
+  const EXPERIMENTAL_UI_TEST_KEY = "menelwars_tools_experimental_ui_test_v1";
   let experimentalUiWarmInFlight=null;
   let experimentalUiWarmAt=0;
 
@@ -30,6 +31,26 @@
     return experimentalUiAllowed() && localStorage.getItem(EXPERIMENTAL_UI_KEY) === "1";
   }
 
+  function experimentalUiTestState() {
+    if (!experimentalUiEnabled()) return {};
+    try {
+      const parsed=JSON.parse(localStorage.getItem(EXPERIMENTAL_UI_TEST_KEY)||"{}");
+      return parsed&&typeof parsed==="object"?parsed:{};
+    } catch (_) { return {}; }
+  }
+
+  function experimentalUiTest(key) {
+    return Boolean(experimentalUiTestState()[key]);
+  }
+
+  function experimentalUiSyncTestControls() {
+    const state=experimentalUiTestState();
+    document.querySelectorAll("[data-experimental-ui-test]").forEach(input=>{
+      input.checked=Boolean(state[input.dataset.experimentalUiTest]);
+      input.disabled=!experimentalUiEnabled();
+    });
+  }
+
   function experimentalUiApply(account=cachedAccountStatus) {
     const allowed=experimentalUiAllowed(account);
     const enabled=allowed && localStorage.getItem(EXPERIMENTAL_UI_KEY) === "1";
@@ -41,6 +62,7 @@
       toggle.checked=enabled;
       toggle.disabled=!allowed;
     }
+    experimentalUiSyncTestControls();
     experimentalUiRefreshAttention();
     if (enabled) experimentalUiWarmAttentionData();
   }
@@ -106,40 +128,41 @@
     };
     if (!active) { reset(); return; }
 
-    let gardenReady=false;
+    const testState=experimentalUiTestState();
+    let gardenReady=Boolean(testState.gardenReady);
     try {
-      gardenReady=(gardenData?.active||[]).some(item=>{
+      gardenReady=gardenReady||(gardenData?.active||[]).some(item=>{
         if (!item || !gardenOwnExperimentForPlot(Number(item.plot)||1)) return false;
         return Number(item.startedAt||0)+gardenDynamicDurationMs(item)<=Date.now();
       });
     } catch (_) {}
 
-    let distillerySoon=false;
+    let distillerySoon=Boolean(testState.distillerySoon);
     try {
-      distillerySoon=Object.values(recipeReservations||{}).some(reservation=>{
+      distillerySoon=distillerySoon||Object.values(recipeReservations||{}).some(reservation=>{
         const left=Number(reservation?.expiresAt||0)-Date.now();
         return accountOwnsReservation(reservation) && left>0 && left<=60*60*1000;
       });
     } catch (_) {}
 
-    let paymentProblem=false;
+    let paymentProblem=Boolean(testState.paymentDebt||testState.aiBlocked);
     try {
       const nick=normalizedPlayerNick(cachedAccountNick());
       const own=(latestGangPayload?.players||[]).find(player=>normalizedPlayerNick(player?.nick)===nick);
-      paymentProblem=Boolean(own && (Number(own.saldo)<0 || Number(own.aiDumpBalance)<0));
+      paymentProblem=paymentProblem||Boolean(own && (Number(own.saldo)<0 || Number(own.aiDumpBalance)<0));
     } catch (_) {}
 
-    let demandOffer=false;
+    let demandOffer=Boolean(testState.demandOffer);
     try {
-      const canHandle=Boolean(cachedAccountStatus?.admin || cachedAccountStatus?.officer);
-      demandOffer=canHandle && (gangDemandCacheGlobal?.entries||[]).some(entry=>
-        !entry.completed && (entry.offers||[]).some(offer=>!offer.withdrawn)
+      demandOffer=demandOffer||(gangDemandCacheGlobal?.entries||[]).some(entry=>
+        !entry.completed && entry.isOwner && (entry.offers||[]).some(offer=>!offer.withdrawn&&!offer.isMine)
       );
     } catch (_) {}
 
     experimentalUiMark('[data-module="garden"]',gardenReady?"action":"",gardenReady?"Możliwy zbiór":"");
     experimentalUiMark('[data-module="distillery"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja kończy się w ciągu godziny":"");
-    experimentalUiMark('[data-module="builds"]',experimentalUiBuildIncomplete()?"suggestion":"",experimentalUiBuildIncomplete()?"Build do uzupełnienia":"");
+    const buildIncomplete=Boolean(testState.buildIncomplete||experimentalUiBuildIncomplete());
+    experimentalUiMark('[data-module="builds"]',buildIncomplete?"suggestion":"",buildIncomplete?"Build do uzupełnienia":"");
     experimentalUiMark('[data-module="gang"]',paymentProblem?"critical":demandOffer?"action":"",paymentProblem?"Sprawdź wpłaty":demandOffer?"Nowe zgłoszenie przedmiotu":"");
     experimentalUiMark('[data-subtab="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-subtab="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś zgłosił przedmiot":"");
@@ -1668,7 +1691,7 @@ function mapRenderRouteResult() {
                 experimentalUiEnabled() &&
                 canEnterResult &&
                 Number(reservation.expiresAt||0)>Date.now() &&
-                Number(reservation.expiresAt||0)-Date.now()<=60*60*1000;
+                (Number(reservation.expiresAt||0)-Date.now()<=60*60*1000||experimentalUiTest("distillerySoon"));
 
               return `
                 <article
@@ -3094,7 +3117,7 @@ function mapRenderRouteResult() {
   function paymentsRow(player,index=0) {
     const saldo = Number(player.saldo) || 0;
     const aiSaldo = Number(player.aiDumpBalance) || 0;
-    const ownPaymentProblem=experimentalUiEnabled()&&normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick())&&(saldo<0||aiSaldo<0);
+    const ownPaymentProblem=experimentalUiEnabled()&&normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick())&&(saldo<0||aiSaldo<0||experimentalUiTest("paymentDebt")||experimentalUiTest("aiBlocked"));
     let stateClass = "zero", status = "🟢 Na bieżąco", amount = "0 zł";
     if (saldo < 0) {
       stateClass = "debt";
@@ -7334,7 +7357,7 @@ function renderGangDemandGlobal(payload) {
       const offerButton=!entry.completed&&!entry.isOwner&&given<amount?`<button type="button" class="gang-demand-offer" data-gang-demand-offer="${escapeHtml(entry.id)}" data-demand-remaining="${amount-given}">🤝 Mogę przekazać</button>`:"";
       const closeButton=entry.canClose&&!entry.completed?`<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete?"🗑 Usuń":"✅ Załatwione"}</button>`:"";
       const offerChips=offers.length?`<div class="gang-demand-offers">${offers.map(offer=>`<span class="gang-demand-offer-chip${offer.withdrawn?" withdrawn":""}">${escapeHtml(offer.nick)}: ${Number(offer.amount)||0}${offer.canWithdraw&&!offer.withdrawn?` <button type="button" data-demand-offer-withdraw="${escapeHtml(offer.id)}" title="Wycofaj deklarację">×</button>`:""}</span>`).join("")}</div>`:"";
-      const handlerAttention=experimentalUiEnabled()&&gangDemandAdminGlobal&&!entry.completed&&activeOffers.length>0;
+      const handlerAttention=experimentalUiEnabled()&&!entry.completed&&entry.isOwner&&(activeOffers.some(offer=>!offer.isMine)||experimentalUiTest("demandOffer"));
       return `<article id="demand-${escapeHtml(entry.id)}" class="gang-demand-card${entry.priority==="urgent"?" urgent":""}">${handlerAttention?'<span class="experimental-card-attention" aria-label="Ktoś zgłosił posiadanie przedmiotu">!</span>':""}<div class="gang-demand-card-main"><strong>${escapeHtml(entry.nick||"Członek Gangu")} potrzebuje ${amount} szt. ${entry.priority==="urgent"?'<span class="gang-demand-urgent">🔥 Pilne</span>':""}</strong><span class="gang-demand-card-meta">${escapeHtml(gangAnnouncementDate(entry.createdAt))}${entry.completed?" · ✅ Zrealizowane":""}</span>${blocked}${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}${!entry.completed?`<div class="gang-demand-progress" title="Zadeklarowano ${given} z ${amount}"><span style="width:${percent}%"></span></div><span class="gang-demand-card-meta">Zadeklarowano ${Math.min(amount,given)} z ${amount}</span>`:""}${offerChips}</div><div class="gang-demand-actions">${offerButton}${closeButton}</div></article>`;
     }).join("")}</div></section>`;
   }).join(""):'<div class="empty">📦 Brak wpisów w tym widoku.</div>';
@@ -14137,7 +14160,7 @@ function setupAdmin() {
       const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite",active.plant) : "";
       const frameBadge = "";
       const needsCheck=active && gardenNeedsModelCheck(active,summary);
-      const possibleHarvest=Boolean(active && Number(active.startedAt||0)+gardenDynamicDurationMs(active)<=Date.now());
+      const possibleHarvest=Boolean(active && (Number(active.startedAt||0)+gardenDynamicDurationMs(active)<=Date.now()||(experimentalUiTest("gardenReady")&&plot===gardenSelectedPlot)));
       const plotAttention=experimentalUiEnabled()?possibleHarvest:needsCheck;
       const plotAttentionLabel=experimentalUiEnabled()?"Możliwy zbiór":"Czeka pytanie Tak lub Nie";
 
@@ -17150,6 +17173,31 @@ fetchModuleAccessPolicy().catch(()=>{});
     }
     localStorage.setItem(EXPERIMENTAL_UI_KEY,event.currentTarget.checked?"1":"0");
     experimentalUiApply();
+  });
+
+  function experimentalUiRerenderTestSurfaces() {
+    experimentalUiRefreshAttention();
+    if (gardenDataLoaded) gardenRenderPlots();
+    if (distilleryDataLoaded) renderAll();
+    if (latestGangPayload) renderGangPayload(latestGangPayload);
+    if (gangDemandCacheGlobal) renderGangDemandGlobal(gangDemandCacheGlobal);
+    buildRenderSetupSteps();
+  }
+
+  document.querySelectorAll("[data-experimental-ui-test]").forEach(input=>{
+    input.addEventListener("change",()=>{
+      if (!experimentalUiEnabled()) { input.checked=false; return; }
+      const state=experimentalUiTestState();
+      state[input.dataset.experimentalUiTest]=input.checked;
+      localStorage.setItem(EXPERIMENTAL_UI_TEST_KEY,JSON.stringify(state));
+      experimentalUiRerenderTestSurfaces();
+    });
+  });
+
+  el("experimental-ui-test-reset")?.addEventListener("click",()=>{
+    localStorage.removeItem(EXPERIMENTAL_UI_TEST_KEY);
+    experimentalUiSyncTestControls();
+    experimentalUiRerenderTestSurfaces();
   });
 
   experimentalUiApply(null);
