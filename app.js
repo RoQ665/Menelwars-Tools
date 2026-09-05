@@ -13448,15 +13448,21 @@ function setupAdmin() {
     }
   }
 
-  async function gardenSnoozeReady(own,{hours=0,muted=false}={}) {
+  function gardenSnoozeLabel(minutes) {
+    const value=Number(minutes)||0;
+    if (value<60) return `${value} min`;
+    return `${value/60} godz.`;
+  }
+
+  async function gardenSnoozeReady(own,{minutes=0,muted=false}={}) {
     const status=el("garden-action-status");
-    if (status) status.textContent=muted?"⏳ Wyciszam przypomnienie…":`⏳ Ustawiam przypomnienie za ${hours} godz.…`;
+    if (status) status.textContent=muted?"⏳ Wyciszam przypomnienie…":`⏳ Ustawiam przypomnienie za ${gardenSnoozeLabel(minutes)}…`;
     try {
       const result=await gardenPostAction("gardenSnoozeReady",{
         id:own.id,
         ownerToken:own.ownerToken||"",
         sessionToken:playerAccountSessionToken()||"",
-        hours,
+        minutes,
         muted
       });
       if (!result||!result.ok) throw new Error(result&&result.error?result.error:"Nie udało się odroczyć przypomnienia.");
@@ -13476,7 +13482,7 @@ function setupAdmin() {
       }
       if (status) status.textContent=muted
         ? "✅ Wykrzyknik i powiadomienia wyciszone do końca tej uprawy."
-        : `✅ Przypomnę ponownie za ${hours} godz.`;
+        : `✅ Przypomnę ponownie za ${gardenSnoozeLabel(minutes)}.`;
       gardenRenderPlots();
       gardenRenderEditor();
       experimentalUiRefreshAttention();
@@ -13769,7 +13775,7 @@ function setupAdmin() {
         ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
         : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div>${correctionPicker}</div>`;
     const readyCheck=frame===9&&modelRemaining===0&&reminderDue
-      ? `<div class="garden-phase-question"><b>🌱 Roślina nadal nie jest gotowa?</b><div class="muted">Potwierdzenie schowa wykrzyknik i zapisze rzeczywisty, dłuższy czas wzrostu.</div><button type="button" class="secondary-btn" data-garden-not-ready>Jeszcze nie można zebrać</button><div class="garden-check-correction" data-garden-snooze-options hidden><b>Kiedy przypomnieć ponownie?</b><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-snooze="6">Za 6 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="12">Za 12 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="24">Za 24 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="mute">Wycisz do zbioru</button></div></div></div>`
+      ? `<div class="garden-phase-question"><b>🌱 Roślina nadal nie jest gotowa?</b><div class="muted">Potwierdzenie schowa wykrzyknik i zapisze rzeczywisty, dłuższy czas wzrostu.</div><button type="button" class="secondary-btn" data-garden-not-ready>Jeszcze nie można zebrać</button><div class="garden-check-correction" data-garden-snooze-options hidden><b>Kiedy przypomnieć ponownie?</b><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-snooze="30">Za 30 min</button><button type="button" class="secondary-btn" data-garden-snooze="60">Za 1 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="180">Za 3 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="360">Za 6 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="720">Za 12 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="1440">Za 24 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="mute">Wycisz do zbioru</button></div></div></div>`
       : lastNotReadyAt&&frame===9
         ? `<div class="garden-phase-note">✅ Ostatnio potwierdzono dalszy wzrost: ${new Date(lastNotReadyAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.</div>`
         : "";
@@ -13780,7 +13786,7 @@ function setupAdmin() {
     });
     tools.querySelectorAll("[data-garden-snooze]").forEach(button=>button.addEventListener("click",()=>{
       const value=button.dataset.gardenSnooze;
-      gardenSnoozeReady(own,value==="mute"?{muted:true}:{hours:Number(value)});
+      gardenSnoozeReady(own,value==="mute"?{muted:true}:{minutes:Number(value)});
     }));
     tools.querySelector('[data-garden-check="YES"]')?.addEventListener("click",()=>{
       gardenRecordModelCheck(frame,"YES");
