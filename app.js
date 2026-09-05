@@ -28,11 +28,11 @@
   }
 
   function experimentalUiEnabled() {
-    return experimentalUiAllowed() && localStorage.getItem(EXPERIMENTAL_UI_KEY) === "1";
+    return true;
   }
 
   function experimentalUiTestState() {
-    if (!experimentalUiEnabled()) return {};
+    if (!experimentalUiAllowed()) return {};
     try {
       const parsed=JSON.parse(localStorage.getItem(EXPERIMENTAL_UI_TEST_KEY)||"{}");
       return parsed&&typeof parsed==="object"?parsed:{};
@@ -47,19 +47,19 @@
     const state=experimentalUiTestState();
     document.querySelectorAll("[data-experimental-ui-test]").forEach(input=>{
       input.checked=Boolean(state[input.dataset.experimentalUiTest]);
-      input.disabled=!experimentalUiEnabled();
+      input.disabled=!experimentalUiAllowed();
     });
   }
 
   function experimentalUiApply(account=cachedAccountStatus) {
     const allowed=experimentalUiAllowed(account);
-    const enabled=allowed && localStorage.getItem(EXPERIMENTAL_UI_KEY) === "1";
+    const enabled=true;
     document.body.classList.toggle("experimental-ui",enabled);
     const indicator=el("experimental-ui-indicator");
-    if (indicator) indicator.hidden=!enabled;
+    if (indicator) indicator.hidden=true;
     const toggle=el("experimental-ui-enabled");
     if (toggle) {
-      toggle.checked=enabled;
+      toggle.checked=true;
       toggle.disabled=!allowed;
     }
     experimentalUiSyncTestControls();
@@ -17246,7 +17246,7 @@ fetchModuleAccessPolicy().catch(()=>{});
 
   document.querySelectorAll("[data-experimental-ui-test]").forEach(input=>{
     input.addEventListener("change",()=>{
-      if (!experimentalUiEnabled()) { input.checked=false; return; }
+      if (!experimentalUiAllowed()) { input.checked=false; return; }
       const state=experimentalUiTestState();
       state[input.dataset.experimentalUiTest]=input.checked;
       localStorage.setItem(EXPERIMENTAL_UI_TEST_KEY,JSON.stringify(state));
