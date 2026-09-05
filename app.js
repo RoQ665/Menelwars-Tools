@@ -2436,7 +2436,8 @@ function mapRenderRouteResult() {
         "kranowa":"Kranówa"
       },
       base: {
-        "cukier klasyczny":"Cukier"
+        "cukier klasyczny":"Cukier",
+        "zgniłe jabłko":"Jabłko"
       },
       yeast: {}
     };
