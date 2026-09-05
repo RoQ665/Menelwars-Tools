@@ -4283,47 +4283,26 @@ async function loadAccountAdminPermissions(
           ${
             result.players
               .map(player => `
-                <div class="account-admin-player">
-                  <div>
-                    <b>${escapeHtml(player.nick)}</b>
-                    <small>
-                      Konto:
-                      ${player.accountActive ? "aktywne" : "nieaktywne"}
-                      · Sesje:
-                      ${Number(player.sessions) || 0}
-                      <br>Ostatnio korzystał: ${escapeHtml(adminLastActivityLabel(player.lastActivity))}
-                    </small>
+                <div class="account-admin-player${player.accountActive ? " account-active" : " account-inactive"}">
+                  <div class="admin-player-identity">
+                    <div class="admin-player-name-row">
+                      <b>${escapeHtml(player.nick)}</b>
+                      <span class="admin-player-role ${player.admin ? "admin" : player.officer ? "officer" : "player"}">${player.admin ? "🛠 Administracja" : player.officer ? "🎖 Oficer" : "👤 Gracz"}</span>
+                    </div>
+                    <div class="admin-player-badges">
+                      <span class="admin-player-state ${player.accountActive ? "active" : "inactive"}">${player.accountActive ? "● Konto aktywne" : "○ Konto nieaktywne"}</span>
+                      <span class="admin-player-sessions">📱 ${Number(player.sessions) || 0} ${Number(player.sessions)===1 ? "sesja" : "sesji"}</span>
+                    </div>
+                    <small class="admin-player-last-activity">🕒 Ostatnia aktywność: <b>${escapeHtml(adminLastActivityLabel(player.lastActivity))}</b></small>
                   </div>
 
-                  <button
-                    data-account-admin-toggle="${escapeHtml(player.nick)}"
-                    data-enabled="${player.admin ? 1 : 0}">
-                    ${player.admin ? "✅ Admin" : "Nadaj Admin"}
-                  </button>
-
-                  <button
-                    data-account-officer-toggle="${escapeHtml(player.nick)}"
-                    data-enabled="${player.officer ? 1 : 0}">
-                    ${player.officer ? "✅ Oficer" : "Nadaj Oficera"}
-                  </button>
-
-                  <button
-                    data-account-logout="${escapeHtml(player.nick)}">
-                    🚫 Wyloguj
-                  </button>
-
-                  <button
-                    type="button"
-                    data-account-rename-player="${escapeHtml(player.nick)}">
-                    ✏️ Zmień nick
-                  </button>
-
-                  <button
-                    type="button"
-                    class="account-player-delete"
-                    data-account-delete-player="${escapeHtml(player.nick)}">
-                    🗑 Usuń
-                  </button>
+                  <div class="admin-player-actions">
+                    <button class="admin-player-role-action" data-account-admin-toggle="${escapeHtml(player.nick)}" data-enabled="${player.admin ? 1 : 0}">${player.admin ? "✓ Administracja" : "Nadaj Admina"}</button>
+                    <button class="admin-player-role-action" data-account-officer-toggle="${escapeHtml(player.nick)}" data-enabled="${player.officer ? 1 : 0}">${player.officer ? "✓ Oficer" : "Nadaj Oficera"}</button>
+                    <button class="admin-player-session-action" data-account-logout="${escapeHtml(player.nick)}">🚫 Wyloguj sesje</button>
+                    <button type="button" class="admin-player-edit-action" data-account-rename-player="${escapeHtml(player.nick)}">✏️ Zmień nick</button>
+                    <button type="button" class="account-player-delete" data-account-delete-player="${escapeHtml(player.nick)}">🗑 Usuń</button>
+                  </div>
                 </div>
               `)
               .join("")

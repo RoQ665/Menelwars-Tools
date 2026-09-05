@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=22.72">
+  <link rel="stylesheet" href="styles.css?v=22.73">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1598,14 +1598,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
       <div id="admin-content" hidden>
 
-        <div style="
-          display:flex;
-          justify-content:space-between;
-          align-items:center;
-          gap:8px;
-          flex-wrap:wrap;
-          margin-bottom:12px;
-        ">
+        <div class="admin-session-banner">
 
           <div>
 
@@ -1747,14 +1740,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             </summary>
             <div class="admin-accordion-body">
 
-  <div style="
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:8px;
-    flex-wrap:wrap;
-    margin-bottom:10px;
-  ">
+  <div class="admin-section-toolbar">
 
     <span class="muted">Snapshoty, raport dzienny, dochód spółki i import rankingu.</span>
 
@@ -1773,15 +1759,13 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
     </div>
   </div>
 
-  <label style="display:block;margin-top:12px">
+  <label class="admin-setting-card">
     <span style="display:block;font-weight:700;margin-bottom:4px">Dzienna składka pieniężna</span>
     <input id="admin-payments-daily-minimum" type="text" inputmode="decimal" value="4000" style="width:100%;box-sizing:border-box">
     <small class="muted">Zmiana zaczyna obowiązywać od następnego dnia.</small>
   </label>
 
-  <div style="
-    margin-top:12px;
-  ">
+  <div class="admin-daily-report-action">
 
     <button
       id="admin-copy-daily-report"
@@ -1800,15 +1784,12 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
   </div>
 
-  <div style="
-    margin-top:14px;
-    padding-top:14px;
-    border-top:1px solid #d8c7aa;
-  ">
-
-    <strong>
-      🏢 Spółka gangowa — udziały i pensje
-    </strong>
+  <details class="admin-inner-accordion admin-company-settings">
+    <summary>
+      <span><b>🏢 Spółka — ustawienia i pensje</b><small>Dochód, przelicznik AI oraz plan wypłat</small></span>
+      <span class="accordion-chevron">⌄</span>
+    </summary>
+    <div class="admin-inner-accordion-body">
 
     <div
       class="muted"
@@ -1862,13 +1843,10 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       </div>
     </div>
 
-  </div>
+    </div>
+  </details>
 
-  <div style="
-  margin-top:14px;
-  padding-top:14px;
-  border-top:1px solid #d8c7aa;
-">
+  <div class="admin-parser-card admin-parser-payments">
 
   <strong>
     📋 Wklej ranking wpłat
@@ -1920,7 +1898,9 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
     style="margin-top:10px">
   </div>
 
-  <div style="margin-top:18px;padding-top:14px;border-top:1px solid #d8c7aa">
+  </div>
+
+  <div class="admin-parser-card admin-parser-ai">
     <strong>♻️ Wysypisko All Inclusive — ranking Historycznie</strong>
     <div class="muted" style="margin-top:4px;margin-bottom:8px">
       Wklej ranking z zakładki Historycznie. System policzy przyrost od poprzedniego snapshotu i odejmie 20 pkt za każdy dzień.
@@ -1930,8 +1910,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
     <div id="admin-ai-dump-status" class="submit-status" style="margin-top:8px"></div>
     <div id="admin-ai-dump-result" style="margin-top:10px"></div>
   </div>
-
-</div>
 
                       </div>
           </details>
@@ -2076,11 +2054,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
           </summary>
           <div class="admin-accordion-body">
 
-            <form
-              id="admin-player-add-form"
-              class="submit-form"
-              style="margin-bottom:12px"
-            >
+            <form id="admin-player-add-form" class="submit-form admin-player-add-form">
 
               <label>
                 <span>Nick nowego gracza</span>
@@ -2135,7 +2109,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ</footer>
 
 <script src="data.js?v=21.05"></script>
-  <script src="item-catalog.js?v=22.72"></script>
-  <script src="app.js?v=22.72"></script>
+  <script src="item-catalog.js?v=22.73"></script>
+  <script src="app.js?v=22.73"></script>
 </body>
 </html>
