@@ -161,14 +161,14 @@
     } catch (_) {}
 
     experimentalUiMark('[data-module="garden"]',gardenReady?"action":"",gardenReady?"Możliwy zbiór":"");
-    experimentalUiMark('[data-module="distillery"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja kończy się w ciągu godziny":"");
+    experimentalUiMark('[data-module="distillery"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja: < 1 godz.":"");
     const buildIncomplete=Boolean(testState.buildIncomplete||experimentalUiBuildIncomplete());
     experimentalUiMark('[data-module="builds"]',buildIncomplete?"suggestion":"",buildIncomplete?"Build do uzupełnienia":"");
     experimentalUiMark('.build-card-list > [data-build-scope="mine"]:first-child',testState.buildIncomplete?"suggestion":"",testState.buildIncomplete?"Test: build wymaga uzupełnienia":"");
     experimentalUiMark('[data-module="gang"]',paymentProblem?"critical":demandOffer?"action":"",paymentProblem?"Sprawdź wpłaty":demandOffer?"Nowe zgłoszenie przedmiotu":"");
     experimentalUiMark('[data-subtab="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-subtab="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś zgłosił przedmiot":"");
-    experimentalUiMark('[data-subtab="optimizer-view"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja kończy się w ciągu godziny":"");
+    experimentalUiMark('[data-subtab="optimizer-view"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja: < 1 godz.":"");
     experimentalUiMark('[data-gang-menu-target="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-gang-menu-target="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś zgłosił Twój przedmiot":"");
   }
