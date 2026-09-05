@@ -134,7 +134,7 @@
     try {
       gardenReady=gardenReady||(gardenData?.active||[]).some(item=>{
         if (!item || !gardenOwnExperimentForPlot(Number(item.plot)||1)) return false;
-        return Number(item.startedAt||0)+gardenDynamicDurationMs(item)<=Date.now();
+        return gardenReadyReminderDue(item);
       });
     } catch (_) {}
 
@@ -164,6 +164,7 @@
     experimentalUiMark('[data-module="distillery"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja kończy się w ciągu godziny":"");
     const buildIncomplete=Boolean(testState.buildIncomplete||experimentalUiBuildIncomplete());
     experimentalUiMark('[data-module="builds"]',buildIncomplete?"suggestion":"",buildIncomplete?"Build do uzupełnienia":"");
+    experimentalUiMark('.build-card-list > [data-build-scope="mine"]:first-child',testState.buildIncomplete?"suggestion":"",testState.buildIncomplete?"Test: build wymaga uzupełnienia":"");
     experimentalUiMark('[data-module="gang"]',paymentProblem?"critical":demandOffer?"action":"",paymentProblem?"Sprawdź wpłaty":demandOffer?"Nowe zgłoszenie przedmiotu":"");
     experimentalUiMark('[data-subtab="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-subtab="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś zgłosił przedmiot":"");
@@ -12705,6 +12706,8 @@ function setupAdmin() {
           if (item) showBuildViewer(item);
         });
       });
+      const simulatedIncomplete=experimentalUiEnabled()&&experimentalUiTest("buildIncomplete");
+      experimentalUiMark('.build-card-list > [data-build-scope="mine"]:first-child',simulatedIncomplete?"suggestion":"",simulatedIncomplete?"Test: build wymaga uzupełnienia":"");
     }
     pvpPopulateSelectors();
   }
@@ -13288,6 +13291,14 @@ function setupAdmin() {
     return Math.max(24*60*60*1000,Math.min(96*60*60*1000,Math.round(duration)));
   }
 
+  function gardenReadyReminderDue(item,now=Date.now()) {
+    if (!item || item.readyReminderMuted) return false;
+    const estimatedReadyAt=Number(item.startedAt||0)+gardenDynamicDurationMs(item);
+    if (estimatedReadyAt>now) return false;
+    const postponedUntil=Number(item.readyReminderAt||0);
+    return !postponedUntil || postponedUntil<=now;
+  }
+
   function gardenCorrectedDurationMs(item,actualFrame,observedAt=Date.now()) {
     const base=gardenDynamicDurationMs(item);
     const frame=Math.max(0,Math.min(9,Math.round(Number(actualFrame)||0)));
@@ -13383,7 +13394,8 @@ function setupAdmin() {
       gardenFinish:"/garden/finish",
       gardenCancel:"/garden/cancel",
       gardenPhase:"/garden/phase",
-      gardenCheck:"/garden/check"
+      gardenCheck:"/garden/check",
+      gardenSnoozeReady:"/garden/snooze-ready"
     };
     const path=routes[action];
     if (!path) throw new Error("Nieznana operacja Ogrodu.");
@@ -13400,6 +13412,30 @@ function setupAdmin() {
       // odpowiedziami formularza, nie awarią transportu.
       if (err&&err.payload&&(err.payload.duplicate||err.payload.correctionRequired)) return err.payload;
       throw err;
+    }
+  }
+
+  async function gardenSnoozeReady(own,{hours=0,muted=false}={}) {
+    const status=el("garden-action-status");
+    if (status) status.textContent=muted?"⏳ Wyciszam przypomnienie…":`⏳ Ustawiam przypomnienie za ${hours} godz.…`;
+    try {
+      const result=await gardenPostAction("gardenSnoozeReady",{
+        id:own.id,
+        ownerToken:own.ownerToken||"",
+        sessionToken:playerAccountSessionToken()||"",
+        hours,
+        muted
+      });
+      if (!result||!result.ok) throw new Error(result&&result.error?result.error:"Nie udało się odroczyć przypomnienia.");
+      if (status) status.textContent=muted
+        ? "✅ Wykrzyknik i powiadomienia wyciszone do końca tej uprawy."
+        : `✅ Przypomnę ponownie za ${hours} godz.`;
+      await gardenFetchData({force:true});
+      gardenRenderPlots();
+      gardenRenderEditor();
+      experimentalUiRefreshAttention();
+    } catch(err) {
+      if (status) status.textContent=`❌ ${err&&err.message?err.message:"Błąd odroczenia przypomnienia."}`;
     }
   }
 
@@ -13650,10 +13686,18 @@ function setupAdmin() {
     const estimatedReadyAt=Number(own.startedAt||0)+gardenDynamicDurationMs(own);
     const modelRemaining=Math.max(0,estimatedReadyAt-Date.now());
     const stageRemaining=Math.max(0,(frame+1)*gardenAutoStageMs(own)-(Date.now()-Number(own.startedAt||0)));
+    const reminderAt=Number(own.readyReminderAt||0);
+    const lastNotReadyAt=Number(own.lastNotReadyAt||0);
+    const reminderMuted=Boolean(own.readyReminderMuted);
+    const reminderDue=gardenReadyReminderDue(own);
     const timingText=frame===9
       ? modelRemaining>0
         ? `Szacowany czas wzrostu za ${gardenFormatDuration(modelRemaining)}.`
-        : "Szacowany czas wzrostu już minął · sprawdź w grze, czy można zebrać plon."
+        : reminderMuted
+          ? "Sprawdzono: roślina nadal rosła · przypomnienie wyłączone dla tej uprawy."
+          : reminderAt>Date.now()
+            ? `Sprawdzono: roślina nadal rosła · przypomnienie ${new Date(reminderAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.`
+            : "Szacowany czas wzrostu już minął · sprawdź w grze, czy można zebrać plon."
       : `Kolejny etap za ${gardenFormatDuration(stageRemaining)} · przewidywany zbiór za ${gardenFormatDuration(modelRemaining)}.`;
     const correctionPicker=canAskForCheck&&!check
       ? `<div class="garden-check-correction" data-garden-correction hidden>
@@ -13674,7 +13718,20 @@ function setupAdmin() {
       : check
         ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
         : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div>${correctionPicker}</div>`;
-    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku i nie powoduje dodatkowych powiadomień. Raport rzeczywistego etapu koryguje prognozę zbioru.</div>`;
+    const readyCheck=frame===9&&modelRemaining===0&&reminderDue
+      ? `<div class="garden-phase-question"><b>🌱 Roślina nadal nie jest gotowa?</b><div class="muted">Potwierdzenie schowa wykrzyknik i zapisze rzeczywisty, dłuższy czas wzrostu.</div><button type="button" class="secondary-btn" data-garden-not-ready>Jeszcze nie można zebrać</button><div class="garden-check-correction" data-garden-snooze-options hidden><b>Kiedy przypomnieć ponownie?</b><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-snooze="6">Za 6 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="12">Za 12 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="24">Za 24 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="mute">Wycisz do zbioru</button></div></div></div>`
+      : lastNotReadyAt&&frame===9
+        ? `<div class="garden-phase-note">✅ Ostatnio potwierdzono dalszy wzrost: ${new Date(lastNotReadyAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.</div>`
+        : "";
+    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}${readyCheck}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku i nie powoduje dodatkowych powiadomień. Raport rzeczywistego etapu koryguje prognozę zbioru.</div>`;
+    tools.querySelector("[data-garden-not-ready]")?.addEventListener("click",()=>{
+      const options=tools.querySelector("[data-garden-snooze-options]");
+      if (options) options.hidden=false;
+    });
+    tools.querySelectorAll("[data-garden-snooze]").forEach(button=>button.addEventListener("click",()=>{
+      const value=button.dataset.gardenSnooze;
+      gardenSnoozeReady(own,value==="mute"?{muted:true}:{hours:Number(value)});
+    }));
     tools.querySelector('[data-garden-check="YES"]')?.addEventListener("click",()=>{
       gardenRecordModelCheck(frame,"YES");
     });
@@ -14163,7 +14220,7 @@ function setupAdmin() {
       const sprite = frame !== null ? gardenFrameSpriteHtml(frame,"garden-plot-sprite",active.plant) : "";
       const frameBadge = "";
       const needsCheck=active && gardenNeedsModelCheck(active,summary);
-      const possibleHarvest=Boolean(active && (Number(active.startedAt||0)+gardenDynamicDurationMs(active)<=Date.now()||(experimentalUiTest("gardenReady")&&plot===gardenSelectedPlot)));
+      const possibleHarvest=Boolean(active && (gardenReadyReminderDue(active)||(experimentalUiTest("gardenReady")&&plot===gardenSelectedPlot)));
       const plotAttention=experimentalUiEnabled()?possibleHarvest:needsCheck;
       const plotAttentionLabel=experimentalUiEnabled()?"Możliwy zbiór":"Czeka pytanie Tak lub Nie";
 
