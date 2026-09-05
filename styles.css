@@ -4329,10 +4329,7 @@ body.experimental-ui .content-accordion[open] .content-accordion-body,body.exper
 @keyframes experimentalUiReveal{from{opacity:.45;transform:translateY(-3px)}to{opacity:1;transform:none}}
 
 body.experimental-ui .module-home-card{border-color:#c6ad86;background:linear-gradient(145deg,rgba(255,253,247,.78),rgba(236,221,196,.55));box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
-body.experimental-ui .home-module-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
-body.experimental-ui .home-module-summary>div{display:flex;justify-content:center;min-height:58px;border-color:#c7ae87;background:linear-gradient(180deg,#fffaf0,#eadbc3);box-shadow:inset 0 1px 0 #fff,0 2px 0 #bea47d;text-align:center}
-body.experimental-ui .home-module-summary>div>span{font-size:22px}
-body.experimental-ui .home-module-summary small{display:none}
+body.experimental-ui .home-module-summary>div{border-color:#d2bd9b;background:rgba(255,250,240,.5);box-shadow:none}
 body.experimental-ui .research-card,body.experimental-ui .gang-demand-card,body.experimental-ui .ranked-payment-row{position:relative}
 body.experimental-ui .experimental-card-attention{position:absolute;right:8px;top:8px;z-index:4;display:grid;place-items:center;width:22px;height:22px;border:2px solid #fff8ea;border-radius:50%;background:#b77726;color:#fff;font-size:14px;font-weight:900;line-height:1;box-shadow:0 2px 5px rgba(66,42,18,.28)}
 body.experimental-ui .experimental-card-attention-critical{background:#a33d35}
@@ -4341,5 +4338,5 @@ body.experimental-ui .ranked-payment-row:has(.experimental-card-attention-critic
 body.experimental-ui .build-setup-attention{animation:none}
 body.experimental-ui .garden-plot-attention{background:#b77726;box-shadow:0 2px 5px rgba(66,42,18,.28)}
 
-@media(max-width:520px){body.experimental-ui #main-tabs .tabs button{min-height:44px;font-size:11px}body.experimental-ui #main-tabs button.active{transform:translateY(1px)}body.experimental-ui .home-module-summary{grid-template-columns:repeat(2,minmax(0,1fr))}body.experimental-ui .home-module-summary>div{min-height:52px}body.experimental-ui .tabs button[data-attention="action"]::after,body.experimental-ui .tabs button[data-attention="critical"]::after{right:-2px;top:-5px;width:19px;height:19px}.experimental-ui-test-grid{grid-template-columns:1fr}}
+@media(max-width:520px){body.experimental-ui #main-tabs .tabs button{min-height:44px;font-size:11px}body.experimental-ui #main-tabs button.active{transform:translateY(1px)}body.experimental-ui .tabs button[data-attention="action"]::after,body.experimental-ui .tabs button[data-attention="critical"]::after{right:-2px;top:-5px;width:19px;height:19px}.experimental-ui-test-grid{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){body.experimental-ui *,body.experimental-ui *::before,body.experimental-ui *::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
