@@ -4062,6 +4062,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .gang-demand-choice small{margin-left:auto;color:#857058;font-size:11px}
 .gang-demand-list{display:grid;gap:8px;margin-top:15px}
 .gang-demand-filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}.gang-demand-filters button.active{background:#76502b;color:#fff;border-color:#76502b}
+.gang-demand-offer-expiry-hint{margin-top:8px;padding:7px 9px;border-left:3px solid #b88a3e;border-radius:7px;background:#fff7e7;color:#745a34;font-size:11px}
 .gang-demand-group{border:1px solid #cfb790;border-radius:12px;background:#fffaf0;overflow:hidden}.gang-demand-group-head{display:flex;align-items:center;gap:10px;padding:10px;background:#f5e8d2}.gang-demand-group-head-main{min-width:0;flex:1}.gang-demand-group-head-main strong,.gang-demand-group-head-main small{display:block}.gang-demand-group-head-main small{color:#7a654c;margin-top:2px}.gang-demand-requests{display:grid;gap:7px;padding:8px}
 .gang-demand-card{display:flex;gap:10px;align-items:center;padding:9px;border:1px solid #deccb0;border-radius:10px;background:#fffdf8}
 .gang-demand-card.urgent{border-color:#df875d;background:#fff6ef}.gang-demand-urgent{color:#b84124;font-weight:800}
