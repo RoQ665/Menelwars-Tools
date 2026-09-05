@@ -106,7 +106,6 @@
   }
 
   function experimentalUiWarmAttentionData() {
-    if (!experimentalUiEnabled()) return Promise.resolve();
     if (experimentalUiWarmInFlight) return experimentalUiWarmInFlight;
     if (Date.now()-experimentalUiWarmAt<2*60*1000) return Promise.resolve();
     experimentalUiWarmInFlight=Promise.allSettled([
@@ -159,14 +158,11 @@
   }
 
   function experimentalUiRefreshAttention() {
-    const active=experimentalUiEnabled();
     const reset=()=>{
       experimentalUiMark('[data-module="garden"], [data-module="distillery"], [data-module="gang"], [data-module="builds"]');
       experimentalUiMark('[data-subtab="payments-view"], [data-subtab="demand-view"], [data-subtab="optimizer-view"]');
       experimentalUiMark('[data-gang-menu-target="payments-view"], [data-gang-menu-target="demand-view"]');
     };
-    if (!active) { reset(); return; }
-
     const testState=experimentalUiTestState();
     let gardenReady=Boolean(testState.gardenReady);
     try {
@@ -1727,7 +1723,6 @@ function mapRenderRouteResult() {
                 !isSubmitted;
 
               const reservationNeedsAttention=
-                experimentalUiEnabled() &&
                 canEnterResult &&
                 Number(reservation.expiresAt||0)>Date.now() &&
                 (Number(reservation.expiresAt||0)-Date.now()<=60*60*1000||experimentalUiTest("distillerySoon"));
@@ -3156,7 +3151,7 @@ function mapRenderRouteResult() {
   function paymentsRow(player,index=0) {
     const saldo = Number(player.saldo) || 0;
     const aiSaldo = Number(player.aiDumpBalance) || 0;
-    const ownPaymentProblem=experimentalUiEnabled()&&normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick())&&(saldo<0||aiSaldo<0||experimentalUiTest("paymentDebt")||experimentalUiTest("aiBlocked"));
+    const ownPaymentProblem=normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick())&&(saldo<0||aiSaldo<0||experimentalUiTest("paymentDebt")||experimentalUiTest("aiBlocked"));
     let stateClass = "zero", status = "🟢 Na bieżąco", amount = "0 zł";
     if (saldo < 0) {
       stateClass = "debt";
@@ -7399,7 +7394,7 @@ function renderGangDemandGlobal(payload) {
       const offerButton=!entry.completed&&!entry.isOwner&&given<amount?`<button type="button" class="gang-demand-offer" data-gang-demand-offer="${escapeHtml(entry.id)}" data-demand-remaining="${amount-given}">🤝 Mogę przekazać</button>`:"";
       const closeButton=entry.canClose&&!entry.completed?`<button type="button" class="gang-demand-close" data-gang-demand-close="${escapeHtml(entry.id)}">${entry.canDelete?"🗑 Usuń":"✅ Załatwione"}</button>`:"";
       const offerChips=offers.length?`<div class="gang-demand-offers">${offers.map(offer=>`<span class="gang-demand-offer-chip${offer.withdrawn?" withdrawn":""}">${escapeHtml(offer.nick)}: ${Number(offer.amount)||0}${offer.canWithdraw&&!offer.withdrawn?` <button type="button" data-demand-offer-withdraw="${escapeHtml(offer.id)}" title="Wycofaj deklarację">×</button>`:""}</span>`).join("")}</div>`:"";
-      const handlerAttention=experimentalUiEnabled()&&!entry.completed&&entry.isOwner&&(activeOffers.some(offer=>!offer.isMine)||experimentalUiTest("demandOffer"));
+      const handlerAttention=!entry.completed&&entry.isOwner&&(activeOffers.some(offer=>!offer.isMine)||experimentalUiTest("demandOffer"));
       return `<article id="demand-${escapeHtml(entry.id)}" class="gang-demand-card${entry.priority==="urgent"?" urgent":""}">${handlerAttention?'<span class="experimental-card-attention" aria-label="Ktoś zgłosił posiadanie przedmiotu">!</span>':""}<div class="gang-demand-card-main"><strong>${escapeHtml(entry.nick||"Członek Gangu")} potrzebuje ${amount} szt. ${entry.priority==="urgent"?'<span class="gang-demand-urgent">🔥 Pilne</span>':""}</strong><span class="gang-demand-card-meta">${escapeHtml(gangAnnouncementDate(entry.createdAt))}${entry.completed?" · ✅ Zrealizowane":""}</span>${blocked}${entry.note?`<span class="gang-demand-card-note">${escapeHtml(entry.note)}</span>`:""}${!entry.completed?`<div class="gang-demand-progress" title="Zadeklarowano ${given} z ${amount}"><span style="width:${percent}%"></span></div><span class="gang-demand-card-meta">Zadeklarowano ${Math.min(amount,given)} z ${amount}</span>`:""}${offerChips}</div><div class="gang-demand-actions">${offerButton}${closeButton}</div></article>`;
     }).join("")}</div></section>`;
   }).join(""):'<div class="empty">📦 Brak wpisów w tym widoku.</div>';
@@ -12744,7 +12739,7 @@ function setupAdmin() {
           if (item) showBuildViewer(item);
         });
       });
-      const simulatedIncomplete=experimentalUiEnabled()&&experimentalUiTest("buildIncomplete");
+      const simulatedIncomplete=experimentalUiTest("buildIncomplete");
       experimentalUiMark('.build-card-list > [data-build-scope="mine"]:first-child',simulatedIncomplete?"suggestion":"",simulatedIncomplete?"Test: build wymaga uzupełnienia":"");
     }
     pvpPopulateSelectors();
@@ -14276,8 +14271,8 @@ function setupAdmin() {
       const frameBadge = "";
       const needsCheck=active && gardenNeedsModelCheck(active,summary);
       const possibleHarvest=Boolean(active && (gardenReadyReminderDue(active)||(experimentalUiTest("gardenReady")&&plot===gardenSelectedPlot)));
-      const plotAttention=experimentalUiEnabled()?possibleHarvest:needsCheck;
-      const plotAttentionLabel=experimentalUiEnabled()?"Możliwy zbiór":"Czeka pytanie Tak lub Nie";
+      const plotAttention=possibleHarvest;
+      const plotAttentionLabel="Możliwy zbiór";
 
       return `
         <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">

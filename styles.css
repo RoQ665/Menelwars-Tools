@@ -4278,6 +4278,23 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .experimental-ui-test-panel{display:none}
 body.experimental-ui .experimental-ui-test-panel{display:block}
 .experimental-ui-test-description{margin-bottom:9px}
+
+/* Znaczniki są funkcją aplikacji, a nie częścią wybranego motywu. */
+body:not(.experimental-ui) .tabs button[data-attention="action"]::after,body:not(.experimental-ui) .tabs button[data-attention="critical"]::after,body:not(.experimental-ui) #main-tabs button[data-attention="suggestion"]::after,body:not(.experimental-ui) .build-card[data-attention="suggestion"]::after{content:"!";position:absolute;right:-4px;top:-6px;display:grid;place-items:center;width:20px;height:20px;border:2px solid #fff8ea;border-radius:50%;background:#b77726;color:#fff;font-size:13px;font-weight:900;line-height:1;box-shadow:0 2px 5px rgba(66,42,18,.3);z-index:3}
+body:not(.experimental-ui) .tabs button[data-attention="critical"]::after{background:#a33d35}
+body:not(.experimental-ui) #main-tabs button[data-attention]{position:relative;padding-bottom:17px}
+body:not(.experimental-ui) #main-tabs button[data-attention]::before{content:attr(data-attention-label);display:block;position:absolute;left:5px;right:5px;bottom:2px;overflow:hidden;text-overflow:ellipsis;color:#b77726;font-size:8px;font-weight:900;white-space:nowrap}
+body:not(.experimental-ui) #main-tabs button[data-attention="critical"]::before{color:#a33d35}
+body:not(.experimental-ui) #main-tabs button.active[data-attention]::before{color:#ffe0a6}
+body:not(.experimental-ui) .gang-menu-grid button[data-attention]{position:relative;padding-bottom:21px}
+body:not(.experimental-ui) .gang-menu-grid button[data-attention]::after{content:"!";position:absolute;right:-6px;top:-7px;display:grid;place-items:center;width:22px;height:22px;border:2px solid #fff8ea;border-radius:50%;background:#b77726;color:#fff;font-size:14px;font-weight:900;line-height:1;box-shadow:0 2px 5px rgba(66,42,18,.3);z-index:3}
+body:not(.experimental-ui) .gang-menu-grid button[data-attention="critical"]::after{background:#a33d35}
+body:not(.experimental-ui) .gang-menu-grid button[data-attention]::before{content:attr(data-attention-label);position:absolute;left:8px;right:8px;bottom:5px;overflow:hidden;text-overflow:ellipsis;color:#b77726;font-size:9px;font-weight:900;white-space:nowrap}
+body:not(.experimental-ui) .gang-menu-grid button[data-attention="critical"]::before{color:#a33d35}
+body:not(.experimental-ui) .experimental-card-attention{position:absolute;right:8px;top:8px;z-index:4;display:grid;place-items:center;width:22px;height:22px;border:2px solid #fff8ea;border-radius:50%;background:#b77726;color:#fff;font-size:14px;font-weight:900;line-height:1;box-shadow:0 2px 5px rgba(66,42,18,.28)}
+body:not(.experimental-ui) .experimental-card-attention-critical{background:#a33d35}
+body:not(.experimental-ui) .build-card[data-attention="suggestion"]{position:relative;border-color:#b1843d;box-shadow:0 0 0 3px rgba(190,145,64,.13)}
+body:not(.experimental-ui) .garden-plot-attention{background:#b77726;animation:none}
 .experimental-ui-test-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}
 .experimental-ui-test-grid label{display:flex;align-items:center;gap:7px;min-height:40px;padding:8px;border:1px solid #d4c09f;border-radius:9px;background:#fffaf0;font-size:12px;font-weight:700;cursor:pointer}
 .experimental-ui-test-grid input{flex:0 0 auto;width:18px;height:18px}
