@@ -214,6 +214,7 @@
   "Obierki jabłek": "Obierki po jabłkach",
   "Obierki ziemniaków": "Obierki po ziemniakach",
   "Cukier": 'Cukier "Klasyczny"',
+  "Jabłko": "Zgniłe Jabłko",
 
   "Instant": 'Drożdże "Instant"',
   "Babuni": "Drożdże Babuni",
