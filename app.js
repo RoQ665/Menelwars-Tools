@@ -2663,6 +2663,7 @@ function mapRenderRouteResult() {
         status.textContent =
           `✅ Sprawdzono ${confirmedCount} wyników — wszystkie poprawne pozycje są już w bazie.` +
           (invalidCount ? ` Pominięto ${invalidCount} błędnych.` : "");
+        achievementTrack(["distillery_import"]);
       } else {
         status.textContent =
           "Nie znaleziono poprawnych nowych wyników ani korekt do wysłania.";
