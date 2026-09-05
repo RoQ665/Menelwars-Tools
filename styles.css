@@ -4275,8 +4275,7 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .experimental-ui-toggle>input:checked+.experimental-ui-toggle-track i{transform:translateX(19px)}
 .experimental-ui-toggle>input:focus-visible+.experimental-ui-toggle-track{outline:3px solid rgba(113,148,83,.28);outline-offset:2px}
 .experimental-ui-indicator{padding:6px 8px;border:1px solid #a98c59;border-radius:8px;background:linear-gradient(180deg,#f2dca9,#cfaa61);color:#49331d;font-size:10px;font-weight:800;box-shadow:inset 0 1px 0 rgba(255,255,255,.55)}
-.experimental-ui-test-panel{display:none}
-body.experimental-ui .experimental-ui-test-panel{display:block}
+.experimental-ui-test-panel{display:block}
 .experimental-ui-test-description{margin-bottom:9px}
 
 /* Znaczniki są funkcją aplikacji, a nie częścią wybranego motywu. */
