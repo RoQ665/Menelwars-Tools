@@ -14,7 +14,7 @@
   const CLOUDFLARE_SESSION_KEY = "menelwars_cloudflare_session_v1";
   const ADMIN_TOKEN_KEY = "menelwars_tools_admin_token_v1";
   const COMPANY_INCOME_KEY = "menelwars_tools_company_income_v1";
-  const EXPERIMENTAL_UI_KEY = "menelwars_tools_experimental_ui_v1";
+  const UI_STYLE_KEY = "menelwars_tools_ui_style_v1";
   const EXPERIMENTAL_UI_TEST_KEY = "menelwars_tools_experimental_ui_test_v1";
   let experimentalUiWarmInFlight=null;
   let experimentalUiWarmAt=0;
@@ -28,7 +28,7 @@
   }
 
   function experimentalUiEnabled() {
-    return true;
+    return localStorage.getItem(UI_STYLE_KEY)!=="classic";
   }
 
   function experimentalUiTestState() {
@@ -53,7 +53,9 @@
 
   function experimentalUiApply(account=cachedAccountStatus) {
     const allowed=experimentalUiAllowed(account);
-    const enabled=true;
+    const accountStyle=String(account?.preferences?.appearance||"");
+    if (accountStyle==="modern"||accountStyle==="classic") localStorage.setItem(UI_STYLE_KEY,accountStyle);
+    const enabled=experimentalUiEnabled();
     document.body.classList.toggle("experimental-ui",enabled);
     const indicator=el("experimental-ui-indicator");
     if (indicator) indicator.hidden=true;
@@ -65,6 +67,42 @@
     experimentalUiSyncTestControls();
     experimentalUiRefreshAttention();
     if (enabled) experimentalUiWarmAttentionData();
+  }
+
+  function accountAppearanceHtml(account) {
+    const selected=String(account?.preferences?.appearance||localStorage.getItem(UI_STYLE_KEY)||"modern")==="classic"?"classic":"modern";
+    return `<div class="account-card appearance-settings">
+      <b>🎨 Wygląd aplikacji</b>
+      <div class="appearance-options" role="group" aria-label="Wybierz wygląd aplikacji">
+        <button type="button" data-appearance="modern" class="${selected==="modern"?"active":""}"><b>Nowoczesny 3D</b><small>Gradienty, cienie i głębia</small></button>
+        <button type="button" data-appearance="classic" class="${selected==="classic"?"active":""}"><b>Klasyczny</b><small>Płaski i spokojniejszy</small></button>
+      </div>
+      <div id="account-appearance-note" class="account-note">Ustawienie działa na wszystkich urządzeniach zalogowanych na to konto.</div>
+    </div>`;
+  }
+
+  function configureAccountAppearance(account) {
+    document.querySelectorAll("[data-appearance]").forEach(button=>button.addEventListener("click",async()=>{
+      const appearance=button.dataset.appearance==="classic"?"classic":"modern";
+      const previous=experimentalUiEnabled()?"modern":"classic";
+      if (appearance===previous) return;
+      localStorage.setItem(UI_STYLE_KEY,appearance);
+      if (cachedAccountStatus) cachedAccountStatus.preferences={...(cachedAccountStatus.preferences||{}),appearance};
+      experimentalUiApply(cachedAccountStatus);
+      document.querySelectorAll("[data-appearance]").forEach(option=>option.classList.toggle("active",option.dataset.appearance===appearance));
+      const note=el("account-appearance-note");
+      if (note) note.textContent="⏳ Zapisuję ustawienie…";
+      try {
+        await cloudflareApi("/auth/preferences",{method:"POST",token:await cloudflareEnsureSession(),body:{appearance}});
+        if (note) note.textContent="✅ Wygląd zapisany na koncie.";
+      } catch(err) {
+        localStorage.setItem(UI_STYLE_KEY,previous);
+        if (cachedAccountStatus) cachedAccountStatus.preferences={...(cachedAccountStatus.preferences||{}),appearance:previous};
+        experimentalUiApply(cachedAccountStatus);
+        document.querySelectorAll("[data-appearance]").forEach(option=>option.classList.toggle("active",option.dataset.appearance===previous));
+        if (note) note.textContent=`❌ ${err&&err.message?err.message:"Nie udało się zapisać wyglądu."}`;
+      }
+    }));
   }
 
   function experimentalUiWarmAttentionData() {
@@ -3841,6 +3879,8 @@ function mapRenderRouteResult() {
         ${account.admin ? `<div class="account-admin-link"><button id="account-admin-open" class="primary-btn" type="button">🛠 Panel administratora</button></div>` : ""}
       </div>
 
+      ${accountAppearanceHtml(account)}
+
       <div class="account-card notification-settings">
         <b>🔔 Powiadomienia</b>
         <label style="margin-top:9px"><input id="account-notifications-enabled" type="checkbox" checked> Chcę otrzymywać powiadomienia</label>
@@ -3860,6 +3900,7 @@ function mapRenderRouteResult() {
       ${achievementsHtml(account.achievements || {},expandedAchievementCategories)}
     `;
 
+    configureAccountAppearance(account);
     void configureNotificationControls();
     void checkImportantAnnouncement();
 
