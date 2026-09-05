@@ -14017,10 +14017,28 @@ function setupAdmin() {
     const effectiveN=sw2>0 ? (sw*sw)/sw2 : 0;
     if (sw<=0 || effectiveN<2.2) return null;
 
-    const predictedMs=weighted.reduce((sum,row)=>sum+row.weight*row.duration,0)/sw;
-    const variance=weighted.reduce((sum,row)=>sum+row.weight*Math.pow(row.duration-predictedMs,2),0)/sw;
+    const basePredictedMs=weighted.reduce((sum,row)=>sum+row.weight*row.duration,0)/sw;
+    const lowerBounds=[...(gardenData.results||[]),...(gardenData.active||[])]
+      .filter(item=>item&&item.plant===candidate.plant&&Number(item.lastNotReadyAt)>Number(item.startedAt))
+      .map(item=>{
+        const distance=gardenResearchDistance(candidate,item);
+        const kernel=Math.exp(-0.5*Math.pow(distance/bandwidth,2));
+        return {duration:Number(item.lastNotReadyAt)-Number(item.startedAt),weight:kernel,distance};
+      })
+      .filter(row=>row.weight>0.015&&row.duration>basePredictedMs);
+    const lowerBoundWeight=lowerBounds.reduce((sum,row)=>sum+row.weight,0);
+    const lowerBoundTarget=lowerBoundWeight>0
+      ? lowerBounds.reduce((sum,row)=>sum+row.weight*row.duration,0)/lowerBoundWeight
+      : basePredictedMs;
+    // „Jeszcze nie wyrosła” jest obserwacją jednostronną: znamy minimum,
+    // ale nie dokładny moment READY. Przesuwamy model w stronę tej granicy,
+    // bez traktowania kliknięcia jak czasu zbioru.
+    const lowerBoundStrength=Math.min(0.75,lowerBoundWeight/(1+lowerBoundWeight));
+    const predictedMs=basePredictedMs+Math.max(0,lowerBoundTarget-basePredictedMs)*lowerBoundStrength;
+    const variance=weighted.reduce((sum,row)=>sum+row.weight*Math.pow(row.duration-basePredictedMs,2),0)/sw;
     const nearest=Math.min(...weighted.map(row=>row.distance));
-    const uncertaintyMs=Math.sqrt(Math.max(0,variance)) + predictedMs*(0.06/Math.sqrt(Math.max(1,effectiveN))) + predictedMs*Math.min(0.25,nearest*0.08);
+    const unresolvedLowerBoundGap=lowerBounds.length?Math.max(...lowerBounds.map(row=>Math.max(0,row.duration-predictedMs)*row.weight)):0;
+    const uncertaintyMs=Math.sqrt(Math.max(0,variance)) + predictedMs*(0.06/Math.sqrt(Math.max(1,effectiveN))) + predictedMs*Math.min(0.25,nearest*0.08) + unresolvedLowerBoundGap*0.5;
     const readySupport=weighted.filter(row=>row.source==="READY").length;
 
     let confidence="niska";
@@ -14034,6 +14052,7 @@ function setupAdmin() {
       effectiveN,
       support:weighted.length,
       readySupport,
+      lowerBoundSupport:lowerBounds.length,
       nearest
     };
   }
@@ -14167,7 +14186,7 @@ function setupAdmin() {
     host.hidden=false;
     const prediction=rec.prediction;
     const modelLine=prediction
-      ? `<div class="garden-model-prediction">🧪 Lokalny model: przewidywany górny czas ~<b>${escapeHtml(gardenFormatDuration(prediction.predictedMs))}</b> · pewność ${escapeHtml(prediction.confidence)} · wsparcie ${Number(prediction.effectiveN).toLocaleString("pl-PL",{maximumFractionDigits:1})}</div>`
+      ? `<div class="garden-model-prediction">🧪 Lokalny model: przewidywany górny czas ~<b>${escapeHtml(gardenFormatDuration(prediction.predictedMs))}</b> · pewność ${escapeHtml(prediction.confidence)} · wsparcie ${Number(prediction.effectiveN).toLocaleString("pl-PL",{maximumFractionDigits:1})}${prediction.lowerBoundSupport?` · potwierdzenia dalszego wzrostu ${prediction.lowerBoundSupport}`:""}</div>`
       : `<div class="garden-model-prediction muted">🧪 Za mało porównywalnych, wiarygodnych wyników — wybieramy test, który dostarczy nowej informacji.</div>`;
     const fastestLine=fastest
       ? `<div class="garden-fastest-known">🏁 Najszybszy znany wynik: <b>${escapeHtml(gardenFormatDuration(fastest.obs.duration))}</b> · ☀️ ${fastest.item.sun} · 💧 ${fastest.item.water} · pH ${Number(fastest.item.ph).toFixed(1)}</div>`
