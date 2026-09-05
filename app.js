@@ -5235,12 +5235,17 @@ const goal = payload && payload.goal;
         : [];
 
     el("payments-date").textContent =
-      "Stan na: " +
       formatPaymentsDateTime(
         payload.updatedAtDisplay ||
         payload.updatedAt ||
         payload.saldoDate
       );
+
+    const aiDumpDate = payload.aiDump && (
+      payload.aiDump.snapshotDate ||
+      payload.aiDump.updatedAt
+    );
+    el("payments-ai-date").textContent = formatPaymentsDateTime(aiDumpDate);
 
     el("payments-count").textContent =
       `Graczy: ${players.length}`;

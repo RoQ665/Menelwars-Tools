@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=22.67">
+  <link rel="stylesheet" href="styles.css?v=22.68">
   <title>MenelWars Tools</title>
 
   <style>
@@ -991,10 +991,22 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <div class="panel-head">💰 Wpłaty</div>
       <div class="panel-body">
         <div id="payments-content">
-          <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-            <div>
-              <strong id="payments-date">Stan na: —</strong>
-              <div id="payments-count" class="muted"></div>
+          <div class="payments-summary-head">
+            <div class="payments-snapshot-grid" aria-label="Aktualność danych wpłat">
+              <div class="payments-snapshot-card payments-snapshot-money">
+                <span class="payments-snapshot-icon" aria-hidden="true">💰</span>
+                <span class="payments-snapshot-copy">
+                  <small>Wpłaty — stan na</small>
+                  <strong id="payments-date">—</strong>
+                </span>
+              </div>
+              <div class="payments-snapshot-card payments-snapshot-ai">
+                <span class="payments-snapshot-icon" aria-hidden="true">♻️</span>
+                <span class="payments-snapshot-copy">
+                  <small>Wysypisko All Inclusive — stan na</small>
+                  <strong id="payments-ai-date">—</strong>
+                </span>
+              </div>
             </div>
 
             <div style="display:flex;gap:8px">
@@ -1002,6 +1014,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
             </div>
           </div>
+          <div id="payments-count" class="muted payments-player-count"></div>
 
           <div id="payments-list"></div>
           <div id="payments-status" class="submit-status"></div>
@@ -2121,7 +2134,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 <footer>MenelWars Tools · autor: RoQ</footer>
 
 <script src="data.js?v=21.05"></script>
-  <script src="item-catalog.js?v=22.67"></script>
-  <script src="app.js?v=22.67"></script>
+  <script src="item-catalog.js?v=22.68"></script>
+  <script src="app.js?v=22.68"></script>
 </body>
 </html>
