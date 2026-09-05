@@ -132,10 +132,7 @@
     const testState=experimentalUiTestState();
     let gardenReady=Boolean(testState.gardenReady);
     try {
-      gardenReady=gardenReady||(gardenData?.active||[]).some(item=>{
-        if (!item || !gardenOwnExperimentForPlot(Number(item.plot)||1)) return false;
-        return gardenReadyReminderDue(item);
-      });
+      gardenReady=gardenReady||[1,2,3,4,5,6].some(plot=>gardenReadyReminderDue(gardenOwnExperimentForPlot(plot)));
     } catch (_) {}
 
     let distillerySoon=Boolean(testState.distillerySoon);
@@ -13427,6 +13424,12 @@ function setupAdmin() {
         muted
       });
       if (!result||!result.ok) throw new Error(result&&result.error?result.error:"Nie udało się odroczyć przypomnienia.");
+      if (result.experiment) {
+        gardenData={
+          ...gardenData,
+          active:(gardenData.active||[]).map(item=>String(item.id)===String(own.id)?{...item,...result.experiment}:item)
+        };
+      }
       if (experimentalUiAllowed()) {
         const testState=experimentalUiTestState();
         if (testState.gardenReady) {
@@ -13438,6 +13441,9 @@ function setupAdmin() {
       if (status) status.textContent=muted
         ? "✅ Wykrzyknik i powiadomienia wyciszone do końca tej uprawy."
         : `✅ Przypomnę ponownie za ${hours} godz.`;
+      gardenRenderPlots();
+      gardenRenderEditor();
+      experimentalUiRefreshAttention();
       await gardenFetchData({force:true});
       gardenRenderPlots();
       gardenRenderEditor();
