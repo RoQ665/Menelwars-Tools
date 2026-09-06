@@ -13401,10 +13401,15 @@ function setupAdmin() {
   }
 
   function gardenCheckForFrame(summary,frame) {
-    return (summary && summary.checks || []).find(
-      event=>Number(event.expectedFrame)===Number(frame) ||
-        (event.answer==="NO"&&Number.isInteger(Number(event.atlasFrame))&&Number(event.atlasFrame)===Number(frame))
-    ) || null;
+    const matches=(summary && summary.checks || []).filter(event=>
+      (event.answer==="YES"&&Number(event.expectedFrame)===Number(frame)) ||
+      (event.answer==="NO"&&Number.isInteger(Number(event.atlasFrame))&&Number(event.atlasFrame)===Number(frame))
+    );
+    // Jeżeli wcześniejsze „Tak” i późniejsza korekta dotyczą tego samego
+    // obrazu, pokazujemy nowszą wiedzę. Błędnie przewidziany etap nie zostaje
+    // przy tym oznaczony jako zaliczony — będzie można sprawdzić go ponownie,
+    // gdy skorygowana oś czasu rzeczywiście do niego dojdzie.
+    return matches.sort((a,b)=>Number(b.observedAt)-Number(a.observedAt))[0] || null;
   }
 
   function gardenNeedsModelCheck(item,summary,now=Date.now()) {
