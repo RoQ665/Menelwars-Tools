@@ -4287,6 +4287,7 @@ body:not(.experimental-ui) .tabs button[data-attention="critical"]::after{backgr
 body:not(.experimental-ui) #main-tabs button[data-attention]{position:relative;padding-bottom:17px}
 body:not(.experimental-ui) #main-tabs button[data-attention]::before{content:attr(data-attention-label);display:block;position:absolute;left:5px;right:5px;bottom:2px;overflow:hidden;text-overflow:ellipsis;color:#b77726;font-size:8px;font-weight:900;white-space:nowrap}
 body:not(.experimental-ui) #main-tabs button[data-attention="critical"]::before{color:#a33d35}
+body:not(.experimental-ui) #main-tabs button[data-attention="info"]::before{color:#66806a;font-weight:700}
 body:not(.experimental-ui) #main-tabs button.active[data-attention]::before{color:#ffe0a6}
 body:not(.experimental-ui) .gang-menu-grid button[data-attention]{position:relative;padding-bottom:21px}
 body:not(.experimental-ui) .gang-menu-grid button[data-attention]::after{content:"!";position:absolute;right:-6px;top:-7px;display:grid;place-items:center;width:22px;height:22px;border:2px solid #fff8ea;border-radius:50%;background:#b77726;color:#fff;font-size:14px;font-weight:900;line-height:1;box-shadow:0 2px 5px rgba(66,42,18,.3);z-index:3}
@@ -4315,10 +4316,13 @@ body.experimental-ui .tabs button.active{background:linear-gradient(180deg,#8063
 body.experimental-ui .tabs button[data-attention="action"]::after,body.experimental-ui .tabs button[data-attention="critical"]::after{content:"!";position:absolute;right:-4px;top:-6px;display:grid;place-items:center;width:20px;height:20px;border:2px solid #fff8ea;border-radius:50%;background:#b77726;color:#fff;font-size:13px;font-weight:900;line-height:1;box-shadow:0 2px 5px rgba(66,42,18,.3);z-index:3}
 body.experimental-ui .tabs button[data-attention="critical"]::after{background:#a33d35}
 body.experimental-ui #main-tabs button[data-attention="action"],body.experimental-ui #main-tabs button[data-attention="critical"]{padding-bottom:17px}
+body.experimental-ui #main-tabs button[data-attention="info"]{padding-bottom:17px}
 body.experimental-ui #main-tabs button[data-attention="action"]::before,body.experimental-ui #main-tabs button[data-attention="critical"]::before{content:attr(data-attention-label);display:block;position:absolute;left:5px;right:5px;bottom:2px;overflow:hidden;text-overflow:ellipsis;color:#b77726;font-size:8px;font-weight:900;white-space:nowrap}
+body.experimental-ui #main-tabs button[data-attention="info"]::before{content:attr(data-attention-label);display:block;position:absolute;left:5px;right:5px;bottom:2px;overflow:hidden;text-overflow:ellipsis;color:#66806a;font-size:8px;font-weight:700;white-space:nowrap}
 body.experimental-ui #main-tabs button[data-attention="critical"]::before{color:#a33d35}
 body.experimental-ui #main-tabs button.active[data-attention="action"]::before{color:#ffd58f}
 body.experimental-ui #main-tabs button.active[data-attention="critical"]::before{color:#ffb6ae}
+body.experimental-ui #main-tabs button.active[data-attention="info"]::before{color:#dcebd8}
 body.experimental-ui .gang-menu-grid button[data-attention="action"]::after,body.experimental-ui .gang-menu-grid button[data-attention="critical"]::after{content:"!";position:absolute;right:-6px;top:-7px;display:grid;place-items:center;width:22px;height:22px;border:2px solid #fff8ea;border-radius:50%;background:#b77726;color:#fff;font-size:14px;font-weight:900;line-height:1;box-shadow:0 2px 5px rgba(66,42,18,.3);z-index:3}
 body.experimental-ui .gang-menu-grid button[data-attention="critical"]::after{background:#a33d35}
 body.experimental-ui .gang-menu-grid button[data-attention="action"],body.experimental-ui .gang-menu-grid button[data-attention="critical"]{padding-bottom:21px}

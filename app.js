@@ -168,6 +168,13 @@
     try {
       gardenReady=gardenReady||[1,2,3,4,5,6].some(plot=>gardenReadyReminderDue(gardenOwnExperimentForPlot(plot)));
     } catch (_) {}
+    let gardenQuestion=false;
+    try {
+      gardenQuestion=[1,2,3,4,5,6].some(plot=>{
+        const item=gardenOwnExperimentForPlot(plot);
+        return item&&gardenNeedsModelCheck(item,gardenPhaseSummary(item));
+      });
+    } catch (_) {}
 
     let distillerySoon=Boolean(testState.distillerySoon);
     try {
@@ -191,7 +198,11 @@
       );
     } catch (_) {}
 
-    experimentalUiMark('[data-module="garden"]',gardenReady?"action":"",gardenReady?"Możliwy zbiór":"");
+    experimentalUiMark(
+      '[data-module="garden"]',
+      gardenReady?"action":gardenQuestion?"info":"",
+      gardenReady?"Możliwy zbiór":gardenQuestion?"Opcjonalne pytanie o etap":""
+    );
     experimentalUiMark('[data-module="distillery"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja: < 1 godz.":"");
     const buildIncomplete=Boolean(testState.buildIncomplete||experimentalUiBuildIncomplete());
     experimentalUiMark('[data-module="builds"]',buildIncomplete?"suggestion":"",buildIncomplete?"Build do uzupełnienia":"");
