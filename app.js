@@ -15311,6 +15311,42 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny przeciwnik z Rewirów odtworzony z logu walki: 847 ATK · 661 DEF · 2060 HP. Statystyki efektów i odporności pochodzą bezpośrednio z gry."
     });
+
+    // Pan Paweł został odtworzony z dwóch pełnych logów walk z 6.09.2026.
+    // Oba logi zwróciły identyczny profil końcowy bossa; różnił je wyłącznie
+    // losowy przebieg zdarzeń i wynik po limicie 15 tur.
+    out.push({
+      id:"boss-18-pan-pawel",
+      name:"Pan Paweł · Lvl 15 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:15,
+      attributes:{strength:41,endurance:43,agility:47,vitality:35,precision:43},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:751,combatDefense:867,combatHp:2388,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:15,
+        primary:{attack:751,defense:867,hp:2388},
+        stats:{
+          accuracy:110.5,initiative:15.9,firstStrike:10.8,
+          critChance:38.6,critDmg:56.1,execute:8.5,lifesteal:18.5,
+          armorPen:18.8,stun:27.2,bleed:35,bleedDamage:0,
+          evasion:26.5,doubleStrike:23.5,counter:14.1,
+          healingReduction:50,damageReduction:20.2,
+          critResist:24.2,stunResist:20.2,bleedResist:39.5,
+          hpRegen:12.3
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z dwóch logów walki: 751 ATK · 867 DEF · 2388 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
