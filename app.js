@@ -13002,7 +13002,6 @@ function setupAdmin() {
   let gardenDraftPlant = "Cebula";
   const GARDEN_AUTO_MODEL_VERSION = "AUTO52";
   const GARDEN_AUTO_MODEL_HOURS = 52;
-  const GARDEN_OPTIMAL_LIMIT_MS = 56 * 60 * 60 * 1000;
 
   function gardenLoadLocalPlots() {
     try {
@@ -13251,7 +13250,7 @@ function setupAdmin() {
 
 
   // ============================================================
-  // v21.00 — Ogród: append-only obserwacje atlasFrame/READY
+  // v21.00 — Ogród: append-only obserwacje etapów i zbiorów
   // ============================================================
   function gardenEventsFor(experimentId) {
     return (gardenData.phases || [])
@@ -13392,16 +13391,23 @@ function setupAdmin() {
     const summary=gardenPhaseSummary(item);
     const stats=gardenCheckStats(item,summary);
     const duration=Math.max(0,Number(item && item.durationMs) || 0);
-    const provenByDeadline=duration>0 && duration<=GARDEN_OPTIMAL_LIMIT_MS;
+    const forecastDuration=Math.max(0,Number(item&&item.estimatedReadyAt||0)-Number(item&&item.startedAt||0)) || GARDEN_AUTO_MODEL_HOURS*60*60*1000;
+    const lastNotReadyDuration=Number(item&&item.lastNotReadyAt)>Number(item&&item.startedAt)
+      ? Number(item.lastNotReadyAt)-Number(item.startedAt)
+      : 0;
+    const hasNotReadyProof=lastNotReadyDuration>0 && (!Number(item.finishedAt)||Number(item.lastNotReadyAt)<=Number(item.finishedAt));
+    const harvestedByForecast=duration>0 && duration<=forecastDuration;
+    const provenByDeadline=harvestedByForecast||hasNotReadyProof;
     const modelMismatch=stats.no.length>0;
-    const lateMismatch=duration>GARDEN_OPTIMAL_LIMIT_MS && modelMismatch;
+    const lateWithoutProof=duration>forecastDuration&&!hasNotReadyProof;
+    const lateMismatch=lateWithoutProof&&modelMismatch;
     const finalGap=stats.last
       ? Math.max(0,Number(item.finishedAt||0)-Number(stats.last.observedAt||0))
       : 0;
     let confidence="niska";
     if (stats.checks.length>=3 && stats.last && finalGap<=6*60*60*1000) confidence="wysoka";
     else if (stats.checks.length>=1) confidence="średnia";
-    return {summary,stats,duration,provenByDeadline,modelMismatch,lateMismatch,finalGap,confidence};
+    return {summary,stats,duration,forecastDuration,lastNotReadyDuration,hasNotReadyProof,harvestedByForecast,lateWithoutProof,provenByDeadline,modelMismatch,lateMismatch,finalGap,confidence};
   }
 
   function gardenDisplayStage(frame) {
@@ -13454,7 +13460,7 @@ function setupAdmin() {
     return `${value/60} godz.`;
   }
 
-  async function gardenSnoozeReady(own,{minutes=0,muted=false}={}) {
+  async function gardenSnoozeReady(own,{minutes=0,muted=false,confirmedNotReady=false}={}) {
     const status=el("garden-action-status");
     if (status) status.textContent=muted?"⏳ Wyciszam przypomnienie…":`⏳ Ustawiam przypomnienie za ${gardenSnoozeLabel(minutes)}…`;
     try {
@@ -13463,7 +13469,8 @@ function setupAdmin() {
         ownerToken:own.ownerToken||"",
         sessionToken:playerAccountSessionToken()||"",
         minutes,
-        muted
+        muted,
+        confirmedNotReady
       });
       if (!result||!result.ok) throw new Error(result&&result.error?result.error:"Nie udało się odroczyć przypomnienia.");
       if (result.experiment) {
@@ -13745,14 +13752,17 @@ function setupAdmin() {
     const reminderAt=Number(own.readyReminderAt||0);
     const lastNotReadyAt=Number(own.lastNotReadyAt||0);
     const reminderMuted=Boolean(own.readyReminderMuted);
+    const reminderConfirmsGrowth=Boolean(own.readyReminderIsNotReady);
     const reminderDue=gardenReadyReminderDue(own);
     const timingText=frame===9
       ? modelRemaining>0
         ? `Szacowany czas wzrostu za ${gardenFormatDuration(modelRemaining)}.`
         : reminderMuted
-          ? "Sprawdzono: roślina nadal rosła · przypomnienie wyłączone dla tej uprawy."
+          ? reminderConfirmsGrowth
+            ? "Sprawdzono: roślina nadal rosła · przypomnienie wyłączone dla tej uprawy."
+            : "Przypomnienie wyłączone dla tej uprawy."
           : reminderAt>Date.now()
-            ? `Sprawdzono: roślina nadal rosła · przypomnienie ${new Date(reminderAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.`
+            ? `${reminderConfirmsGrowth?"Sprawdzono: roślina nadal rosła · ":""}Przypomnienie ${new Date(reminderAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.`
             : "Szacowany czas wzrostu już minął · sprawdź w grze, czy można zebrać plon."
       : `Kolejny etap za ${gardenFormatDuration(stageRemaining)} · przewidywany zbiór za ${gardenFormatDuration(modelRemaining)}.`;
     const correctionPicker=canAskForCheck&&!check
@@ -13775,18 +13785,21 @@ function setupAdmin() {
         ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
         : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div>${correctionPicker}</div>`;
     const readyCheck=frame===9&&modelRemaining===0&&reminderDue
-      ? `<div class="garden-phase-question"><b>🌱 Roślina nadal nie jest gotowa?</b><div class="muted">Potwierdzenie schowa wykrzyknik i zapisze rzeczywisty, dłuższy czas wzrostu.</div><button type="button" class="secondary-btn" data-garden-not-ready>Jeszcze nie można zebrać</button><div class="garden-check-correction" data-garden-snooze-options hidden><b>Kiedy przypomnieć ponownie?</b><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-snooze="30">Za 30 min</button><button type="button" class="secondary-btn" data-garden-snooze="60">Za 1 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="180">Za 3 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="360">Za 6 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="720">Za 12 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="1440">Za 24 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="mute">Wycisz do zbioru</button></div></div></div>`
+      ? `<div class="garden-phase-question"><b>🌱 Co wiesz o roślinie?</b><div class="muted">Tylko potwierdzone sprawdzenie w grze może wydłużyć model wzrostu.</div><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-reminder-mode="checked">Sprawdzono — nadal rośnie</button><button type="button" class="secondary-btn" data-garden-reminder-mode="later">Nie sprawdzam teraz</button></div><div class="garden-check-correction" data-garden-snooze-options hidden><b data-garden-snooze-title>Kiedy przypomnieć ponownie?</b><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-snooze="30">Za 30 min</button><button type="button" class="secondary-btn" data-garden-snooze="60">Za 1 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="180">Za 3 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="360">Za 6 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="720">Za 12 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="1440">Za 24 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="mute">Wycisz do zbioru</button></div></div></div>`
       : lastNotReadyAt&&frame===9
         ? `<div class="garden-phase-note">✅ Ostatnio potwierdzono dalszy wzrost: ${new Date(lastNotReadyAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.</div>`
         : "";
     tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}${readyCheck}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku i nie powoduje dodatkowych powiadomień. Raport rzeczywistego etapu koryguje prognozę zbioru.</div>`;
-    tools.querySelector("[data-garden-not-ready]")?.addEventListener("click",()=>{
+    let reminderMode="";
+    tools.querySelectorAll("[data-garden-reminder-mode]").forEach(button=>button.addEventListener("click",()=>{
+      reminderMode=button.dataset.gardenReminderMode||"later";
       const options=tools.querySelector("[data-garden-snooze-options]");
       if (options) options.hidden=false;
-    });
+    }));
     tools.querySelectorAll("[data-garden-snooze]").forEach(button=>button.addEventListener("click",()=>{
       const value=button.dataset.gardenSnooze;
-      gardenSnoozeReady(own,value==="mute"?{muted:true}:{minutes:Number(value)});
+      const confirmedNotReady=reminderMode==="checked";
+      gardenSnoozeReady(own,value==="mute"?{muted:true,confirmedNotReady}:{minutes:Number(value),confirmedNotReady});
     }));
     tools.querySelector('[data-garden-check="YES"]')?.addEventListener("click",()=>{
       gardenRecordModelCheck(frame,"YES");
@@ -13827,25 +13840,72 @@ function setupAdmin() {
     return null;
   }
 
+  function gardenStageObservation(item,evidence) {
+    const startedAt=Number(item&&item.startedAt)||0;
+    if (!startedAt) return null;
+    const rows=(evidence?.stats?.checks||[]).map(event=>{
+      const frame=event.answer==="NO"&&Number.isInteger(Number(event.atlasFrame))
+        ? Number(event.atlasFrame)
+        : Number(event.expectedFrame);
+      const age=Number(event.observedAt)-startedAt;
+      if (!Number.isInteger(frame)||frame<0||frame>8||age<=0) return null;
+      const duration=Math.max(24*60*60*1000,Math.min(96*60*60*1000,age*10/(frame+0.5)));
+      // Późniejsze obrazy zawężają czas mocniej. Wybrany przy odpowiedzi „Nie”
+      // rzeczywisty obraz jest nieco silniejszym dowodem niż zwykłe „Tak”.
+      const weight=(0.08+0.22*(frame/8))*(event.answer==="NO"&&Number.isInteger(Number(event.atlasFrame))?1:0.72);
+      return {duration,weight};
+    }).filter(Boolean);
+    if (!rows.length) return null;
+    const total=rows.reduce((sum,row)=>sum+row.weight,0);
+    return {
+      duration:rows.reduce((sum,row)=>sum+row.duration*row.weight,0)/total,
+      weight:Math.min(0.48,total),
+      source:"STAGES"
+    };
+  }
+
   function gardenObservationForModel(item) {
     if (gardenUsesAutoModel(item)) {
       const evidence=gardenEvidenceForResult(item);
       if (!evidence.duration) return null;
-
-      // Późny zbiór bez obserwacji nie dowodzi wolnego wzrostu — gracz mógł
-      // po prostu odebrać gotową roślinę później. Takiego wyniku nie używamy
-      // do uczenia suwaków, dopóki nie mamy dowodu, że roślina nie była READY.
-      if (!evidence.provenByDeadline) return null;
-
       const reportWeight=Math.min(0.28,evidence.stats.checks.length*0.08);
       const agreementWeight=evidence.stats.agreement==null
         ? 0
         : Math.max(-0.16,Math.min(0.16,(evidence.stats.agreement-0.5)*0.32));
-      const timeWeight=evidence.provenByDeadline ? 0.58 : 0.46;
+      const stage=gardenStageObservation(item,evidence);
+      let harvest=null;
+
+      if (evidence.hasNotReadyProof) {
+        // Wiemy jedynie, że dojrzenie nastąpiło po ostatnim sprawdzeniu i nie
+        // później niż zbiór. Środek przedziału jest neutralnym oszacowaniem,
+        // a szeroki przedział automatycznie obniża wagę wyniku.
+        const lower=Math.min(evidence.lastNotReadyDuration,evidence.duration);
+        const gap=Math.max(0,evidence.duration-lower);
+        harvest={
+          duration:lower+gap/2,
+          source:"NOT_READY_TO_HARVEST",
+          weight:Math.max(0.18,Math.min(0.82,0.72/(1+gap/(6*60*60*1000))+reportWeight+agreementWeight))
+        };
+      } else if (evidence.harvestedByForecast) {
+        // Zbiór przed prognozą dowodzi, że roślina była gotowa najpóźniej w
+        // tej chwili. Może bezpiecznie skracać model, lecz ma mniejszą wagę
+        // niż przedział oparty na świadomym sprawdzeniu.
+        harvest={
+          duration:evidence.duration,
+          source:"EARLY_HARVEST",
+          weight:Math.max(0.25,Math.min(0.78,0.5+reportWeight+agreementWeight))
+        };
+      }
+
+      // Późny odbiór bez „Sprawdzono — nadal rośnie” nie może wydłużać
+      // prognozy. Odpowiedzi etapów pozostają jednak niezależnym dowodem.
+      if (!harvest) return stage ? {...stage,evidence} : null;
+      if (!stage) return {...harvest,evidence};
+      const combinedWeight=harvest.weight+stage.weight;
       return {
-        duration:evidence.duration,
-        source:"AUTO_HARVEST",
-        weight:Math.max(0.25,Math.min(1,timeWeight+reportWeight+agreementWeight)),
+        duration:(harvest.duration*harvest.weight+stage.duration*stage.weight)/combinedWeight,
+        source:`${harvest.source}_AND_STAGES`,
+        weight:Math.min(1,combinedWeight),
         evidence
       };
     }
@@ -13853,8 +13913,8 @@ function setupAdmin() {
     const observed=gardenObservedDuration(item);
     if (!observed || !Number.isFinite(observed.duration) || observed.duration<=0) return null;
 
-    // MANUAL ma mniejszą wiarygodność czasu startu. HARVEST bywa mocno
-    // spóźniony, więc dostaje mniejszą wagę niż osobno zgłoszone READY.
+    // Starsze pomiary ręczne zachowują wcześniejsze zasady, aby nie usuwać
+    // historycznych danych z okresu przed automatycznym modelem.
     // Obie wartości nadal są górnym ograniczeniem rzeczywistego momentu
     // dojrzenia, a nie „prawdą co do sekundy”.
     const startWeight=String(item.startSource||"LIVE").toUpperCase()==="MANUAL" ? 0.65 : 1;
@@ -14031,7 +14091,7 @@ function setupAdmin() {
       ? lowerBounds.reduce((sum,row)=>sum+row.weight*row.duration,0)/lowerBoundWeight
       : basePredictedMs;
     // „Jeszcze nie wyrosła” jest obserwacją jednostronną: znamy minimum,
-    // ale nie dokładny moment READY. Przesuwamy model w stronę tej granicy,
+    // ale nie dokładny moment dojrzenia. Przesuwamy model w stronę tej granicy,
     // bez traktowania kliknięcia jak czasu zbioru.
     const lowerBoundStrength=Math.min(0.75,lowerBoundWeight/(1+lowerBoundWeight));
     const predictedMs=basePredictedMs+Math.max(0,lowerBoundTarget-basePredictedMs)*lowerBoundStrength;
@@ -14154,7 +14214,7 @@ function setupAdmin() {
       const candidate={plant,sun:Number(center.sun),water:Number(center.water),ph:Number(center.ph)};
       const prediction=gardenKernelPrediction(candidate);
       const reason=best
-        ? "Celowo powtarzamy obecnie najlepszy wariant z READY/HARVEST, żeby sprawdzić powtarzalność."
+        ? "Celowo powtarzamy obecnie najlepszy wariant z obserwacji etapów i zbiorów, żeby sprawdzić powtarzalność."
         : race
           ? `Celowo replikujemy lidera porównania na tym samym etapie ${race.frame}; frame nie jest procentem postępu.`
           : "Powtarzamy punkt kontrolny 60/50/7; to punkt startowy, nie uznane optimum.";
@@ -14474,12 +14534,14 @@ function setupAdmin() {
       if (gardenUsesAutoModel(result)) {
         const evidence=gardenEvidenceForResult(result);
         const quality=`${evidence.stats.checks.length} raportów · pewność ${evidence.confidence}`;
-        if (evidence.provenByDeadline) {
-          lines.push(`<div class="garden-known">✅ Zbiór do 56 h: ${escapeHtml(gardenFormatDuration(evidence.duration))} · ${escapeHtml(quality)}${manualHint}</div>`);
+        if (evidence.hasNotReadyProof) {
+          lines.push(`<div class="garden-known">✅ Potwierdzony przedział wzrostu: ${escapeHtml(gardenFormatDuration(evidence.lastNotReadyDuration))}–${escapeHtml(gardenFormatDuration(evidence.duration))} · ${escapeHtml(quality)}${manualHint}</div>`);
+        } else if (evidence.harvestedByForecast) {
+          lines.push(`<div class="garden-known">✅ Zebrano przed prognozą: ${escapeHtml(gardenFormatDuration(evidence.duration))} · wynik może bezpiecznie skracać model · ${escapeHtml(quality)}${manualHint}</div>`);
         } else if (evidence.lateMismatch) {
-          lines.push(`<div class="garden-known">↔️ Niezgodna z modelem 52 h: zbiór ${escapeHtml(gardenFormatDuration(evidence.duration))} · odpowiedzi Nie wpływają na omijanie tego obszaru, ale nie udają dokładnego czasu wzrostu.</div>`);
+          lines.push(`<div class="garden-known">↔️ Etapy nie zgadzały się z prognozą: odbiór po ${escapeHtml(gardenFormatDuration(evidence.duration))} · etapowe obserwacje uczą model niezależnie od spóźnionego zbioru.</div>`);
         } else {
-          lines.push(`<div class="garden-known">🕒 Późny zbiór: ${escapeHtml(gardenFormatDuration(evidence.duration))} · READY mógł nastąpić wcześniej, więc wynik nie obniża rankingu.</div>`);
+          lines.push(`<div class="garden-known">🕒 Odbiór po prognozie: ${escapeHtml(gardenFormatDuration(evidence.duration))} · bez potwierdzenia dalszego wzrostu nie wydłuża modelu.</div>`);
         }
       } else {
         const observed = gardenObservedDuration(result);
