@@ -13764,7 +13764,7 @@ function setupAdmin() {
     const reminderDue=gardenReadyReminderDue(own);
     const timingText=frame===9
       ? modelRemaining>0
-        ? `Szacowany czas wzrostu za ${gardenFormatDuration(modelRemaining)} · przewidywany zbiór: ${gardenFormatDeadline(estimatedReadyAt)}.`
+        ? `Przewidywany zbiór za ${gardenFormatDuration(modelRemaining)} (${gardenFormatDeadline(estimatedReadyAt)}).`
         : reminderMuted
           ? reminderConfirmsGrowth
             ? "Sprawdzono: roślina nadal rosła · przypomnienie wyłączone dla tej uprawy."
