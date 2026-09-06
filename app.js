@@ -13415,8 +13415,9 @@ function setupAdmin() {
   function gardenNeedsModelCheck(item,summary,now=Date.now()) {
     if (!item || !gardenUsesAutoModel(item)) return false;
     const frame=gardenAutoFrame(item,now);
-    // Etap 1 jest potwierdzany posadzeniem, a etap 10 potwierdza sam zbiór.
-    return frame>0 && frame<9 && !gardenCheckForFrame(summary,frame);
+    // Etap 1 potwierdza posadzenie. Etap 10 też można sprawdzić wizualnie,
+    // lecz zgodność jego obrazu nie oznacza jeszcze gotowości do zbioru.
+    return frame>0 && frame<=9 && !gardenCheckForFrame(summary,frame);
   }
 
   function gardenCheckStats(item,summary) {
@@ -13789,7 +13790,7 @@ function setupAdmin() {
     const stage=gardenDisplayStage(frame);
     // Etap 1 jest potwierdzony samym udanym posadzeniem; pierwsza
     // sensowna obserwacja porównawcza zaczyna się od etapu 2.
-    const canAskForCheck=frame>0 && frame<9;
+    const canAskForCheck=frame>0 && frame<=9;
     const check=canAskForCheck ? gardenCheckForFrame(summary,frame) : null;
     const sprite=gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant);
     const stats=gardenCheckStats(own,summary);
@@ -13818,27 +13819,28 @@ function setupAdmin() {
             <b>Jak wygląda roślina?</b>
             <div class="garden-phase-answer-actions">
               <button type="button" class="secondary-btn" data-garden-direction="earlier">🌱 Jest mniej rozwinięta</button>
-              <button type="button" class="secondary-btn" data-garden-direction="later">🌿 Jest bardziej rozwinięta</button>
+              ${frame<9?`<button type="button" class="secondary-btn" data-garden-direction="later">🌿 Jest bardziej rozwinięta</button>`:""}
             </div>
           </div>
           <div class="garden-check-images" data-garden-images hidden></div>
         </div>`
       : "";
+    const stageTenHint=frame===9
+      ? `<div class="garden-phase-note">Etap 10 może trwać przed zbiorem. Odpowiedź „Tak” potwierdza tylko wygląd, nie gotowość rośliny.</div>`
+      : "";
     const report=frame===0
       ? `<div class="garden-phase-note">🌱 Etap 1 został potwierdzony przez posadzenie. Pierwsze pytanie pojawi się przy etapie 2.</div>`
-      : frame===9
-      ? `<div class="garden-phase-note">Etap 10 wygląda tak samo podczas dalszego wzrostu i przy gotowości. Zbierz roślinę dopiero, gdy gra pozwoli.</div>`
       : check
         ? `<div class="garden-phase-note">${check.answer==="YES"
           ? "✅ Zapisano: etap się zgadza."
           : `↔️ Zapisano rzeczywisty etap ${gardenDisplayStage(check.atlasFrame)} — od niego biegnie dalsza prognoza.`} Jedna odpowiedź na etap wystarczy.</div>`
         : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div>${correctionPicker}</div>`;
-    const readyCheck=frame===9&&modelRemaining===0&&reminderDue
+    const readyCheck=frame===9&&modelRemaining===0&&reminderDue&&Boolean(check)
       ? `<div class="garden-phase-question"><b>🌱 Co wiesz o roślinie?</b><div class="muted">Tylko potwierdzone sprawdzenie w grze może wydłużyć model wzrostu.</div><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-reminder-mode="checked">Sprawdzono — nadal rośnie</button><button type="button" class="secondary-btn" data-garden-reminder-mode="later">Nie sprawdzam teraz</button></div><div class="garden-check-correction" data-garden-snooze-options hidden><b data-garden-snooze-title>Kiedy przypomnieć ponownie?</b><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-snooze="30">Za 30 min</button><button type="button" class="secondary-btn" data-garden-snooze="60">Za 1 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="180">Za 3 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="360">Za 6 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="720">Za 12 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="1440">Za 24 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="mute">Wycisz do zbioru</button></div></div></div>`
       : lastNotReadyAt&&frame===9
         ? `<div class="garden-phase-note">✅ Ostatnio potwierdzono dalszy wzrost: ${new Date(lastNotReadyAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.</div>`
         : "";
-    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${report}${readyCheck}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku i nie powoduje dodatkowych powiadomień. Raport rzeczywistego etapu koryguje prognozę zbioru.</div>`;
+    tools.innerHTML=`<div class="garden-phase-head"><div><strong>🌿 Automatyczny etap ${stage}/10</strong><div class="muted">${escapeHtml(timingText)}</div></div><span class="chip">${stats.checks.length} raportów</span></div><div class="garden-auto-phase-visual">${sprite}</div>${stageTenHint}${report}${readyCheck}<div class="muted garden-phase-note">Brak odpowiedzi nie obniża wyniku i nie powoduje dodatkowych powiadomień. Raport rzeczywistego etapu koryguje prognozę zbioru.</div>`;
     let reminderMode="";
     tools.querySelectorAll("[data-garden-reminder-mode]").forEach(button=>button.addEventListener("click",()=>{
       reminderMode=button.dataset.gardenReminderMode||"later";
@@ -14425,6 +14427,7 @@ function setupAdmin() {
       const possibleHarvest=Boolean(active && (gardenReadyReminderDue(active)||(experimentalUiTest("gardenReady")&&plot===gardenSelectedPlot)));
       const plotAttention=possibleHarvest;
       const plotAttentionLabel="Możliwy zbiór";
+      const plotQuestion=Boolean(needsCheck&&!possibleHarvest);
 
       return `
         <button type="button" class="garden-plot ${active ? "growing" : "empty"} ${plot===gardenSelectedPlot ? "active" : ""}" data-garden-plot="${plot}">
@@ -14434,6 +14437,7 @@ function setupAdmin() {
             ${stats}
           </span>
           ${plotAttention?`<span class="build-setup-attention garden-plot-attention" aria-label="${plotAttentionLabel}">!</span>`:""}
+          ${plotQuestion?`<span class="garden-plot-question" aria-label="Możesz potwierdzić aktualny etap" title="Możesz potwierdzić aktualny etap">?</span>`:""}
           <span class="garden-plot-name">Grządka ${plot}</span>
           <span class="garden-plot-meta">${active ? `${escapeHtml(active.plant)} · ${frame===null?"bez etapu":`etap ${gardenDisplayStage(frame)}`}` : "Pusta"}</span>
         </button>`;
