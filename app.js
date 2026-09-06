@@ -13860,23 +13860,41 @@ function setupAdmin() {
     tools.querySelectorAll("[data-garden-direction]").forEach(button=>button.addEventListener("click",()=>{
       const earlier=button.dataset.gardenDirection==="earlier";
       const candidates=[];
-      for (let distance=1;distance<=3;distance++) {
+      for (let distance=1;distance<=9;distance++) {
         const candidate=frame+(earlier?-distance:distance);
         if (candidate>=0&&candidate<=9) candidates.push(candidate);
       }
       const images=tools.querySelector("[data-garden-images]");
       const direction=tools.querySelector("[data-garden-direction-step]");
       if (!images) return;
-      images.innerHTML=`<b>Wybierz najbardziej podobny obraz:</b><div class="garden-check-image-grid">${candidates.map(candidate=>`<button type="button" class="garden-phase-option" data-garden-actual-frame="${candidate}" aria-label="Etap ${gardenDisplayStage(candidate)}">${gardenFrameSpriteHtml(candidate,"garden-phase-sprite",own.plant)}<b>${gardenDisplayStage(candidate)}</b></button>`).join("")}</div><button type="button" class="secondary-btn garden-check-direction-back" data-garden-direction-back>← Zmień kierunek</button>`;
       if (direction) direction.hidden=true;
       images.hidden=false;
-      images.querySelectorAll("[data-garden-actual-frame]").forEach(option=>option.addEventListener("click",()=>{
-        gardenRecordModelCheck(frame,"NO",Number(option.dataset.gardenActualFrame));
-      }));
-      images.querySelector("[data-garden-direction-back]")?.addEventListener("click",()=>{
-        images.hidden=true;
-        if (direction) direction.hidden=false;
-      });
+      const renderCandidatePage=(page=0)=>{
+        const pageSize=2;
+        const pageCount=Math.max(1,Math.ceil(candidates.length/pageSize));
+        const safePage=Math.max(0,Math.min(pageCount-1,page));
+        const visible=candidates.slice(safePage*pageSize,safePage*pageSize+pageSize);
+        const fartherLabel=earlier?"🌱 Pokaż jeszcze wcześniejsze":"🌿 Pokaż jeszcze późniejsze";
+        const nearerLabel=earlier?"🌿 Pokaż późniejsze":"🌱 Pokaż wcześniejsze";
+        images.innerHTML=`<b>Wybierz najbardziej podobny obraz:</b>
+          <div class="garden-check-image-grid">${visible.map(candidate=>`<button type="button" class="garden-phase-option" data-garden-actual-frame="${candidate}" aria-label="Etap ${gardenDisplayStage(candidate)}">${gardenFrameSpriteHtml(candidate,"garden-phase-sprite",own.plant)}<b>${gardenDisplayStage(candidate)}</b></button>`).join("")}</div>
+          <div class="garden-phase-answer-actions garden-check-page-actions">
+            ${safePage>0?`<button type="button" class="secondary-btn" data-garden-page="${safePage-1}">${nearerLabel}</button>`:""}
+            ${safePage<pageCount-1?`<button type="button" class="secondary-btn" data-garden-page="${safePage+1}">${fartherLabel}</button>`:""}
+          </div>
+          <button type="button" class="secondary-btn garden-check-direction-back" data-garden-direction-back>← Zmień kierunek</button>`;
+        images.querySelectorAll("[data-garden-actual-frame]").forEach(option=>option.addEventListener("click",()=>{
+          gardenRecordModelCheck(frame,"NO",Number(option.dataset.gardenActualFrame));
+        }));
+        images.querySelectorAll("[data-garden-page]").forEach(pageButton=>pageButton.addEventListener("click",()=>{
+          renderCandidatePage(Number(pageButton.dataset.gardenPage));
+        }));
+        images.querySelector("[data-garden-direction-back]")?.addEventListener("click",()=>{
+          images.hidden=true;
+          if (direction) direction.hidden=false;
+        });
+      };
+      renderCandidatePage();
     }));
   }
 
