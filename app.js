@@ -15333,6 +15333,9 @@ function setupAdmin() {
       bonuses:[],
       exactCombat:{
         level:15,
+        // Kalibracja z niekrytycznych ciosów RoQ w obu logach: przy 523 ATK,
+        // 18,4% przebicia i 867 DEF odtwarza 118 obrażeń w T1 oraz 122 w T2.
+        defenseK:264,
         primary:{attack:751,defense:867,hp:2388},
         stats:{
           accuracy:110.5,initiative:15.9,firstStrike:10.8,
@@ -15605,7 +15608,10 @@ function setupAdmin() {
     // tej samej walki daje K ~= 175 + 4,9 × (poziom obrońcy - 1) i odtwarza
     // kolejne zwykłe ciosy z dokładnością około jednego punktu obrażeń.
     const defenderLevel=Math.max(1,Number(defender.combatLevel)||Number(defender.calculated?.characterLevel)||1);
-    const defenseK=175+4.9*(defenderLevel-1);
+    const loggedDefenseK=Number(defender.source?.exactCombat?.defenseK);
+    const defenseK=Number.isFinite(loggedDefenseK) && loggedDefenseK>0
+      ? loggedDefenseK
+      : 175+4.9*(defenderLevel-1);
     const defenseFactor=defenseK/(effectiveDefense+defenseK);
     // Pełne logi walk z Panem Pawłem podają osobno evasionDR, ale końcowy
     // damageTakenMult obu stron odpowiada wyłącznie właściwej Redukcji obrażeń
