@@ -13346,7 +13346,7 @@ function setupAdmin() {
     // Obraz reprezentuje przedział etapu. Tempo liczymy z jego środka, ale
     // pojedynczy raport tylko częściowo przesuwa prognozę; kolejne ją doprecyzują.
     const implied=age*10/(frame+0.5);
-    const expected=gardenAutoFrame(item,observedAt);
+    const expected=gardenUnanchoredAutoFrame(item,observedAt);
     const distance=Math.max(1,Math.abs(frame-expected));
     const evidenceWeight=Math.min(0.65,0.35+distance*0.10);
     const adjusted=base*(1-evidenceWeight)+implied*evidenceWeight;
@@ -13357,9 +13357,42 @@ function setupAdmin() {
     return gardenDynamicDurationMs(item)/10;
   }
 
-  function gardenAutoFrame(item,now=Date.now()) {
+  function gardenUnanchoredAutoFrame(item,now=Date.now()) {
     const age=Math.max(0,Number(now)-Number(item && item.startedAt || 0));
     return Math.max(0,Math.min(9,Math.floor(age/gardenAutoStageMs(item))));
+  }
+
+  function gardenAutoProgress(item,now=Date.now()) {
+    const stageMs=gardenAutoStageMs(item);
+    const summary=gardenPhaseSummary(item);
+    const checks=(summary.checks||[])
+      .filter(event=>Number(event.observedAt)<=Number(now))
+      .slice()
+      .sort((a,b)=>Number(a.observedAt)-Number(b.observedAt));
+    const anchor=checks.length ? checks[checks.length-1] : null;
+    if (!anchor) {
+      const age=Math.max(0,Number(now)-Number(item&&item.startedAt||0));
+      const progress=age/stageMs;
+      return {frame:Math.max(0,Math.min(9,Math.floor(progress))),progress,anchor:null};
+    }
+    const anchorFrame=anchor.answer==="NO"&&Number.isInteger(Number(anchor.atlasFrame))
+      ? Number(anchor.atlasFrame)
+      : Number(anchor.expectedFrame);
+    // Obserwacja wskazuje przybliżony środek wybranego etapu. Dzięki temu
+    // grafika i następne pytania biegną dalej od faktycznie widzianej sadzonki.
+    const elapsed=Math.max(0,Number(now)-Number(anchor.observedAt));
+    const progress=anchorFrame+0.5+elapsed/stageMs;
+    return {frame:Math.max(0,Math.min(9,Math.floor(progress))),progress,anchor};
+  }
+
+  function gardenAutoFrame(item,now=Date.now()) {
+    return gardenAutoProgress(item,now).frame;
+  }
+
+  function gardenAutoStageRemaining(item,now=Date.now()) {
+    const state=gardenAutoProgress(item,now);
+    if (state.frame>=9) return 0;
+    return Math.max(0,(state.frame+1-state.progress)*gardenAutoStageMs(item));
   }
 
   function gardenDisplayFrame(item,summary,now=Date.now()) {
@@ -13369,7 +13402,8 @@ function setupAdmin() {
 
   function gardenCheckForFrame(summary,frame) {
     return (summary && summary.checks || []).find(
-      event=>Number(event.expectedFrame)===Number(frame)
+      event=>Number(event.expectedFrame)===Number(frame) ||
+        (event.answer==="NO"&&Number.isInteger(Number(event.atlasFrame))&&Number(event.atlasFrame)===Number(frame))
     ) || null;
   }
 
@@ -13756,7 +13790,7 @@ function setupAdmin() {
     const stats=gardenCheckStats(own,summary);
     const estimatedReadyAt=Number(own.startedAt||0)+gardenDynamicDurationMs(own);
     const modelRemaining=Math.max(0,estimatedReadyAt-Date.now());
-    const stageRemaining=Math.max(0,(frame+1)*gardenAutoStageMs(own)-(Date.now()-Number(own.startedAt||0)));
+    const stageRemaining=gardenAutoStageRemaining(own);
     const reminderAt=Number(own.readyReminderAt||0);
     const lastNotReadyAt=Number(own.lastNotReadyAt||0);
     const reminderMuted=Boolean(own.readyReminderMuted);
@@ -13790,7 +13824,9 @@ function setupAdmin() {
       : frame===9
       ? `<div class="garden-phase-note">Etap 10 wygląda tak samo podczas dalszego wzrostu i przy gotowości. Zbierz roślinę dopiero, gdy gra pozwoli.</div>`
       : check
-        ? `<div class="garden-phase-note">${check.answer==="YES"?"✅ Zapisano: etap się zgadza.":"↔️ Zapisano: etap się nie zgadza."} Jedna odpowiedź na etap wystarczy.</div>`
+        ? `<div class="garden-phase-note">${check.answer==="YES"
+          ? "✅ Zapisano: etap się zgadza."
+          : `↔️ Zapisano rzeczywisty etap ${gardenDisplayStage(check.atlasFrame)} — od niego biegnie dalsza prognoza.`} Jedna odpowiedź na etap wystarczy.</div>`
         : `<div class="garden-phase-question"><b>Czy w grze widzisz teraz etap ${stage}?</b><div class="garden-phase-answer-actions"><button type="button" class="primary-btn" data-garden-check="YES">✅ Tak</button><button type="button" class="secondary-btn" data-garden-check="NO">❌ Nie</button></div>${correctionPicker}</div>`;
     const readyCheck=frame===9&&modelRemaining===0&&reminderDue
       ? `<div class="garden-phase-question"><b>🌱 Co wiesz o roślinie?</b><div class="muted">Tylko potwierdzone sprawdzenie w grze może wydłużyć model wzrostu.</div><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-reminder-mode="checked">Sprawdzono — nadal rośnie</button><button type="button" class="secondary-btn" data-garden-reminder-mode="later">Nie sprawdzam teraz</button></div><div class="garden-check-correction" data-garden-snooze-options hidden><b data-garden-snooze-title>Kiedy przypomnieć ponownie?</b><div class="garden-phase-answer-actions"><button type="button" class="secondary-btn" data-garden-snooze="30">Za 30 min</button><button type="button" class="secondary-btn" data-garden-snooze="60">Za 1 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="180">Za 3 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="360">Za 6 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="720">Za 12 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="1440">Za 24 godz.</button><button type="button" class="secondary-btn" data-garden-snooze="mute">Wycisz do zbioru</button></div></div></div>`
@@ -14644,7 +14680,7 @@ function setupAdmin() {
       const frame=gardenAutoFrame(own);
       const stats=gardenCheckStats(own,gardenPhaseSummary(own));
       box.textContent=`⏱️ Rośnie już: ${gardenFormatDuration(age)} · model: etap ${gardenDisplayStage(frame)}/10 · raporty ${stats.yes.length} Tak / ${stats.no.length} Nie`;
-      const nextStageRemaining=Math.max(0,(frame+1)*gardenAutoStageMs(own)-age);
+      const nextStageRemaining=gardenAutoStageRemaining(own);
       const phaseMinute=Math.floor(nextStageRemaining/60000);
       const phaseSignature=`${own.id}:${frame}:${stats.yes.length}:${stats.no.length}:${gardenNeedsModelCheck(own,gardenPhaseSummary(own))?1:0}:${gardenPendingPhase?.eventId||""}:${phaseMinute}`;
       if (phaseSignature!==gardenLastPhaseToolsSignature) {
