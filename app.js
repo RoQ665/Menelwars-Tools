@@ -13045,6 +13045,14 @@ function setupAdmin() {
     return parts.join(" ");
   }
 
+  function gardenFormatDeadline(timestamp) {
+    const value=Number(timestamp)||0;
+    if (!value) return "";
+    return new Date(value).toLocaleString("pl-PL",{
+      day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"
+    });
+  }
+
   function gardenClampValue(value,min,max,step,fallback) {
     let number = Number(value);
     if (!Number.isFinite(number)) number = Number(fallback);
@@ -13756,7 +13764,7 @@ function setupAdmin() {
     const reminderDue=gardenReadyReminderDue(own);
     const timingText=frame===9
       ? modelRemaining>0
-        ? `Szacowany czas wzrostu za ${gardenFormatDuration(modelRemaining)}.`
+        ? `Szacowany czas wzrostu za ${gardenFormatDuration(modelRemaining)} · przewidywany zbiór: ${gardenFormatDeadline(estimatedReadyAt)}.`
         : reminderMuted
           ? reminderConfirmsGrowth
             ? "Sprawdzono: roślina nadal rosła · przypomnienie wyłączone dla tej uprawy."
@@ -13764,7 +13772,7 @@ function setupAdmin() {
           : reminderAt>Date.now()
             ? `${reminderConfirmsGrowth?"Sprawdzono: roślina nadal rosła · ":""}Przypomnienie ${new Date(reminderAt).toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}.`
             : "Szacowany czas wzrostu już minął · sprawdź w grze, czy można zebrać plon."
-      : `Kolejny etap za ${gardenFormatDuration(stageRemaining)} · przewidywany zbiór za ${gardenFormatDuration(modelRemaining)}.`;
+      : `Kolejny etap za ${gardenFormatDuration(stageRemaining)} · przewidywany zbiór za ${gardenFormatDuration(modelRemaining)} (${gardenFormatDeadline(estimatedReadyAt)}).`;
     const correctionPicker=canAskForCheck&&!check
       ? `<div class="garden-check-correction" data-garden-correction hidden>
           <div class="garden-check-direction" data-garden-direction-step>
