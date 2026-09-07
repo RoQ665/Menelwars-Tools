@@ -15496,6 +15496,45 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss odtworzony z dwóch logów walki: 751 ATK · 867 DEF · 2388 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
+
+    // Mateusz Rowerzysta został odtworzony z pełnego logu walki z 7.09.2026.
+    // Walka doszła do limitu 15 tur, dzięki czemu zawiera obrażenia z całej
+    // tabeli eskalacji oraz końcowe statystyki obu stron.
+    out.push({
+      id:"boss-19-mateusz-rowerzysta",
+      name:"Mateusz Rowerzysta · Lvl 16 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:16,
+      attributes:{strength:43,endurance:51,agility:35,vitality:45,precision:45},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:765,combatDefense:980,combatHp:2882,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:16,
+        // Kalibracja z niekrytycznych ciosów RoQ: 523 ATK, 18,4% przebicia,
+        // 980 DEF i 29,7% redukcji odtwarza 104 obrażenia w pierwszej turze.
+        defenseK:299,
+        primary:{attack:765,defense:980,hp:2882},
+        stats:{
+          accuracy:111.5,initiative:16.5,firstStrike:11.3,
+          critChance:36,critDmg:58.3,execute:15.8,lifesteal:12.8,
+          armorPen:19.7,stun:18,bleed:32.4,bleedDamage:0,
+          evasion:14.3,doubleStrike:17.5,counter:10.5,
+          healingReduction:28,damageReduction:29.7,
+          critResist:43.4,stunResist:41.4,bleedResist:22.5,
+          hpRegen:6.8
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z pełnego logu walki: 765 ATK · 980 DEF · 2882 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
