@@ -15835,15 +15835,16 @@ function setupAdmin() {
     const normalAttack=attacker.primary.attack*(1+dynamicPct/100)+5;
     const attack=normalAttack*(1+condA.attackPct/100);
     const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
-    // Pełny log RoQ (lvl 53) kontra Nagła Śmierć (lvl 14) pokazał, że K
-    // zależy od poziomu BRONIĄCEGO, nie atakującego. Kalibracja obu kierunków
-    // tej samej walki daje K ~= 175 + 4,9 × (poziom obrońcy - 1) i odtwarza
-    // kolejne zwykłe ciosy z dokładnością około jednego punktu obrażeń.
+    // K zależy od poziomu BRONIĄCEGO, nie atakującego. Pełny log xBuLax
+    // kontra RoQ (obaj lvl 55) kalibruje zwykłe buildy graczy na całej tabeli:
+    // 485 ATK, 21,75% przebicia, 1126 DEF i 53% DR daje 73 dmg do T12,
+    // a następnie 74 / 76 / 77. Odtwarza to K ~= 256–257, czyli
+    // 175 + 1,5 × (poziom - 1). Dokładne bossy mają własny defenseK.
     const defenderLevel=Math.max(1,Number(defender.combatLevel)||Number(defender.calculated?.characterLevel)||1);
     const loggedDefenseK=Number(defender.source?.exactCombat?.defenseK);
     const defenseK=Number.isFinite(loggedDefenseK) && loggedDefenseK>0
       ? loggedDefenseK
-      : 175+4.9*(defenderLevel-1);
+      : 175+1.5*(defenderLevel-1);
     const defenseFactor=defenseK/(effectiveDefense+defenseK);
     // Pełne logi walk z Panem Pawłem podają osobno evasionDR, ale końcowy
     // damageTakenMult obu stron odpowiada wyłącznie właściwej Redukcji obrażeń
@@ -16370,7 +16371,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftSource,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftSource,rightItem.source,params);
-      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki; odporność jest sprawdzana przy jego nakładaniu, a nie ponownie przy każdym ticku. Unik rozstrzyga trafienie, ale nie jest drugi raz doliczany do stałej redukcji obrażeń; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF używa modelu zależnego od poziomu broniącego: K = 175 + 4,9 × (poziom − 1). Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki; odporność jest sprawdzana przy jego nakładaniu, a nie ponownie przy każdym ticku. Unik rozstrzyga trafienie, ale nie jest drugi raz doliczany do stałej redukcji obrażeń; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF zwykłych buildów graczy używa modelu zależnego od poziomu broniącego: K = 175 + 1,5 × (poziom − 1); dokładne bossy nadpisują K danymi z logów. Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
