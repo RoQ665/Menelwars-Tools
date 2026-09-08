@@ -15535,6 +15535,44 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss odtworzony z pełnego logu walki: 765 ATK · 980 DEF · 2882 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
+
+    // Adrian Puchacki został potwierdzony w dwóch pełnych walkach z 8.09.2026.
+    // Oba logi zawierają identyczne statystyki bossa i obrażenia aż do 15. tury.
+    out.push({
+      id:"boss-20-adrian-puchacki",
+      name:"Adrian Puchacki · Lvl 17 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:17,
+      attributes:{strength:45,endurance:53,agility:35,vitality:47,precision:47},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:772,combatDefense:993,combatHp:2931,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:17,
+        // Kalibracja z niekrytycznych ciosów RoQ: 504 ATK, 19% przebicia,
+        // 993 DEF i 31,6% redukcji odtwarza całą tabelę 97–140 obrażeń.
+        defenseK:299,
+        primary:{attack:772,defense:993,hp:2931},
+        stats:{
+          accuracy:112.5,initiative:17.1,firstStrike:11.8,
+          critChance:37,critDmg:60.5,execute:17.1,lifesteal:14.1,
+          armorPen:20.6,stun:18.8,bleed:33.4,bleedDamage:0,
+          evasion:14.3,doubleStrike:17.5,counter:10.5,
+          healingReduction:28,damageReduction:31.6,
+          critResist:44.2,stunResist:44.2,bleedResist:23.5,
+          hpRegen:7.1
+        }
+      },
+      boss:true,
+      description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 772 ATK · 993 DEF · 2931 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
