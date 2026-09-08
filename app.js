@@ -23,6 +23,7 @@
     return Boolean(
       account &&
       account.admin &&
+      Number(account.adminTier) >= 2 &&
       cachedAccountStatusToken === playerAccountSessionToken()
     );
   }
@@ -53,6 +54,8 @@
 
   function experimentalUiApply(account=cachedAccountStatus) {
     const allowed=experimentalUiAllowed(account);
+    const testPanel=document.querySelector(".experimental-ui-test-panel");
+    if (testPanel) testPanel.hidden=!allowed;
     const accountStyle=String(account?.preferences?.appearance||"");
     if (accountStyle==="modern"||accountStyle==="classic") localStorage.setItem(UI_STYLE_KEY,accountStyle);
     const enabled=experimentalUiEnabled();
@@ -2771,7 +2774,7 @@ function mapRenderRouteResult() {
     if (account && account.nick) {
       box.className = "submit-info known-recipe";
       box.innerHTML =
-        `✅ Zalogowano jako <b>${escapeHtml(account.nick)}</b>${account.admin ? " · 🛠 Administracja" : ""}.`;
+        `✅ Zalogowano jako <b>${escapeHtml(account.nick)}</b>${account.admin ? (Number(account.adminTier)>=2 ? " · 🛠 Administrator T2" : " · 🛠 Administracja") : ""}.`;
     } else if (playerAccountSessionToken()) {
       box.className = "submit-info unknown-recipe";
       box.textContent = "⚠️ Nie udało się potwierdzić zapisanej sesji.";
@@ -3552,6 +3555,7 @@ function mapRenderRouteResult() {
       buildListsFetchedAt = 0;
       buildPublicItems = [];
       buildMyItems = [];
+      buildPrivatePreviewItems = [];
       buildListsFetchInFlight = null;
     }
     if (typeof gangPollsCache !== "undefined") {
@@ -3877,7 +3881,7 @@ function mapRenderRouteResult() {
       <div class="account-card logged">
         <div class="account-profile-heading"><b>👤 ${escapeHtml(account.nick)}</b>${overallMedal?`<span class="account-overall-medal ${overallMedal.tier}" title="Postęp ogólny: ${overallMedal.complete} / ${overallMedal.total} (${Math.round(overallMedal.percent)}%)"><img src="${overallMedal.medal}" alt="Medal ogólnego postępu"></span>`:""}</div>
         ${profileMedals.length?`<div class="account-achievement-medals" aria-label="Medale kategorii">${profileMedals.map(category=>`<span class="account-achievement-medal ${category.tier}" title="${escapeHtml(category.title)}: ${category.complete} / ${category.items.length} (${Math.round(category.percent)}%)"><img src="${category.medal}" alt="${escapeHtml(category.title)}"></span>`).join("")}</div>`:""}
-        <div style="margin-top:5px">✅ Sesja aktywna${account.admin ? " · 🛠 Administracja" : account.officer ? " · 🎖 Ranga oficerska" : ""}</div>
+        <div style="margin-top:5px">✅ Sesja aktywna${account.admin ? (Number(account.adminTier)>=2 ? " · 🛠 Administrator T2" : " · 🛠 Administracja") : account.officer ? " · 🎖 Ranga oficerska" : ""}</div>
         <div style="margin-top:7px"><span class="account-session-stat">📱 Aktywne sesje: ${Number(account.sessionCount)||0}</span></div>
         <div class="account-actions">
           <button id="account-change-open" type="button">🔑 Zmień hasło</button>
@@ -4303,7 +4307,7 @@ async function loadAccountAdminPermissions(
                   <div class="admin-player-identity">
                     <div class="admin-player-name-row">
                       <b>${escapeHtml(player.nick)}</b>
-                      <span class="admin-player-role ${player.admin ? "admin" : player.officer ? "officer" : "player"}">${player.admin ? "🛠 Administracja" : player.officer ? "🎖 Oficer" : "👤 Gracz"}</span>
+                      <span class="admin-player-role ${player.admin ? "admin" : player.officer ? "officer" : "player"}">${player.admin ? (Number(player.adminTier)>=2 ? "🛠 Administrator T2" : "🛠 Administracja") : player.officer ? "🎖 Oficer" : "👤 Gracz"}</span>
                     </div>
                     <div class="admin-player-badges">
                       <span class="admin-player-state ${player.accountActive ? "active" : "inactive"}">${player.accountActive ? "● Konto aktywne" : "○ Konto nieaktywne"}</span>
@@ -11905,6 +11909,7 @@ function setupAdmin() {
   let buildActiveAttr = "";
   let buildPublicItems = [];
   let buildMyItems = [];
+  let buildPrivatePreviewItems = [];
   let buildListsLoaded = false;
   let buildListsFetchedAt = 0;
   let buildListsFetchInFlight = null;
@@ -12494,6 +12499,9 @@ function setupAdmin() {
         : [];
       buildMyItems = Array.isArray(result.myBuilds)
         ? result.myBuilds.map(buildNormalizeServerItem)
+        : [];
+      buildPrivatePreviewItems = Array.isArray(result.privatePreviewBuilds)
+        ? result.privatePreviewBuilds.map(buildNormalizeServerItem)
         : [];
       buildListsLoaded = true;
       buildListsFetchedAt = Date.now();
@@ -15582,6 +15590,7 @@ function setupAdmin() {
     const all = [{key:"current",label:"✏️ Aktualny edytor",source:current,group:"current"}];
     buildMyItems.forEach(item=>all.push({key:`mine:${item.id}`,label:`🔒 ${item.name}`,source:item,group:"mine"}));
     buildPublicItems.forEach(item=>all.push({key:`public:${item.id}`,label:`🌍 ${item.name} · ${item.authorNick||"Anonim"}`,source:item,group:"public"}));
+    buildPrivatePreviewItems.forEach(item=>all.push({key:`private-preview:${item.id}`,label:`🔐 ${item.name} · ${item.authorNick||item.ownerNick||"Anonim"} · prywatny`,source:item,group:"private-preview"}));
     pvpGeneratedPresets().forEach(item=>all.push({key:`preset:${item.id}`,label:`🤖 ${item.name} · treningowy`,source:item,group:"preset"}));
     return all;
   }
