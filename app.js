@@ -15581,6 +15581,46 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 772 ATK · 993 DEF · 2931 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
+
+    // Janusz Tracz został potwierdzony w dwóch pełnych walkach z 10.09.2026.
+    // Obie próby miały identyczne statystyki obu stron i aktywny komplet
+    // dopalaczy bossowych; różnicę wyniku zrobiło głównie krwawienie.
+    out.push({
+      id:"boss-21-janusz-tracz",
+      name:"Janusz Tracz · Lvl 18 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:18,
+      attributes:{strength:47,endurance:41,agility:41,vitality:35,precision:49},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:776,combatDefense:825,combatHp:2409,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:18,
+        // Kalibracja z dwóch pełnych tabel ciosów RoQ: 547 ATK, 22,4%
+        // przebicia, 825 DEF i 19,9% redukcji. K=272 minimalizuje błąd
+        // zaokrągleń na całej sekwencji 136–187 obrażeń przed bonusem low HP.
+        defenseK:272,
+        primary:{attack:776,defense:825,hp:2409},
+        stats:{
+          accuracy:121.5,initiative:17.7,firstStrike:12.3,
+          critChance:39.8,critDmg:62.7,execute:9.4,lifesteal:7.4,
+          armorPen:21.5,stun:19.6,bleed:56.2,bleedDamage:40,
+          evasion:16.4,doubleStrike:20.5,counter:12.3,
+          healingReduction:50,damageReduction:19.9,
+          critResist:21.4,stunResist:19.4,bleedResist:37.5,
+          hpRegen:5.3
+        }
+      },
+      boss:true,
+      description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 776 ATK · 825 DEF · 2409 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
