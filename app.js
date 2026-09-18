@@ -24,7 +24,7 @@
       account &&
       account.admin &&
       Number(account.adminTier) >= 2 &&
-      cachedAccountStatusToken === playerAccountSessionToken()
+      cachedAccountStatusToken === cloudflareSessionToken()
     );
   }
 
@@ -3166,9 +3166,14 @@ function mapRenderRouteResult() {
   }
 
   function paymentsRow(player,index=0) {
-    const saldo = Number(player.saldo) || 0;
-    const aiSaldo = Number(player.aiDumpBalance) || 0;
     const isOwn=normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick());
+    const realSaldo=Number(player.saldo)||0,realAiSaldo=Number(player.aiDumpBalance)||0;
+    const testState=experimentalUiTestState();
+    const testPayment=isOwn&&realSaldo>=0&&Boolean(testState.paymentDebt);
+    const testAi=isOwn&&realAiSaldo>=0&&Boolean(testState.aiBlocked);
+    const saldo=testPayment?-1:realSaldo,aiSaldo=testAi?-1:realAiSaldo;
+    const paymentDeclared=testPayment?Boolean(testState.paymentDebtReportedAt):Boolean(player.paymentDebtDeclared);
+    const aiDeclared=testAi?Boolean(testState.aiBlockedReportedAt):Boolean(player.aiDumpDebtDeclared);
     const ownPaymentProblem=isOwn&&(saldo<0||aiSaldo<0||experimentalUiTest("paymentDebt")||experimentalUiTest("aiBlocked"));
     let stateClass = "zero", status = "🟢 Na bieżąco", amount = "0 zł";
     if (saldo < 0) {
@@ -3186,20 +3191,20 @@ function mapRenderRouteResult() {
         <div class="payment-rank">${paymentsRankBadge(index)}</div>
         <div class="payment-main">
           <div class="finance-name">${escapeHtml(player.nick)}</div>
-          <div class="finance-meta"><span>${status}</span></div>
+          <div class="finance-meta"><span>${status}${testPayment?" · 🧪 test":""}</span></div>
           <div class="finance-meta ai-dump-payment ${aiSaldo < 0 ? "debt" : aiSaldo > 0 ? "credit" : "zero"}">
-            <span>♻️ Wysypisko All Inclusive: ${aiSaldo < 0 ? "Dług" : aiSaldo > 0 ? "Nadpłata" : "Saldo 0"}</span>
+            <span>♻️ Wysypisko All Inclusive: ${aiSaldo < 0 ? "Dług" : aiSaldo > 0 ? "Nadpłata" : "Saldo 0"}${testAi?" · 🧪 test":""}</span>
             <strong>${aiSaldo > 0 ? "+" : ""}${formatSaldo(aiSaldo)} pkt</strong>
           </div>
           <div class="ai-dump-access ${aiSaldo >= 0 ? "allowed" : "blocked"}">
             ${aiSaldo >= 0 ? "✅ Może kopać" : "⛔ Dług — brak wejścia"}
           </div>
-          ${saldo<0 ? player.paymentDebtDeclared
-            ? `<div class="debt-declaration-note">🕒 Gracz zgłosił uregulowanie wpłaty. Czekamy na nowy stan wpłat.</div>`
-            : isOwn ? `<button class="debt-declaration-button" type="button" data-debt-declare="payments">💰 Zgłoś uregulowanie wpłaty</button>` : "" : ""}
-          ${aiSaldo<0 ? player.aiDumpDebtDeclared
-            ? `<div class="debt-declaration-note">🕒 Gracz zgłosił uzupełnienie punktów AI. Czekamy na nowy stan Wysypiska AI.</div>`
-            : isOwn ? `<button class="debt-declaration-button" type="button" data-debt-declare="ai_dump">♻️ Zgłoś uzupełnienie punktów AI</button>` : "" : ""}
+          ${saldo<0 ? paymentDeclared
+            ? `<div class="debt-declaration-note">🕒 ${testPayment?"🧪 Test: ":""}Gracz zgłosił uregulowanie wpłaty. Czekamy na nowy stan wpłat.</div>`
+            : isOwn ? `<button class="debt-declaration-button" type="button" data-debt-declare="payments" ${testPayment?'data-debt-test="1"':""}>💰 Zgłoś uregulowanie wpłaty</button>` : "" : ""}
+          ${aiSaldo<0 ? aiDeclared
+            ? `<div class="debt-declaration-note">🕒 ${testAi?"🧪 Test: ":""}Gracz zgłosił uzupełnienie punktów AI. Czekamy na nowy stan Wysypiska AI.</div>`
+            : isOwn ? `<button class="debt-declaration-button" type="button" data-debt-declare="ai_dump" ${testAi?'data-debt-test="1"':""}>♻️ Zgłoś uzupełnienie punktów AI</button>` : "" : ""}
         </div>
         <div class="payment-total">${amount}</div>
       </div>
@@ -4020,6 +4025,12 @@ function mapRenderRouteResult() {
         panel.hidden=false;
         el("admin-login").hidden=true;
         el("admin-content").hidden=false;
+        // Po przeniesieniu panelu do Konta odśwież widoczność narzędzi T2.
+        // Nie opieraj jej na wcześniejszym stanie DOM ani starym cache sesji.
+        experimentalUiApply(account);
+        playerAccountStatus().then(fresh=>{
+          if(fresh)experimentalUiApply(fresh);
+        });
 
         closeAllAdminSections();
         setupAdminAccordionLazyLoad();
@@ -5233,6 +5244,22 @@ const goal = payload && payload.goal;
   function renderGangPayload(payload) {
     if (!payload) return;
 
+    if (experimentalUiAllowed()) {
+      const testState=experimentalUiTestState();
+      let cleared=false;
+      const paymentUpdated=Date.parse(payload.updatedAt||""),aiUpdated=Date.parse(payload.aiDump?.updatedAt||"");
+      if(testState.paymentDebtReportedAt&&paymentUpdated>Number(testState.paymentDebtReportedAt)){
+        delete testState.paymentDebt;delete testState.paymentDebtReportedAt;cleared=true;
+      }
+      if(testState.aiBlockedReportedAt&&aiUpdated>Number(testState.aiBlockedReportedAt)){
+        delete testState.aiBlocked;delete testState.aiBlockedReportedAt;cleared=true;
+      }
+      if(cleared){
+        localStorage.setItem(EXPERIMENTAL_UI_TEST_KEY,JSON.stringify(testState));
+        experimentalUiSyncTestControls();
+      }
+    }
+
     renderCompanySummary(payload);
 
     const players =
@@ -5498,13 +5525,21 @@ const goal = payload && payload.goal;
       const status=el("payments-status");
       button.disabled=true;
       try {
-        await cloudflareApi("/payments/debt-declaration",{
-          method:"POST",token:await cloudflareEnsureSession(),body:{kind,requestId:makeNonce()}
-        });
-        await loadPayments({background:true,force:true});
-        if(status)status.textContent=kind==="payments"
-          ? "✅ Zgłoszono uregulowanie wpłaty. Saldo zmieni się dopiero po nowej aktualizacji wpłat."
-          : "✅ Zgłoszono uzupełnienie punktów AI. Saldo zmieni się dopiero po nowej aktualizacji Wysypiska AI.";
+        if(button.dataset.debtTest==="1"&&experimentalUiAllowed()){
+          const state=experimentalUiTestState();
+          state[kind==="payments"?"paymentDebtReportedAt":"aiBlockedReportedAt"]=Date.now();
+          localStorage.setItem(EXPERIMENTAL_UI_TEST_KEY,JSON.stringify(state));
+          if(latestGangPayload)renderGangPayload(latestGangPayload);
+          if(status)status.textContent="🧪 To była symulacja na tym urządzeniu. Prawdziwe saldo i deklaracje nie zostały zmienione.";
+        } else {
+          await cloudflareApi("/payments/debt-declaration",{
+            method:"POST",token:await cloudflareEnsureSession(),body:{kind,requestId:makeNonce()}
+          });
+          await loadPayments({background:true,force:true});
+          if(status)status.textContent=kind==="payments"
+            ? "✅ Zgłoszono uregulowanie wpłaty. Saldo zmieni się dopiero po nowej aktualizacji wpłat."
+            : "✅ Zgłoszono uzupełnienie punktów AI. Saldo zmieni się dopiero po nowej aktualizacji Wysypiska AI.";
+        }
       } catch(error) {
         button.disabled=false;
         if(status)status.textContent=error?.message||"Nie udało się zapisać zgłoszenia.";
@@ -17734,6 +17769,8 @@ fetchModuleAccessPolicy().catch(()=>{});
       if (!experimentalUiAllowed()) { input.checked=false; return; }
       const state=experimentalUiTestState();
       state[input.dataset.experimentalUiTest]=input.checked;
+      if(input.dataset.experimentalUiTest==="paymentDebt")delete state.paymentDebtReportedAt;
+      if(input.dataset.experimentalUiTest==="aiBlocked")delete state.aiBlockedReportedAt;
       localStorage.setItem(EXPERIMENTAL_UI_TEST_KEY,JSON.stringify(state));
       experimentalUiRerenderTestSurfaces();
     });
