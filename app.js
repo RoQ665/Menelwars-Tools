@@ -9201,10 +9201,10 @@ function renderAdminAiDumpPreview(payload) {
     ...warnings.map(message=>`<div style="color:#8a6500;margin:4px 0">⚠️ ${escapeHtml(message)}</div>`)
   ].join("");
   const rows=players.map(player=>{
-    const balance=Number(player.newBalance)||0,bad=player.status==="error"||player.status==="missing";
+    const balance=Number(player.newBalance)||0,bad=player.status==="error";
     return `<div style="border:1px solid ${bad?"#e3b2b2":"#bad7ba"};background:${bad?"#fff1f1":"#eef7ee"};border-radius:8px;padding:8px;margin-bottom:6px">
       <div style="display:flex;justify-content:space-between;gap:8px"><strong>${escapeHtml(player.nick)}</strong><strong>${balance>0?"+":""}${formatSaldo(balance)} pkt</strong></div>
-      <div class="muted">${player.status==="missing"?"Brak w rankingu":`Nowe punkty: +${formatSaldo(player.delta)} · obowiązek: -${formatSaldo(player.obligation)} (${Number(player.chargedDays)||0} dni)`}</div>
+      <div class="muted">${player.status==="missing"||player.status==="waiting_zero"?"Brak w rankingu · przyjęto 0 nowych punktów · ":"Nowe punkty: +"+formatSaldo(player.delta)+" · "}obowiązek: -${formatSaldo(player.obligation)} (${Number(player.chargedDays)||0} dni)</div>
       ${player.previousTotal!=null&&player.currentTotal!=null?`<div class="muted">Historycznie: ${formatSaldo(player.previousTotal)} → ${formatSaldo(player.currentTotal)} pkt</div>`:""}
     </div>`;
   }).join("");
