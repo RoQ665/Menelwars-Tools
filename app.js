@@ -8539,6 +8539,14 @@ function renderAdminCompanyPlan(
       income
     );
 
+  // Osoby, które były w ostatnim potwierdzonym planie, ale dziś
+  // nie osiągają progu, znikają z listy pensji. Wymagają osobnej akcji w grze.
+  const dismissRows = (Array.isArray(payload.players) ? payload.players : [])
+    .filter(player => Boolean(player.activeEligible) &&
+      Number(player.contribution) < COMPANY_MIN_CONTRIBUTION)
+    .sort((a, b) => Number(a.contribution) - Number(b.contribution) ||
+      String(a.nick || "").localeCompare(String(b.nick || ""), "pl", { sensitivity: "base" }));
+
   const totalContribution =
     (Array.isArray(payload.players)
       ? payload.players
@@ -8780,6 +8788,24 @@ function renderAdminCompanyPlan(
         🟢 ZOSTAW = w grze powinna już być prawidłowa wartość.
       </span>
     </div>
+
+    ${dismissRows.length ? `
+      <div class="admin-company-salary-section dismiss-section">
+        <div class="admin-company-salary-section-head">
+          <strong>⛔ DO ZWOLNIENIA ZE SPÓŁKI</strong>
+          <span>${dismissRows.length} ${dismissRows.length === 1 ? "osoba" : "osób"}</span>
+        </div>
+        <div class="admin-company-dismiss-note">Według ostatniego potwierdzonego planu te osoby miały etat, ale ich obecny wkład spadł poniżej ${companyMoney(COMPANY_MIN_CONTRIBUTION)} zł. Sprawdź i usuń ich etat w grze przed potwierdzeniem nowego planu.</div>
+        ${dismissRows.map(player => `
+          <div class="admin-company-salary-row needs-change">
+            <div class="admin-company-salary-player">
+              <div class="admin-company-player-name"><strong>${escapeHtml(player.nick)}</strong></div>
+              <div class="muted">Wkład: ${companyMoney(player.contribution)} zł · brakuje ${companyMoney(COMPANY_MIN_CONTRIBUTION - Number(player.contribution))} zł do progu</div>
+              <div class="admin-company-current-salary">Ostatnio ustawiona pensja: <strong>${companyMoney(player.activePayoutSalary)} zł</strong></div>
+            </div>
+            <div class="admin-company-instruction dismiss"><span>⛔ ZWOLNIJ W GRZE</span></div>
+          </div>`).join("")}
+      </div>` : ""}
 
     ${rowsHtml}
   `;

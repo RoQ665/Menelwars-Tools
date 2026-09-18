@@ -2544,6 +2544,10 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .admin-company-salary-section.change-section .admin-company-salary-section-head { background:rgba(223,174,54,.18); }
 .admin-company-salary-section.correct-section .admin-company-salary-section-head { background:rgba(70,145,76,.10); }
 .admin-company-salary-section.correct-section .admin-company-salary-row { opacity:.82; }
+.admin-company-salary-section.dismiss-section .admin-company-salary-section-head { background:rgba(184,70,58,.16); color:#8f3029; }
+.admin-company-salary-section.dismiss-section .admin-company-salary-row { border-color:rgba(184,70,58,.34); background:rgba(184,70,58,.06); }
+.admin-company-dismiss-note { padding:6px 8px 2px; color:#795047; font-size:9px; line-height:1.4; }
+.admin-company-instruction.dismiss { align-self:center; background:rgba(184,70,58,.13); color:#8f3029; }
 .admin-company-instruction.waiver-change { background:rgba(184,70,58,.13); }
 .admin-company-instruction.waiver-change span { color:#8f3029; }
 
