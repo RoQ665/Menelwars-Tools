@@ -4949,7 +4949,7 @@ async function loadAccountAdminPermissions(
         <div class="company-stat"><small>Dzienny dochód</small><b>${money(payload.companyIncome)}</b></div>
         <div class="company-stat"><small>Budżet pensji 50%</small><b>${money(payload.salaryBudget)}</b></div>
         <div class="company-stat"><small>Rozwój 50%</small><b>${money(payload.developmentBudget)}</b></div>
-        <div class="company-stat"><small>Udziałowcy ≥ 30 000</small><b>${Number(payload.eligibleCount) || 0}</b></div>
+        <div class="company-stat"><small>Udziałowcy ≥ ${companyMoney(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION)} zł</small><b>${Number(payload.eligibleCount) || 0}</b></div>
       </div>
 
       ${
@@ -5036,7 +5036,7 @@ async function loadAccountAdminPermissions(
                   </div>
                 </div>
               `).join("")
-            : `<div class="empty">Nikt nie osiągnął jeszcze progu 30 000 zł wkładu.</div>`
+            : `<div class="empty">Nikt nie osiągnął jeszcze progu ${companyMoney(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION)} zł wkładu.</div>`
         }
       </div>
 
@@ -5866,6 +5866,8 @@ async function adminPostAction(action, data={}) {
       adminSetCompanyIncome:["/admin/company/income",{income:Number(data.income)}],
       adminSetCompanyAiDumpRate:["/admin/company/ai-dump-rate",{pointValue:Number(data.pointValue)}],
       adminSetPaymentsDailyMinimum:["/admin/payments/daily-minimum",{amount:Number(data.amount)}],
+      adminSetAiDumpDailyMinimum:["/admin/ai-dump/daily-minimum",{amount:Number(data.amount)}],
+      adminSetCompanyMinimumContribution:["/admin/company/minimum-contribution",{amount:Number(data.amount)}],
       adminActivateCompanySalaryPlan:["/admin/company/activate-plan",{}]
     };
     const accessRoutes={
@@ -8386,7 +8388,7 @@ function buildAdminDailyReport(payload) {
 Każdego dnia naliczany jest wymóg ${companyMoney(payload&&payload.paymentDailyMinimum||2000)} zł.
 Nadpłata przechodzi na kolejne dni i jednocześnie stanowi wkład w firmę.
 
-🏢 Od 30 000 zł wkładu gracz kwalifikuje się do udziału w spółce.
+🏢 Od ${companyMoney(payload?.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION)} zł wkładu gracz kwalifikuje się do udziału w spółce.
 
 \`\`\`
 ${rows}
@@ -8538,12 +8540,13 @@ function renderAdminCompanyPlan(
       payload,
       income
     );
+  const companyMinimum = Number(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION);
 
   // Osoby, które były w ostatnim potwierdzonym planie, ale dziś
   // nie osiągają progu, znikają z listy pensji. Wymagają osobnej akcji w grze.
   const dismissRows = (Array.isArray(payload.players) ? payload.players : [])
     .filter(player => Boolean(player.activeEligible) &&
-      Number(player.contribution) < COMPANY_MIN_CONTRIBUTION)
+      Number(player.contribution) < companyMinimum)
     .sort((a, b) => Number(a.contribution) - Number(b.contribution) ||
       String(a.nick || "").localeCompare(String(b.nick || ""), "pl", { sensitivity: "base" }));
 
@@ -8659,7 +8662,7 @@ function renderAdminCompanyPlan(
 
   let rowsHtml = "";
   if (!orderedRows.length) {
-    rowsHtml = `<div class="empty">Nikt nie osiągnął jeszcze progu ${companyMoney(COMPANY_MIN_CONTRIBUTION)} zł.</div>`;
+    rowsHtml = `<div class="empty">Nikt nie osiągnął jeszcze progu ${companyMoney(companyMinimum)} zł.</div>`;
   } else if (anyNeedsAction) {
     const changed = orderedRows.filter(row => row.needsAction);
     const correct = orderedRows.filter(row => !row.needsAction);
@@ -8771,7 +8774,7 @@ function renderAdminCompanyPlan(
       Próg zatrudnienia:
       <b>
         ${companyMoney(
-          COMPANY_MIN_CONTRIBUTION
+          companyMinimum
         )} zł
       </b>.
       Każdy zakwalifikowany dostaje najpierw
@@ -8795,12 +8798,12 @@ function renderAdminCompanyPlan(
           <strong>⛔ DO ZWOLNIENIA ZE SPÓŁKI</strong>
           <span>${dismissRows.length} ${dismissRows.length === 1 ? "osoba" : "osób"}</span>
         </div>
-        <div class="admin-company-dismiss-note">Według ostatniego potwierdzonego planu te osoby miały etat, ale ich obecny wkład spadł poniżej ${companyMoney(COMPANY_MIN_CONTRIBUTION)} zł. Sprawdź i usuń ich etat w grze przed potwierdzeniem nowego planu.</div>
+        <div class="admin-company-dismiss-note">Według ostatniego potwierdzonego planu te osoby miały etat, ale ich obecny wkład spadł poniżej ${companyMoney(companyMinimum)} zł. Sprawdź i usuń ich etat w grze przed potwierdzeniem nowego planu.</div>
         ${dismissRows.map(player => `
           <div class="admin-company-salary-row needs-change">
             <div class="admin-company-salary-player">
               <div class="admin-company-player-name"><strong>${escapeHtml(player.nick)}</strong></div>
-              <div class="muted">Wkład: ${companyMoney(player.contribution)} zł · brakuje ${companyMoney(COMPANY_MIN_CONTRIBUTION - Number(player.contribution))} zł do progu</div>
+              <div class="muted">Wkład: ${companyMoney(player.contribution)} zł · brakuje ${companyMoney(companyMinimum - Number(player.contribution))} zł do progu</div>
               <div class="admin-company-current-salary">Ostatnio ustawiona pensja: <strong>${companyMoney(player.activePayoutSalary)} zł</strong></div>
             </div>
             <div class="admin-company-instruction dismiss"><span>⛔ ZWOLNIJ W GRZE</span></div>
@@ -8890,6 +8893,10 @@ async function loadAdminPaymentsStatus() {
 
     const dailyMinimumInput=el("admin-payments-daily-minimum");
     if(dailyMinimumInput)dailyMinimumInput.value=String(Number(payload.paymentDailyMinimum)||2000);
+    const aiDailyMinimumInput=el("admin-ai-dump-daily-minimum");
+    if(aiDailyMinimumInput)aiDailyMinimumInput.value=String(payload.aiDump?.dailyMinimum ?? 20);
+    const companyMinimumInput=el("admin-company-minimum-contribution");
+    if(companyMinimumInput)companyMinimumInput.value=String(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION);
 
     renderAdminCompanyPlan(
       payload
@@ -9219,7 +9226,7 @@ function renderAdminAiDumpPreview(payload) {
   const warnings=Array.isArray(payload&&payload.warnings)?payload.warnings:[];
   const summary=`<div class="panel" style="margin-bottom:10px"><div class="panel-body">
     <b>♻️ Rozliczenie Wysypiska All Inclusive</b><br>
-    Stan rankingu: <b>${escapeHtml(formatAdminDate(payload.closeDate))}</b> · minimum: <b>${Number(payload.dailyMinimum)||20} pkt/dzień</b><br>
+    Stan rankingu: <b>${escapeHtml(formatAdminDate(payload.closeDate))}</b> · minimum: <b>${Number(payload.dailyMinimum)} pkt/dzień</b><br>
     Gracze: <b>${Number(payload.rosterCount)||0}</b> · znalezieni: <b>${Number(payload.matchedCount)||0}</b>
   </div></div>`;
   const messages=[
@@ -9324,6 +9331,42 @@ function setupAdmin() {
       } catch(err) {
         const status=el("admin-status");
         if(status)status.textContent=err&&err.message?err.message:"Nie udało się zapisać dziennej składki.";
+        await runtimeLoaderFinish("❌ Aktualizacja nieudana");
+      } finally { input.disabled=false; }
+    });
+
+  el("admin-ai-dump-daily-minimum")
+    ?.addEventListener("change",async event=>{
+      const input=event.target,amount=Number(input.value);
+      if(!Number.isSafeInteger(amount)||amount<0){
+        const status=el("admin-status");if(status)status.textContent="Składka AI musi być nieujemną liczbą całkowitą punktów.";
+        await loadAdminPaymentsStatus();return;
+      }
+      input.disabled=true;
+      try {
+        const result=await adminPostAction("adminSetAiDumpDailyMinimum",{amount});
+        await loadAdminPaymentsStatus();
+        await runtimeLoaderFinish(`✅ Składka AI ${result.amount} pkt od ${formatAdminDate(result.effectiveFrom)}`);
+      } catch(err) {
+        const status=el("admin-status");if(status)status.textContent=err?.message||"Nie udało się zapisać składki AI.";
+        await runtimeLoaderFinish("❌ Aktualizacja nieudana");
+      } finally { input.disabled=false; }
+    });
+
+  el("admin-company-minimum-contribution")
+    ?.addEventListener("change",async event=>{
+      const input=event.target,amount=Number(String(input.value||"").replace(/\s+/g,"").replace(",","."));
+      if(!Number.isFinite(amount)||amount<=0){
+        const status=el("admin-status");if(status)status.textContent="Próg zatrudnienia musi być większy od 0 zł.";
+        await loadAdminPaymentsStatus();return;
+      }
+      input.disabled=true;
+      try {
+        await adminPostAction("adminSetCompanyMinimumContribution",{amount});
+        await loadAdminPaymentsStatus();
+        await runtimeLoaderFinish("✅ Próg zatrudnienia zaktualizowany");
+      } catch(err) {
+        const status=el("admin-status");if(status)status.textContent=err?.message||"Nie udało się zapisać progu zatrudnienia.";
         await runtimeLoaderFinish("❌ Aktualizacja nieudana");
       } finally { input.disabled=false; }
     });

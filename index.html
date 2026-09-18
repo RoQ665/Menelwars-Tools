@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=23.01">
+  <link rel="stylesheet" href="styles.css?v=23.02">
   <title>MenelWars Tools</title>
 
   <style>
@@ -1777,6 +1777,12 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
     <small class="muted">Zmiana zaczyna obowiązywać od następnego dnia.</small>
   </label>
 
+  <label class="admin-setting-card">
+    <span style="display:block;font-weight:700;margin-bottom:4px">Dzienna składka punktów AI</span>
+    <input id="admin-ai-dump-daily-minimum" type="number" inputmode="numeric" min="0" step="1" value="20" style="width:100%;box-sizing:border-box">
+    <small class="muted">Zmiana zaczyna obowiązywać od następnego dnia.</small>
+  </label>
+
   <div class="admin-daily-report-action">
 
     <button
@@ -1807,9 +1813,15 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       class="muted"
       style="margin-top:4px;margin-bottom:8px"
     >
-      Do udziału kwalifikuje się gracz z wkładem co najmniej 30 000 zł.
+      Do udziału kwalifikuje się gracz, którego wkład osiągnął ustawiony próg.
       50% dochodu przeznaczamy na pensje, 50% pozostaje na rozwój.
     </div>
+
+    <label style="display:block;margin-bottom:8px">
+      <span style="display:block;font-weight:700;margin-bottom:4px">Próg zatrudnienia w Spółce</span>
+      <input id="admin-company-minimum-contribution" type="text" inputmode="decimal" value="30000" style="width:100%;box-sizing:border-box">
+      <small class="muted">Zmiana od razu aktualizuje kwalifikację i proponowany plan pensji.</small>
+    </label>
 
     <label style="display:block;margin-bottom:8px">
       <span style="display:block;font-weight:700;margin-bottom:4px">
@@ -2122,6 +2134,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="app.js?v=23.01"></script>
+  <script src="app.js?v=23.02"></script>
 </body>
 </html>
