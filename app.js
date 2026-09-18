@@ -3168,7 +3168,8 @@ function mapRenderRouteResult() {
   function paymentsRow(player,index=0) {
     const saldo = Number(player.saldo) || 0;
     const aiSaldo = Number(player.aiDumpBalance) || 0;
-    const ownPaymentProblem=normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick())&&(saldo<0||aiSaldo<0||experimentalUiTest("paymentDebt")||experimentalUiTest("aiBlocked"));
+    const isOwn=normalizedPlayerNick(player.nick)===normalizedPlayerNick(cachedAccountNick());
+    const ownPaymentProblem=isOwn&&(saldo<0||aiSaldo<0||experimentalUiTest("paymentDebt")||experimentalUiTest("aiBlocked"));
     let stateClass = "zero", status = "🟢 Na bieżąco", amount = "0 zł";
     if (saldo < 0) {
       stateClass = "debt";
@@ -3193,6 +3194,12 @@ function mapRenderRouteResult() {
           <div class="ai-dump-access ${aiSaldo >= 0 ? "allowed" : "blocked"}">
             ${aiSaldo >= 0 ? "✅ Może kopać" : "⛔ Dług — brak wejścia"}
           </div>
+          ${saldo<0 ? player.paymentDebtDeclared
+            ? `<div class="debt-declaration-note">🕒 Gracz zgłosił uregulowanie wpłaty. Czekamy na nowy stan wpłat.</div>`
+            : isOwn ? `<button class="debt-declaration-button" type="button" data-debt-declare="payments">💰 Zgłoś uregulowanie wpłaty</button>` : "" : ""}
+          ${aiSaldo<0 ? player.aiDumpDebtDeclared
+            ? `<div class="debt-declaration-note">🕒 Gracz zgłosił uzupełnienie punktów AI. Czekamy na nowy stan Wysypiska AI.</div>`
+            : isOwn ? `<button class="debt-declaration-button" type="button" data-debt-declare="ai_dump">♻️ Zgłoś uzupełnienie punktów AI</button>` : "" : ""}
         </div>
         <div class="payment-total">${amount}</div>
       </div>
@@ -5481,6 +5488,27 @@ const goal = payload && payload.goal;
         "payments-view",
         {forceRefresh:true}
       );
+    });
+
+    el("payments-list")?.addEventListener("click",async event=>{
+      const button=event.target.closest("[data-debt-declare]");
+      if(!button)return;
+      const kind=button.dataset.debtDeclare;
+      if(kind!=="payments"&&kind!=="ai_dump")return;
+      const status=el("payments-status");
+      button.disabled=true;
+      try {
+        await cloudflareApi("/payments/debt-declaration",{
+          method:"POST",token:await cloudflareEnsureSession(),body:{kind,requestId:makeNonce()}
+        });
+        await loadPayments({background:true,force:true});
+        if(status)status.textContent=kind==="payments"
+          ? "✅ Zgłoszono uregulowanie wpłaty. Saldo zmieni się dopiero po nowej aktualizacji wpłat."
+          : "✅ Zgłoszono uzupełnienie punktów AI. Saldo zmieni się dopiero po nowej aktualizacji Wysypiska AI.";
+      } catch(error) {
+        button.disabled=false;
+        if(status)status.textContent=error?.message||"Nie udało się zapisać zgłoszenia.";
+      }
     });
 
     el("gang-tabs").hidden = true;
