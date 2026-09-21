@@ -15753,6 +15753,42 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 776 ATK · 825 DEF · 2409 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
+    // Ochroniarz Mirek „Byk” pochodzi z pełnej 15-turowej walki z 21.09.2026.
+    // K=400 odtwarza pierwszy zwykły cios RoQ: 702 ATK, 36,6% przebicia,
+    // 1354 DEF i 31,7% redukcji bossa daje 158 obrażeń w T1.
+    out.push({
+      id:"boss-28-ochroniarz-mirek-byk",
+      name:"Ochroniarz Mirek „Byk” · Lvl 24 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:24,
+      attributes:{strength:48,endurance:56,agility:38,vitality:52,precision:44},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:998,combatDefense:1354,combatHp:4863,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:24,
+        defenseK:400,
+        primary:{attack:998,defense:1354,hp:4863},
+        stats:{
+          accuracy:115,initiative:16.2,firstStrike:11,
+          critChance:36.4,critDmg:60.8,execute:8.6,lifesteal:14.6,
+          armorPen:21,stun:17.6,bleed:34.6,bleedDamage:0,
+          evasion:15.3,doubleStrike:19,counter:11.4,
+          healingReduction:50,damageReduction:31.7,
+          critResist:38.4,stunResist:38.4,bleedResist:42,
+          hpRegen:13.8
+        }
+      },
+      boss:true,
+      description:"Boss potwierdzony w pięciu pełnych walkach: 998 ATK · 1354 DEF · 4863 HP. Statystyki PvP pochodzą bezpośrednio z logów gry; model obrażeń jest eksperymentalny."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
