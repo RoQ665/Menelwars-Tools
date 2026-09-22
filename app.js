@@ -7757,7 +7757,10 @@ function specialOpsItemIconGlobal(name){
 
 function specialOpsDateGlobal(value){
   const timestamp=Number(value)||0;
-  return timestamp?formatAdminDate(timestamp):"brak";
+  if(!timestamp)return "brak";
+  const date=new Date(timestamp<100000000000?timestamp*1000:timestamp);
+  if(Number.isNaN(date.getTime()))return "brak";
+  return date.toLocaleString("pl-PL",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
 }
 
 function specialOpsPreferenceEnabledGlobal(payload,nickKey,itemKey){
