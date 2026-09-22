@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=23.04">
+  <link rel="stylesheet" href="styles.css?v=23.06">
   <title>MenelWars Tools</title>
 
   <style>
@@ -716,6 +716,7 @@
     <button data-subtab="goals-view" data-group="gang">🎯 Cele</button>
     <button data-subtab="announcements-view" data-group="gang">📢 Ogłoszenia</button>
     <button data-subtab="demand-view" data-group="gang">📦 Potrzeby</button>
+    <button data-subtab="special-operations-view" data-group="gang">🎁 Operacje specjalne</button>
   </nav>
 
   <section id="home-view" class="view">
@@ -965,6 +966,9 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
           <button type="button" data-gang-menu-target="demand-view">
             <span>📦</span><b>Zapotrzebowanie</b><small>Przedmioty poszukiwane przez ekipę.</small>
           </button>
+          <button type="button" data-gang-menu-target="special-operations-view">
+            <span>🎁</span><b>Operacje specjalne</b><small>Preferencje, wkład i jawny podział łupów.</small>
+          </button>
         </div>
       </div>
     </div>
@@ -1096,6 +1100,80 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
         </div>
         <div class="gang-demand-offer-expiry-hint">🧹 Gdy zostanie zadeklarowana cała potrzebna liczba, po 48 godzinach wpis automatycznie przejdzie do „Zrealizowane”.</div>
         <div id="gang-demand-list" class="gang-demand-list"><div class="empty">Ładowanie zapotrzebowania…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="special-operations-view" class="view" hidden>
+    <div class="panel">
+      <div class="panel-head">🎁 Operacje specjalne</div>
+      <div class="panel-body special-ops-page">
+        <div id="special-ops-summary" class="special-ops-summary"><div class="empty">Ładowanie danych operacji specjalnych…</div></div>
+
+        <details class="content-accordion" open>
+          <summary><span>🎛️ Moje losowania</span><span class="accordion-chevron">⌄</span></summary>
+          <div class="content-accordion-body">
+            <p class="muted special-ops-help">Domyślnie bierzesz udział we wszystkich losowaniach. Wyłącz przedmioty, których nie potrzebujesz. Ustawienie jest stałe i możesz je później zmienić.</p>
+            <div class="special-ops-toolbar">
+              <input id="special-ops-search" type="search" placeholder="Szukaj przedmiotu…" autocomplete="off">
+              <div class="special-ops-filters" role="group" aria-label="Filtr preferencji">
+                <button type="button" class="active" data-special-filter="all">Wszystkie</button>
+                <button type="button" data-special-filter="enabled">Biorę udział</button>
+                <button type="button" data-special-filter="disabled">Nie potrzebuję</button>
+              </div>
+            </div>
+            <div id="special-ops-preferences" class="special-ops-preferences"><div class="empty">Ładowanie preferencji…</div></div>
+          </div>
+        </details>
+
+        <details class="content-accordion" open>
+          <summary><span>📦 Aktualny schowek i szanse</span><span class="accordion-chevron">⌄</span></summary>
+          <div class="content-accordion-body">
+            <div id="special-ops-stash" class="special-ops-stash"><div class="empty">Schowek nie został jeszcze zaimportowany.</div></div>
+          </div>
+        </details>
+
+        <details class="content-accordion" open>
+          <summary><span>🎲 Ostatni podział</span><span class="accordion-chevron">⌄</span></summary>
+          <div class="content-accordion-body">
+            <div id="special-ops-results"><div class="empty">Nie wykonano jeszcze żadnego losowania.</div></div>
+          </div>
+        </details>
+
+        <details id="special-ops-admin" class="content-accordion special-ops-admin" hidden>
+          <summary><span>🛠️ Zarządzanie podziałem</span><span class="accordion-chevron">⌄</span></summary>
+          <div class="content-accordion-body">
+            <div class="special-ops-import-grid">
+              <section>
+                <b>1. Wkład · Cała historia · Obecni</b>
+                <textarea id="special-ops-contribution-text" rows="6" placeholder="W grze otwórz Wkład, wybierz Cała historia i Obecni, następnie Ctrl+A → Ctrl+C."></textarea>
+                <button id="special-ops-import-contribution" type="button" class="primary-btn">📥 Importuj wkład</button>
+              </section>
+              <section>
+                <b>2. Schowek</b>
+                <textarea id="special-ops-stash-text" rows="6" placeholder="Otwórz Schowek i wklej całą stronę skopiowaną przez Ctrl+A."></textarea>
+                <button id="special-ops-import-stash" type="button" class="primary-btn">📥 Importuj schowek</button>
+              </section>
+              <section>
+                <b>3. Historia przydziałów</b>
+                <textarea id="special-ops-history-text" rows="6" placeholder="Otwórz Historię bez rozwijania operacji i wklej całą stronę."></textarea>
+                <button id="special-ops-import-history" type="button" class="primary-btn">📥 Importuj historię</button>
+              </section>
+            </div>
+            <div id="special-ops-admin-status" class="submit-status"></div>
+            <div id="special-ops-admin-preferences" class="special-ops-admin-preferences"></div>
+            <div class="special-ops-draw-box">
+              <div><b>🎲 Oficjalny podział całego schowka</b><small>Jedno kliknięcie zapisuje wszystkie wyniki. Losowania nie można powtórzyć.</small></div>
+              <button id="special-ops-draw" type="button" class="primary-btn">🎲 Rozlosuj cały schowek</button>
+            </div>
+            <details id="special-ops-manual-close-box" class="special-ops-emergency" hidden>
+              <summary>⚠️ Awaryjne zamknięcie serii</summary>
+              <p class="muted">Użyj tylko wtedy, gdy Historia gry nie pozwala potwierdzić przydziałów. Powód będzie publiczny.</p>
+              <textarea id="special-ops-manual-reason" rows="3" maxlength="300" placeholder="Publiczny powód ręcznego zamknięcia…"></textarea>
+              <button id="special-ops-manual-close" type="button" class="danger-soft">Zamknij serię ręcznie</button>
+            </details>
+          </div>
+        </details>
       </div>
     </div>
   </section>
@@ -2134,6 +2212,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="app.js?v=23.05"></script>
+  <script src="app.js?v=23.06"></script>
 </body>
 </html>

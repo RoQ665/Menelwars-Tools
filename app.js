@@ -7611,13 +7611,14 @@ async function markActivityNotificationReadGlobal(id){
 
 async function openActivityNotificationTargetGlobal(kind){
   if(kind==="garden_ready"){await openGardenModule();return;}
+  if(kind==="special_operation_win"){await openGangModule("special-operations-view",{forceRefresh:true});return;}
   if(kind==="distillery_expiring"){await openDistilleryModule("optimizer-view",{forceRefresh:true});}
 }
 
 function showActivityNotificationGlobal(notification){
   if(!notification||document.querySelector(".gang-demand-toast"))return;
-  const garden=notification.kind==="garden_ready",toast=document.createElement("aside");toast.className="gang-demand-toast";
-  toast.innerHTML=`<strong>${garden?"🌱 Sprawdź Ogród":"⚗️ Rezerwacja niedługo wygaśnie"}</strong><span>${escapeHtml(notification.text)}</span><div class="gang-demand-toast-actions"><button type="button" data-activity-toast-close>Zamknij</button><button type="button" class="primary-btn" data-activity-toast-open>Otwórz</button></div>`;
+  const garden=notification.kind==="garden_ready",special=notification.kind==="special_operation_win",toast=document.createElement("aside");toast.className="gang-demand-toast";
+  toast.innerHTML=`<strong>${special?"🎁 Wynik Operacji specjalnej":garden?"🌱 Sprawdź Ogród":"⚗️ Rezerwacja niedługo wygaśnie"}</strong><span>${escapeHtml(notification.text)}</span><div class="gang-demand-toast-actions"><button type="button" data-activity-toast-close>Zamknij</button><button type="button" class="primary-btn" data-activity-toast-open>Otwórz</button></div>`;
   document.body.appendChild(toast);
   const finish=async open=>{toast.remove();try{await markActivityNotificationReadGlobal(notification.id);}catch{}if(open)await openActivityNotificationTargetGlobal(notification.kind);};
   toast.querySelector("[data-activity-toast-close]")?.addEventListener("click",()=>finish(false));
@@ -7627,7 +7628,8 @@ function showActivityNotificationGlobal(notification){
 async function checkActivityNotificationsGlobal(){
   if(!playerAccountSessionToken())return;
   try{
-    const params=new URL(location.href).searchParams,activity=params.get("activity"),notificationId=params.get("notification");
+    const params=new URL(location.href).searchParams,gang=params.get("gang"),activity=params.get("activity"),notificationId=params.get("notification");
+    if(gang==="special-operations-view"){if(notificationId)await markActivityNotificationReadGlobal(notificationId);history.replaceState(null,"",location.pathname+location.hash);await openGangModule("special-operations-view",{forceRefresh:true});return;}
     if(activity){if(notificationId)await markActivityNotificationReadGlobal(notificationId);history.replaceState(null,"",location.pathname+location.hash);await openActivityNotificationTargetGlobal(activity==="garden"?"garden_ready":"distillery_expiring");return;}
     const payload=await cloudflareApi("/notifications/pending",{token:await cloudflareEnsureSession()});
     const pending=payload&&Array.isArray(payload.notifications)?payload.notifications[0]:null;
@@ -7707,6 +7709,163 @@ function setupGangDemand() {
     }
     catch(err) { if (status) status.textContent="❌ "+(err.message||"Nie udało się dodać wpisu."); }
   });
+}
+
+// --- Operacje specjalne ---------------------------------------------------
+// Podział łupów jest liczony i zapisywany wyłącznie na serwerze. Frontend
+// pokazuje dokładnie te wagi, które backend wykorzystał w losowaniu.
+let specialOpsCacheGlobal=null;
+let specialOpsLoadInFlightGlobal=null;
+let specialOpsFilterGlobal="all";
+
+function specialOpsItemIconGlobal(name){
+  const normalized=String(name||"").trim().toLocaleLowerCase("pl-PL");
+  const item=(Array.isArray(window.MENELWARS_GAME_ITEMS)?window.MENELWARS_GAME_ITEMS:[])
+    .find(row=>String(row?.[1]||"").trim().toLocaleLowerCase("pl-PL")===normalized);
+  const icon=String(item?.[2]||"").trim();
+  return icon?`<img src="${escapeHtml(icon)}" alt="" loading="lazy">`:`<span aria-hidden="true">🎁</span>`;
+}
+
+function specialOpsDateGlobal(value){
+  const timestamp=Number(value)||0;
+  return timestamp?formatAdminDate(timestamp):"brak";
+}
+
+function specialOpsPreferenceEnabledGlobal(payload,nickKey,itemKey){
+  const row=(payload.preferences||[]).find(entry=>entry.nickKey===nickKey&&entry.itemKey===itemKey);
+  return row?Boolean(row.enabled):true;
+}
+
+function specialOpsCurrentCycleGlobal(payload,itemKey){
+  return Number((payload.cycles||[]).find(entry=>entry.itemKey===itemKey)?.cycleNo)||1;
+}
+
+function specialOpsCandidateInfoGlobal(payload,item){
+  const cycleNo=specialOpsCurrentCycleGlobal(payload,item.itemKey);
+  const received=new Set((payload.receipts||[]).filter(row=>row.itemKey===item.itemKey&&Number(row.cycleNo)===cycleNo).map(row=>row.nickKey));
+  const active=[],excluded=[];
+  for(const player of payload.contributions||[]){
+    let reason="";
+    if(!(Number(player.weight)>0))reason="Brak wkładu — 0% szans";
+    else if(!specialOpsPreferenceEnabledGlobal(payload,player.nickKey,item.itemKey))reason="Nie potrzebuje tego przedmiotu";
+    else if(item.kind==="single"&&received.has(player.nickKey))reason=`Otrzymał już ten przedmiot w cyklu ${cycleNo}`;
+    if(reason)excluded.push({...player,reason});else active.push(player);
+  }
+  const total=active.reduce((sum,row)=>sum+Number(row.weight||0),0);
+  return {cycleNo,total,active:active.map(row=>({...row,chance:total?Number(row.weight)/total:0})),excluded};
+}
+
+function specialOpsRenderSummaryGlobal(payload){
+  const box=el("special-ops-summary");if(!box)return;
+  const contributionImport=(payload.imports||[]).find(row=>row.kind==="contribution");
+  const stashImport=(payload.imports||[]).find(row=>row.kind==="stash");
+  const stashTotal=(payload.stash||[]).reduce((sum,row)=>sum+Number(row.quantity||0),0);
+  const contributors=(payload.contributions||[]).filter(row=>Number(row.weight)>0).length;
+  const batch=payload.batch;
+  const batchText=!batch?"Brak losowania":batch.status==="pending"||batch.status==="needs_attention"?"Oczekuje na przekazanie w grze":batch.status==="manual_closed"?"Zamknięte ręcznie":"Rozliczone";
+  box.innerHTML=`<div class="special-ops-summary-card"><b>👥 ${contributors}</b><span>graczy z wkładem</span><small>aktualizacja: ${specialOpsDateGlobal(contributionImport?.createdAt)}</small></div><div class="special-ops-summary-card"><b>📦 ${stashTotal}</b><span>sztuk w schowku</span><small>aktualizacja: ${specialOpsDateGlobal(stashImport?.createdAt)}</small></div><div class="special-ops-summary-card ${batch&&(batch.status==="pending"||batch.status==="needs_attention")?"attention":""}"><b>🎲 ${escapeHtml(batchText)}</b><span>${batch?`seria z ${specialOpsDateGlobal(batch.createdAt)}`:"Najpierw zaimportuj dane"}</span></div>`;
+}
+
+function specialOpsRenderPreferencesGlobal(payload){
+  const box=el("special-ops-preferences");if(!box)return;
+  const query=String(el("special-ops-search")?.value||"").trim().toLocaleLowerCase("pl-PL"),me=payload.me?.nickKey;
+  const stashKeys=new Set((payload.stash||[]).map(row=>row.itemKey));
+  const items=[...(payload.items||[])].sort((a,b)=>Number(stashKeys.has(b.itemKey))-Number(stashKeys.has(a.itemKey))||Number(a.priority)-Number(b.priority));
+  const visible=items.filter(item=>{
+    const enabled=specialOpsPreferenceEnabledGlobal(payload,me,item.itemKey);
+    return (!query||String(item.itemName).toLocaleLowerCase("pl-PL").includes(query))&&(specialOpsFilterGlobal==="all"||(specialOpsFilterGlobal==="enabled"?enabled:!enabled));
+  });
+  box.innerHTML=visible.map(item=>{
+    const enabled=specialOpsPreferenceEnabledGlobal(payload,me,item.itemKey),cycle=specialOpsCurrentCycleGlobal(payload,item.itemKey);
+    const received=item.kind==="single"&&(payload.receipts||[]).some(row=>row.itemKey===item.itemKey&&row.nickKey===me&&Number(row.cycleNo)===cycle);
+    return `<article class="special-ops-pref-card${enabled?"":" disabled"}"><div class="special-ops-item-icon">${specialOpsItemIconGlobal(item.itemName)}</div><div class="special-ops-pref-copy"><strong>${escapeHtml(item.itemName)}</strong><small>${item.kind==="single"?`Pojedynczy · cykl ${cycle}`:"Wielosztukowy · każda sztuka osobno"}${received?" · ✅ już otrzymany w tym cyklu":""}</small></div><label class="special-ops-switch"><input type="checkbox" data-special-pref="${escapeHtml(item.itemKey)}" ${enabled?"checked":""}><span aria-hidden="true"></span><b>${enabled?"Chcę":"Nie chcę"}</b></label></article>`;
+  }).join("")||'<div class="empty">Nie znaleziono przedmiotów dla wybranego filtra.</div>';
+  box.querySelectorAll("[data-special-pref]").forEach(input=>input.addEventListener("change",()=>specialOpsSavePreferenceGlobal(input.dataset.specialPref,input.checked,me,input)));
+}
+
+function specialOpsRenderStashGlobal(payload){
+  const box=el("special-ops-stash");if(!box)return;
+  const items=new Map((payload.items||[]).map(item=>[item.itemKey,item]));
+  box.innerHTML=(payload.stash||[]).map(stash=>{
+    const item=items.get(stash.itemKey)||{...stash,kind:"single",priority:999},info=specialOpsCandidateInfoGlobal(payload,item);
+    const chances=info.active.map(row=>`<li><span>${escapeHtml(row.nick)}</span><b>${(row.chance*100).toLocaleString("pl-PL",{minimumFractionDigits:2,maximumFractionDigits:2})}%</b></li>`).join("");
+    const omitted=info.excluded.map(row=>`<li><span>${escapeHtml(row.nick)}</span><small>${escapeHtml(row.reason)}</small></li>`).join("");
+    return `<article class="special-ops-stash-card"><header><div class="special-ops-item-icon">${specialOpsItemIconGlobal(stash.itemName)}</div><div><strong>${escapeHtml(stash.itemName)}</strong><small>${item.kind==="single"?`Pojedynczy · cykl ${info.cycleNo}`:"Wielosztukowy"}</small></div><b class="special-ops-qty">×${Number(stash.quantity)||0}</b></header><div class="special-ops-eligibility"><b>${info.active.length} aktywnych kandydatów</b><span>Łączna waga: ${info.total.toLocaleString("pl-PL",{maximumFractionDigits:4})}</span></div><details><summary>Pokaż szanse${info.excluded.length?` i ${info.excluded.length} wykluczeń`:""}</summary><ul class="special-ops-chances">${chances||"<li>Brak aktywnych kandydatów.</li>"}</ul>${info.excluded.length?`<b class="special-ops-omitted-title">Pominięci</b><ul class="special-ops-omitted">${omitted}</ul>`:""}</details></article>`;
+  }).join("")||'<div class="empty">📦 Schowek nie został jeszcze zaimportowany albo jest pusty.</div>';
+}
+
+function specialOpsRenderResultsGlobal(payload){
+  const box=el("special-ops-results"),batch=payload.batch;if(!box)return;
+  const auditRows=(payload.audit||[]).filter(row=>row.action==="preference"||row.action==="manual_close").slice(0,20);
+  const auditHtml=auditRows.length?`<details class="special-ops-proof"><summary>📜 Jawna historia zmian (${auditRows.length})</summary>${auditRows.map(row=>{const target=(payload.contributions||[]).find(player=>player.nickKey===row.targetNickKey)?.nick||row.targetNickKey||"gracz";return `<article><b>${row.action==="preference"?`${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}`:`${escapeHtml(row.actor)} zamknął serię ręcznie`}</b><small>${specialOpsDateGlobal(row.createdAt)}${row.action==="preference"?` · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}`:""}</small></article>`;}).join("")}</details>`:"";
+  if(!batch||!Array.isArray(batch.draws)||!batch.draws.length){box.innerHTML='<div class="empty">Nie wykonano jeszcze żadnego losowania.</div>'+auditHtml;return;}
+  const byItem=new Map(),byPlayer=new Map();
+  for(const draw of batch.draws){
+    const item=byItem.get(draw.itemKey)||{name:draw.itemName,rows:new Map()};item.rows.set(draw.winner,(item.rows.get(draw.winner)||0)+1);byItem.set(draw.itemKey,item);
+    const player=byPlayer.get(draw.winner)||new Map();player.set(draw.itemName,(player.get(draw.itemName)||0)+1);byPlayer.set(draw.winner,player);
+  }
+  const status=batch.status==="pending"||batch.status==="needs_attention"?"⏳ Oczekuje na potwierdzenie Historii gry":batch.status==="manual_closed"?"⚠️ Zamknięte ręcznie":"✅ Potwierdzone";
+  box.innerHTML=`<div class="special-ops-batch-head"><b>${status}</b><small>Losował: ${escapeHtml(batch.createdBy)} · ${specialOpsDateGlobal(batch.createdAt)}</small>${batch.closeReason?`<p>${escapeHtml(batch.closeReason)}</p>`:""}</div><div class="special-ops-result-columns"><section><h4>Według przedmiotów</h4>${[...byItem.values()].map(item=>`<article><strong>${escapeHtml(item.name)}</strong>${[...item.rows].map(([nick,count])=>`<span>${escapeHtml(nick)} <b>×${count}</b></span>`).join("")}</article>`).join("")}</section><section><h4>Według graczy</h4>${[...byPlayer].map(([nick,items])=>`<article><strong>${escapeHtml(nick)}</strong>${[...items].map(([name,count])=>`<span>${escapeHtml(name)} <b>×${count}</b></span>`).join("")}</article>`).join("")}</section></div><details class="special-ops-proof"><summary>🔎 Publiczny zapis losowania (${batch.draws.length})</summary>${batch.draws.map((draw,index)=>`<article><b>${index+1}. ${escapeHtml(draw.itemName)} → ${escapeHtml(draw.winner)}</b><small>Liczba losowa: ${(Number(draw.randomRatio)*100).toFixed(6)}% · kandydatów: ${draw.candidates.length}</small><details><summary>Wagi i przedziały</summary><ul>${draw.candidates.map(row=>`<li><span>${escapeHtml(row.nick)} · waga ${Number(row.weight).toLocaleString("pl-PL")}</span><b>${(Number(row.chance)*100).toFixed(4)}% · ${(Number(row.rangeStart)*100).toFixed(4)}–${(Number(row.rangeEnd)*100).toFixed(4)}%</b></li>`).join("")}</ul></details></article>`).join("")}</details>${auditHtml}`;
+}
+
+function specialOpsRenderAdminGlobal(payload){
+  const admin=el("special-ops-admin"),prefs=el("special-ops-admin-preferences"),draw=el("special-ops-draw"),manual=el("special-ops-manual-close-box");
+  if(admin)admin.hidden=!payload.permissions?.admin;if(!payload.permissions?.admin)return;
+  const pending=payload.batch&&(payload.batch.status==="pending"||payload.batch.status==="needs_attention");
+  if(draw){draw.disabled=Boolean(pending)||!(payload.stash||[]).length||!(payload.contributions||[]).some(row=>Number(row.weight)>0);draw.textContent=pending?"⏳ Najpierw rozlicz obecną serię":"🎲 Rozlosuj cały schowek";}
+  if(manual)manual.hidden=!pending;
+  if(prefs){
+    const players=payload.contributions||[],items=payload.items||[];
+    prefs.innerHTML=`<details><summary>👥 Korekta preferencji gracza</summary><div class="special-ops-admin-pref-row"><select id="special-ops-admin-player" aria-label="Gracz">${players.map(row=>`<option value="${escapeHtml(row.nickKey)}">${escapeHtml(row.nick)}</option>`).join("")}</select><select id="special-ops-admin-item" aria-label="Przedmiot">${items.map(row=>`<option value="${escapeHtml(row.itemKey)}">${escapeHtml(row.itemName)}</option>`).join("")}</select><select id="special-ops-admin-enabled" aria-label="Udział"><option value="1">Bierze udział</option><option value="0">Nie potrzebuje</option></select><button type="button" id="special-ops-admin-pref-save">Zapisz korektę</button></div><small>Zmiana jest publicznie zapisywana wraz z nickiem administratora.</small></details>`;
+    el("special-ops-admin-pref-save")?.addEventListener("click",()=>specialOpsSavePreferenceGlobal(el("special-ops-admin-item").value,el("special-ops-admin-enabled").value==="1",el("special-ops-admin-player").value));
+  }
+}
+
+function specialOpsRenderGlobal(payload){
+  if(!payload)return;specialOpsRenderSummaryGlobal(payload);specialOpsRenderPreferencesGlobal(payload);specialOpsRenderStashGlobal(payload);specialOpsRenderResultsGlobal(payload);specialOpsRenderAdminGlobal(payload);
+}
+
+async function loadSpecialOperationsGlobal(options={}){
+  if(specialOpsLoadInFlightGlobal)return specialOpsLoadInFlightGlobal;
+  if(specialOpsCacheGlobal&&!options.force){specialOpsRenderGlobal(specialOpsCacheGlobal);return specialOpsCacheGlobal;}
+  const promise=(async()=>{try{const payload=await cloudflareApi("/gang/special-operations",{token:await cloudflareEnsureSession()});specialOpsCacheGlobal=payload;specialOpsRenderGlobal(payload);return payload;}catch(err){const message=escapeHtml(err?.message||"Nie udało się pobrać danych.");["special-ops-summary","special-ops-preferences","special-ops-stash","special-ops-results"].forEach(id=>{const node=el(id);if(node)node.innerHTML=`<div class="empty">❌ ${message}</div>`;});return null;}})();
+  specialOpsLoadInFlightGlobal=promise;try{return await promise;}finally{if(specialOpsLoadInFlightGlobal===promise)specialOpsLoadInFlightGlobal=null;}
+}
+
+async function specialOpsSavePreferenceGlobal(itemKey,enabled,nickKey,input){
+  if(input)input.disabled=true;const status=el("special-ops-admin-status");
+  try{await cloudflareApi("/gang/special-operations/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{itemKey,enabled,nickKey,requestId:makeRecipeNonce()}});specialOpsCacheGlobal=null;if(status)status.textContent="✅ Preferencja została zapisana.";await loadSpecialOperationsGlobal({force:true});}
+  catch(err){if(input){input.checked=!enabled;input.disabled=false;}if(status)status.textContent="❌ "+(err?.message||"Nie udało się zapisać preferencji.");}
+}
+
+async function specialOpsImportGlobal(kind){
+  const map={contribution:["special-ops-contribution-text","/admin/gang/special-operations/contribution-import","wkład"],stash:["special-ops-stash-text","/admin/gang/special-operations/stash-import","schowek"],history:["special-ops-history-text","/admin/gang/special-operations/history-import","historię"]},config=map[kind],status=el("special-ops-admin-status"),text=String(el(config[0])?.value||"").trim();
+  if(!text){if(status)status.textContent="⚠️ Najpierw wklej całą stronę z gry.";return;}if(status)status.textContent=`⏳ Odczytuję ${config[2]}…`;
+  try{const result=await cloudflareApi(config[1],{method:"POST",token:await cloudflareEnsureSession(),body:{text,requestId:makeRecipeNonce()}});if(status)status.textContent=`✅ Zaimportowano ${config[2]}.${result.summary?.warnings?.length?" "+result.summary.warnings.join(" "):""}`;specialOpsCacheGlobal=null;await loadSpecialOperationsGlobal({force:true});}
+  catch(err){if(status)status.textContent="❌ "+(err?.message||"Import nie powiódł się.");}
+}
+
+async function specialOpsDrawGlobal(){
+  const payload=specialOpsCacheGlobal;if(!payload)return;const status=el("special-ops-admin-status"),total=(payload.stash||[]).reduce((sum,row)=>sum+Number(row.quantity||0),0);
+  if(!window.confirm(`Rozlosować cały schowek (${total} szt.)? Wyniki zostaną zapisane na stałe i nie można ich losować ponownie.`))return;
+  if(status)status.textContent="⏳ Trwa bezpieczne losowanie całego schowka…";
+  try{const result=await cloudflareApi("/admin/gang/special-operations/draw",{method:"POST",token:await cloudflareEnsureSession(),body:{requestId:makeRecipeNonce()}});if(status)status.textContent=`✅ Zapisano ${result.drawCount} losowań dla ${result.winnerCount} graczy. Teraz przekaż przedmioty w grze i zaimportuj Historię.`;specialOpsCacheGlobal=null;await loadSpecialOperationsGlobal({force:true});}
+  catch(err){if(status)status.textContent="❌ "+(err?.message||"Losowanie nie powiodło się.");}
+}
+
+async function specialOpsManualCloseGlobal(){
+  const payload=specialOpsCacheGlobal,reason=String(el("special-ops-manual-reason")?.value||"").trim(),status=el("special-ops-admin-status");if(!payload?.batch)return;
+  if(reason.length<10){if(status)status.textContent="⚠️ Podaj publiczny powód (minimum 10 znaków).";return;}if(!window.confirm("Awaryjnie zamknąć serię według wylosowanych odbiorców? Ta decyzja będzie publiczna."))return;
+  try{await cloudflareApi("/admin/gang/special-operations/manual-close",{method:"POST",token:await cloudflareEnsureSession(),body:{batchId:payload.batch.id,reason,requestId:makeRecipeNonce()}});if(status)status.textContent="✅ Seria została awaryjnie zamknięta i publicznie opisana.";specialOpsCacheGlobal=null;await loadSpecialOperationsGlobal({force:true});}catch(err){if(status)status.textContent="❌ "+(err?.message||"Nie udało się zamknąć serii.");}
+}
+
+function setupSpecialOperationsGlobal(){
+  el("special-ops-search")?.addEventListener("input",()=>specialOpsRenderPreferencesGlobal(specialOpsCacheGlobal||{items:[],preferences:[],me:{}}));
+  document.querySelectorAll("[data-special-filter]").forEach(button=>button.addEventListener("click",()=>{specialOpsFilterGlobal=button.dataset.specialFilter||"all";document.querySelectorAll("[data-special-filter]").forEach(other=>other.classList.toggle("active",other===button));specialOpsRenderPreferencesGlobal(specialOpsCacheGlobal||{items:[],preferences:[],me:{}});}));
+  el("special-ops-import-contribution")?.addEventListener("click",()=>specialOpsImportGlobal("contribution"));
+  el("special-ops-import-stash")?.addEventListener("click",()=>specialOpsImportGlobal("stash"));
+  el("special-ops-import-history")?.addEventListener("click",()=>specialOpsImportGlobal("history"));
+  el("special-ops-draw")?.addEventListener("click",specialOpsDrawGlobal);el("special-ops-manual-close")?.addEventListener("click",specialOpsManualCloseGlobal);
 }
 
 let adminSubmissionsCache = null;
@@ -17271,6 +17430,15 @@ function setupAdmin() {
       return;
     }
 
+    if (target === "special-operations-view") {
+      el("gang-tabs").hidden = false;
+      showToolView("special-operations-view","gang");
+      gangTrackIndecisiveEasterEgg(target);
+      loadSpecialOperationsGlobal({force:forceRefresh}).catch(()=>{});
+      validateGangSessionInBackground();
+      return;
+    }
+
     // v20.71:
     // Wpłaty i Spółka są renderowane z tego samego payloadu.
     // Jeśli został już pobrany w tej sesji, samo przełączenie zakładki
@@ -17324,7 +17492,8 @@ function setupAdmin() {
       "polls-view":"📊 Ładowanie Ankiet...",
       "goals-view":"🎯 Ładowanie Celów...",
       "announcements-view":"📢 Ładowanie Ogłoszeń...",
-      "demand-view":"📦 Ładowanie zapotrzebowania..."
+      "demand-view":"📦 Ładowanie zapotrzebowania...",
+      "special-operations-view":"🎁 Ładowanie Operacji specjalnych..."
     };
 
     showModuleLoading(
@@ -17535,6 +17704,7 @@ setupBuildCreator();
   setupGarden();
 setupPayments();
 setupGangDemand();
+setupSpecialOperationsGlobal();
 setupAdmin();
 
 showToolView("home-view", "");
@@ -17637,6 +17807,11 @@ fetchModuleAccessPolicy().catch(()=>{});
 
     if (viewId === "demand-view") {
       await loadGangDemandGlobal({force:false});
+      return;
+    }
+
+    if (viewId === "special-operations-view") {
+      await loadSpecialOperationsGlobal({force:false});
       return;
     }
 
