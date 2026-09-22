@@ -7725,7 +7725,9 @@ function specialOpsItemIconGlobal(name){
   const specialIcons={
     ak47:"https://images.menelgame.online/items/ak47_20260914_v1.png",
     "kwit na elitarny set moro":"https://images.menelgame.online/items/kwit-elitarny-moro-20260921.png",
-    "kwit na elitarny set szturmowca":"https://images.menelgame.online/items/kwit-elitarny-szturmowiec-20260920.png"
+    "kwit na elitarny set szturmowca":"https://images.menelgame.online/items/kwit-elitarny-szturmowiec-20260920.png",
+    'obraz "upadła madonna z wielkim cycem"':"https://images.menelgame.online/items/item_upadla_madonna_20260921.png",
+    "rzeźba warszawskiej syrenki":"https://images.menelgame.online/items/item_syrenka_warszawska_20260921.png"
   };
   const icon=String(item?.[2]||specialIcons[normalized]||"").trim();
   return icon?`<img src="${escapeHtml(icon)}" alt="" loading="lazy">`:`<span aria-hidden="true">🎁</span>`;
