@@ -4406,6 +4406,11 @@ body.experimental-ui .ai-dump-access.blocked{background:linear-gradient(180deg,#
 .module-admin-tools-head>div{display:grid;gap:2px}
 .module-admin-tools-head strong{font-size:14px;color:#3d2a17}
 .module-admin-tools-head small{font-size:10px;color:#75624c}
+.module-admin-tools>summary.module-admin-tools-head{cursor:pointer;list-style:none;margin:-12px -12px 0;padding:12px;border-bottom:0}
+.module-admin-tools>summary.module-admin-tools-head::-webkit-details-marker{display:none}
+.module-admin-tools[open]>summary.module-admin-tools-head{margin-bottom:11px;border-bottom:1px solid rgba(151,112,51,.25)}
+.module-admin-tools>summary .accordion-chevron{margin-left:auto;transition:transform .18s ease}
+.module-admin-tools[open]>summary .accordion-chevron{transform:rotate(180deg)}
 .module-admin-tools .admin-company-settings{margin:0}
 body.experimental-ui .payments-snapshot-card{border-color:#bea67f;box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 4px rgba(69,46,22,.08)}
 

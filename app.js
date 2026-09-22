@@ -5567,8 +5567,9 @@ let latestGangPayload = null;
 let latestGangPayloadAt = 0;
 const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
 let gangSessionValidationAt = 0;
+let buildActiveTab="editor";
 
-function ensureModuleAdminTools(viewId,id,title,subtitle) {
+function ensureModuleAdminTools(viewId,id,title,subtitle,position="bottom") {
   const view=el(viewId);
   const host=view?.querySelector(":scope > .panel > .panel-body")||view;
   if(!host)return null;
@@ -5579,7 +5580,8 @@ function ensureModuleAdminTools(viewId,id,title,subtitle) {
     section.className="module-admin-tools";
     section.hidden=true;
     section.innerHTML=`<div class="module-admin-tools-head"><span>🛠️</span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></div></div><div class="module-admin-tools-body"></div>`;
-    host.appendChild(section);
+    if(position==="top")host.prepend(section);
+    else host.appendChild(section);
   }
   return section.querySelector(".module-admin-tools-body");
 }
@@ -5600,14 +5602,18 @@ function setupContextualAdminTools() {
     Array.from(sourceBody.children).forEach(node=>paymentsBody.appendChild(node));
     source.hidden=true;
   }
+  const paymentsTools=el("payments-admin-tools"),paymentsContent=el("payments-content");
+  if(paymentsTools&&paymentsContent)paymentsContent.before(paymentsTools);
+  const companyToolsHost=el("company-admin-tools"),companySummary=el("company-summary");
+  if(companyToolsHost&&companySummary)companySummary.before(companyToolsHost);
 
   const distilleryBody=ensureModuleAdminTools("distillery-admin-view","distillery-admin-tools","Narzędzia administratora","Akceptacja receptur i aktywne rezerwacje");
   moveAdminSectionToModule("admin-section-submissions",distilleryBody);
   moveAdminSectionToModule("admin-section-reservations",distilleryBody);
-  moveAdminSectionToModule("admin-section-builds",ensureModuleAdminTools("builds-view","builds-admin-tools","Moderacja buildów PvP","Zarządzanie publiczną listą buildów"));
-  moveAdminSectionToModule("admin-section-polls",ensureModuleAdminTools("polls-view","polls-admin-tools","Zarządzanie ankietami","Tworzenie i zamykanie ankiet gangu"));
-  moveAdminSectionToModule("admin-section-goal",ensureModuleAdminTools("goals-view","goals-admin-tools","Zarządzanie celami gangu","Edycja i usuwanie aktualnego celu"));
-  moveAdminSectionToModule("admin-section-announcements",ensureModuleAdminTools("announcements-view","announcements-admin-tools","Zarządzanie ogłoszeniami","Dodawanie i moderacja komunikatów gangu"));
+  moveAdminSectionToModule("admin-section-builds",el("builds-admin-tools")?.querySelector(".module-admin-tools-body"));
+  moveAdminSectionToModule("admin-section-polls",ensureModuleAdminTools("polls-view","polls-admin-tools","Zarządzanie ankietami","Tworzenie i zamykanie ankiet gangu","top"));
+  moveAdminSectionToModule("admin-section-goal",ensureModuleAdminTools("goals-view","goals-admin-tools","Zarządzanie celami gangu","Edycja i usuwanie aktualnego celu","top"));
+  moveAdminSectionToModule("admin-section-announcements",ensureModuleAdminTools("announcements-view","announcements-admin-tools","Zarządzanie ogłoszeniami","Dodawanie i moderacja komunikatów gangu","top"));
 
   const oldGangTools=document.querySelector("#admin-content .admin-gang-tools");
   if(oldGangTools&&!oldGangTools.querySelector("details"))oldGangTools.hidden=true;
@@ -5616,11 +5622,15 @@ function setupContextualAdminTools() {
 
 function syncFinanceAdminToolsVisibility(account=cachedAccountStatus) {
   const visible=Boolean(account&&account.admin&&playerAccountSessionToken());
-  ["payments-admin-tools","company-admin-tools","distillery-admin-tools","builds-admin-tools","polls-admin-tools","goals-admin-tools","announcements-admin-tools"].forEach(id=>{
+  ["payments-admin-tools","company-admin-tools","distillery-admin-tools","polls-admin-tools","goals-admin-tools","announcements-admin-tools"].forEach(id=>{
     const section=el(id);if(section)section.hidden=!visible;
   });
   const distilleryAdminTab=document.querySelector('[data-subtab="distillery-admin-view"]');
   if(distilleryAdminTab)distilleryAdminTab.hidden=!visible;
+  const buildsAdminTab=document.querySelector('[data-build-tab="admin"]');
+  if(buildsAdminTab)buildsAdminTab.hidden=!visible;
+  const buildsAdminTools=el("builds-admin-tools");
+  if(buildsAdminTools)buildsAdminTools.hidden=!visible||buildActiveTab!=="admin";
 }
 
 
@@ -16881,10 +16891,8 @@ function setupAdmin() {
   }
 
 
-  let buildActiveTab="editor";
-
   function setBuildTab(tab,options={}) {
-    const wanted=["editor","sim","public","mine"].includes(tab)?tab:"editor";
+    const wanted=["editor","sim","public","mine"].includes(tab)||(tab==="admin"&&cachedAccountStatus?.admin)?tab:"editor";
     buildActiveTab=wanted;
 
     const intro=el("build-editor-intro");
@@ -16892,12 +16900,14 @@ function setupAdmin() {
     const publicSection=el("build-public-section");
     const mineSection=el("build-my-section");
     const simSection=el("pvp-simulator-section");
+    const adminSection=el("builds-admin-tools");
 
     if (intro) intro.hidden=wanted!=="editor";
     if (editor) editor.hidden=wanted!=="editor";
     if (publicSection) publicSection.hidden=wanted!=="public";
     if (mineSection) mineSection.hidden=wanted!=="mine";
     if (simSection) simSection.hidden=wanted!=="sim";
+    if (adminSection) adminSection.hidden=wanted!=="admin";
 
     document.querySelectorAll("[data-build-tab]").forEach(button=>{
       button.classList.toggle("active",button.dataset.buildTab===wanted);
