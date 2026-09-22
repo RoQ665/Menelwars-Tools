@@ -7722,7 +7722,11 @@ function specialOpsItemIconGlobal(name){
   const normalized=String(name||"").trim().toLocaleLowerCase("pl-PL");
   const item=(Array.isArray(window.MENELWARS_GAME_ITEMS)?window.MENELWARS_GAME_ITEMS:[])
     .find(row=>String(row?.[1]||"").trim().toLocaleLowerCase("pl-PL")===normalized);
-  const specialIcons={ak47:"https://images.menelgame.online/items/ak47_20260914_v1.png"};
+  const specialIcons={
+    ak47:"https://images.menelgame.online/items/ak47_20260914_v1.png",
+    "kwit na elitarny set moro":"https://images.menelgame.online/items/kwit-elitarny-moro-20260921.png",
+    "kwit na elitarny set szturmowca":"https://images.menelgame.online/items/kwit-elitarny-szturmowiec-20260920.png"
+  };
   const icon=String(item?.[2]||specialIcons[normalized]||"").trim();
   return icon?`<img src="${escapeHtml(icon)}" alt="" loading="lazy">`:`<span aria-hidden="true">🎁</span>`;
 }
