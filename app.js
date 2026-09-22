@@ -207,7 +207,9 @@
       gardenReady?"Możliwy zbiór":gardenQuestion?"Opcjonalne pytanie o etap":""
     );
     const pendingSubmissions=Math.max(0,Number(adminModuleAttentionGlobal?.pendingSubmissions)||0);
-    const companyChanges=Math.max(0,Number(adminModuleAttentionGlobal?.companyChanges)||0);
+    const companyChanges=experimentalUiAllowed()
+      ? Math.max(0,Number(adminModuleAttentionGlobal?.companyChanges)||0)
+      : 0;
     experimentalUiMark('[data-module="distillery"]',pendingSubmissions?"critical":distillerySoon?"action":"",pendingSubmissions?`${pendingSubmissions} receptur do akceptacji`:distillerySoon?"Rezerwacja: < 1 godz.":"");
     const buildIncomplete=Boolean(testState.buildIncomplete||experimentalUiBuildIncomplete());
     experimentalUiMark('[data-module="builds"]',buildIncomplete?"suggestion":"",buildIncomplete?"Build do uzupełnienia":"");
@@ -6794,12 +6796,14 @@ function setAdminGlobalBadge(count) {
 
 function applyAdminDashboardStatus(payload) {
   const pending = Math.max(0,Number(payload && payload.pendingSubmissions) || 0);
-  const company = Object.prototype.hasOwnProperty.call(payload||{},"companyChanges")
+  const rawCompany = Object.prototype.hasOwnProperty.call(payload||{},"companyChanges")
     ? Math.max(0,Number(payload.companyChanges)||0)
     : Math.max(0,Number(adminModuleAttentionGlobal.companyChanges)||0);
-  const total = Math.max(0,Number(payload && payload.totalAttention) || pending + company);
+  const company = experimentalUiAllowed() ? rawCompany : 0;
+  const rawTotal = Math.max(0,Number(payload && payload.totalAttention) || pending + rawCompany);
+  const total = Math.max(0,rawTotal-rawCompany+company);
 
-  adminModuleAttentionGlobal={pendingSubmissions:pending,companyChanges:company};
+  adminModuleAttentionGlobal={pendingSubmissions:pending,companyChanges:rawCompany};
   setAdminSectionBadge("admin-section-submissions",pending);
   setAdminSectionBadge("admin-section-payments",company);
   setAdminGlobalBadge(Math.max(0,total-pending-company));
