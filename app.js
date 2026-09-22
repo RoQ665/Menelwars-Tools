@@ -5567,7 +5567,8 @@ const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
 let gangSessionValidationAt = 0;
 
 function ensureModuleAdminTools(viewId,id,title,subtitle) {
-  const host=el(viewId)?.querySelector(":scope > .panel > .panel-body");
+  const view=el(viewId);
+  const host=view?.querySelector(":scope > .panel > .panel-body")||view;
   if(!host)return null;
   let section=el(id);
   if(!section){
