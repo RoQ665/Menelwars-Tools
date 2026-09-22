@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=23.16">
+  <link rel="stylesheet" href="styles.css?v=23.17">
   <title>MenelWars Tools</title>
 
   <style>
@@ -707,6 +707,7 @@
     <button data-subtab="unknown-view" data-group="distillery">🔬 Nieodkryte</button>
     <button data-subtab="submit-view" data-group="distillery">➕ Dodaj</button>
     <button data-subtab="progress-view" data-group="distillery">📊 Postęp</button>
+    <button data-subtab="distillery-admin-view" data-group="distillery" hidden>🛠 Zarządzanie</button>
   </nav>
 
   <nav class="tabs sub-tabs" id="gang-tabs" hidden>
@@ -1115,6 +1116,13 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
         <div class="gang-demand-offer-expiry-hint">🧹 Gdy zostanie zadeklarowana cała potrzebna liczba, po 48 godzinach wpis automatycznie przejdzie do „Zrealizowane”.</div>
         <div id="gang-demand-list" class="gang-demand-list"><div class="empty">Ładowanie zapotrzebowania…</div></div>
       </div>
+    </div>
+  </section>
+
+  <section id="distillery-admin-view" class="view" hidden>
+    <div class="panel">
+      <div class="panel-head">🛠 Zarządzanie Destylarnią</div>
+      <div class="panel-body"></div>
     </div>
   </section>
 
@@ -2227,6 +2235,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="app.js?v=23.16"></script>
+  <script src="app.js?v=23.17"></script>
 </body>
 </html>

@@ -163,7 +163,7 @@
   function experimentalUiRefreshAttention() {
     const reset=()=>{
       experimentalUiMark('[data-module="garden"], [data-module="distillery"], [data-module="gang"], [data-module="builds"]');
-      experimentalUiMark('[data-subtab="payments-view"], [data-subtab="company-view"], [data-subtab="demand-view"], [data-subtab="optimizer-view"]');
+      experimentalUiMark('[data-subtab="payments-view"], [data-subtab="company-view"], [data-subtab="demand-view"], [data-subtab="optimizer-view"], [data-subtab="distillery-admin-view"]');
       experimentalUiMark('[data-gang-menu-target="payments-view"], [data-gang-menu-target="company-view"], [data-gang-menu-target="demand-view"]');
     };
     const testState=experimentalUiTestState();
@@ -215,7 +215,8 @@
     experimentalUiMark('[data-module="gang"]',paymentProblem?"critical":companyChanges||demandOffer?"action":"",paymentProblem?"Sprawdź wpłaty":companyChanges?"Sprawdź zmiany w Spółce":demandOffer?"Ktoś ma Twój przedmiot":"");
     experimentalUiMark('[data-subtab="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-subtab="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś ma Twój przedmiot":"");
-    experimentalUiMark('[data-subtab="optimizer-view"]',pendingSubmissions?"critical":distillerySoon?"action":"",pendingSubmissions?`${pendingSubmissions} receptur do akceptacji`:distillerySoon?"Rezerwacja: < 1 godz.":"");
+    experimentalUiMark('[data-subtab="optimizer-view"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja: < 1 godz.":"");
+    experimentalUiMark('[data-subtab="distillery-admin-view"]',pendingSubmissions?"critical":"",pendingSubmissions?`${pendingSubmissions} receptur do akceptacji`:"");
     experimentalUiMark('[data-subtab="company-view"]',companyChanges?"action":"",companyChanges?"Plan Spółki wymaga uwagi":"");
     experimentalUiMark('[data-gang-menu-target="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-gang-menu-target="company-view"]',companyChanges?"action":"",companyChanges?"Plan Spółki wymaga uwagi":"");
@@ -2946,6 +2947,7 @@ function mapRenderRouteResult() {
     target="optimizer-view",
     options={}
   ) {
+    if(target==="distillery-admin-view"&&!cachedAccountStatus?.admin)return;
     // Natychmiastowa reakcja na klik. Kontrola dostępu może wymagać sieci,
     // więc loader musi pojawić się PRZED pierwszym await.
     if (!distilleryDataLoaded) {
@@ -5599,7 +5601,7 @@ function setupContextualAdminTools() {
     source.hidden=true;
   }
 
-  const distilleryBody=ensureModuleAdminTools("optimizer-view","distillery-admin-tools","Zarządzanie Destylarnią","Akceptacja receptur i aktywne rezerwacje");
+  const distilleryBody=ensureModuleAdminTools("distillery-admin-view","distillery-admin-tools","Narzędzia administratora","Akceptacja receptur i aktywne rezerwacje");
   moveAdminSectionToModule("admin-section-submissions",distilleryBody);
   moveAdminSectionToModule("admin-section-reservations",distilleryBody);
   moveAdminSectionToModule("admin-section-builds",ensureModuleAdminTools("builds-view","builds-admin-tools","Moderacja buildów PvP","Zarządzanie publiczną listą buildów"));
@@ -5617,6 +5619,8 @@ function syncFinanceAdminToolsVisibility(account=cachedAccountStatus) {
   ["payments-admin-tools","company-admin-tools","distillery-admin-tools","builds-admin-tools","polls-admin-tools","goals-admin-tools","announcements-admin-tools"].forEach(id=>{
     const section=el(id);if(section)section.hidden=!visible;
   });
+  const distilleryAdminTab=document.querySelector('[data-subtab="distillery-admin-view"]');
+  if(distilleryAdminTab)distilleryAdminTab.hidden=!visible;
 }
 
 
