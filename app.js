@@ -7738,6 +7738,7 @@ function setupGangDemand() {
 let specialOpsCacheGlobal=null;
 let specialOpsLoadInFlightGlobal=null;
 let specialOpsFilterGlobal="all";
+let specialOpsPreferenceStatusTimerGlobal=null;
 
 function specialOpsItemIconGlobal(name){
   const normalized=String(name||"").trim().toLocaleLowerCase("pl-PL");
@@ -7862,8 +7863,9 @@ async function loadSpecialOperationsGlobal(options={}){
 
 async function specialOpsSavePreferenceGlobal(itemKey,enabled,nickKey,input){
   if(input)input.disabled=true;const status=el("special-ops-preference-status"),adminStatus=el("special-ops-admin-status");
+  if(specialOpsPreferenceStatusTimerGlobal){clearTimeout(specialOpsPreferenceStatusTimerGlobal);specialOpsPreferenceStatusTimerGlobal=null;}
   if(status)status.textContent="⏳ Zapisuję preferencję…";
-  try{await cloudflareApi("/gang/special-operations/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{itemKey,enabled:Boolean(enabled),nickKey,requestId:makeRecipeNonce()}});specialOpsCacheGlobal=null;if(status)status.textContent=enabled?"✅ Bierzesz udział w losowaniu tego przedmiotu.":"✅ Nie bierzesz udziału w losowaniu tego przedmiotu.";if(adminStatus)adminStatus.textContent="✅ Preferencja została zapisana.";await loadSpecialOperationsGlobal({force:true});}
+  try{await cloudflareApi("/gang/special-operations/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{itemKey,enabled:Boolean(enabled),nickKey,requestId:makeRecipeNonce()}});specialOpsCacheGlobal=null;const confirmation=enabled?"✅ Bierzesz udział w losowaniu tego przedmiotu.":"✅ Nie bierzesz udziału w losowaniu tego przedmiotu.";if(status)status.textContent=confirmation;if(adminStatus)adminStatus.textContent="✅ Preferencja została zapisana.";await loadSpecialOperationsGlobal({force:true});specialOpsPreferenceStatusTimerGlobal=setTimeout(()=>{const current=el("special-ops-preference-status");if(current?.textContent===confirmation)current.textContent="";specialOpsPreferenceStatusTimerGlobal=null;},3500);}
   catch(err){if(input)input.disabled=false;const message="❌ "+(err?.message||"Nie udało się zapisać preferencji.");if(status)status.textContent=message;if(adminStatus)adminStatus.textContent=message;}
 }
 
