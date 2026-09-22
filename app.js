@@ -7871,8 +7871,8 @@ function specialOpsRenderStashGlobal(payload){
 
 function specialOpsRenderResultsGlobal(payload){
   const box=el("special-ops-results"),batch=payload.batch;if(!box)return;
-  const auditRows=(payload.audit||[]).filter(row=>row.action==="preference"||row.action==="manual_close").slice(0,20);
-  const auditHtml=auditRows.length?`<details class="special-ops-proof"><summary>📜 Jawna historia zmian (${auditRows.length})</summary>${auditRows.map(row=>{const target=(payload.contributions||[]).find(player=>player.nickKey===row.targetNickKey)?.nick||row.targetNickKey||"gracz";return `<article><b>${row.action==="preference"?`${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}`:`${escapeHtml(row.actor)} zamknął serię ręcznie`}</b><small>${specialOpsDateGlobal(row.createdAt)}${row.action==="preference"?` · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}`:""}</small></article>`;}).join("")}</details>`:"";
+  const auditRows=(payload.audit||[]).filter(row=>row.action==="manual_close"||(row.action==="preference"&&row.actorKey!==row.targetNickKey)).slice(0,20);
+  const auditHtml=auditRows.length?`<details class="special-ops-proof"><summary>📜 Historia zmian (${auditRows.length})</summary>${auditRows.map(row=>{const target=(payload.players||payload.contributions||[]).find(player=>player.nickKey===row.targetNickKey)?.nick||row.targetNickKey||"gracz";return `<article><b>${row.action==="preference"?`${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}`:`${escapeHtml(row.actor)} zamknął serię ręcznie`}</b><small>${specialOpsDateGlobal(row.createdAt)}${row.action==="preference"?` · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}`:""}</small></article>`;}).join("")}</details>`:"";
   if(!batch||!Array.isArray(batch.draws)||!batch.draws.length){box.innerHTML='<div class="empty">Nie wykonano jeszcze żadnego losowania.</div>'+auditHtml;return;}
   const byItem=new Map(),byPlayer=new Map();
   for(const draw of batch.draws){
