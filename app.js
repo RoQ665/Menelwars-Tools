@@ -7816,7 +7816,7 @@ function specialOpsRenderAdminGlobal(payload){
   if(draw){draw.disabled=Boolean(pending)||!(payload.stash||[]).length||!(payload.contributions||[]).some(row=>Number(row.weight)>0);draw.textContent=pending?"⏳ Najpierw rozlicz obecną serię":"🎲 Rozlosuj cały schowek";}
   if(manual)manual.hidden=!pending;
   if(prefs){
-    const players=payload.contributions||[],items=payload.items||[];
+    const players=(payload.players?.length?payload.players:payload.contributions)||[],items=payload.items||[];
     prefs.innerHTML=`<details><summary>👥 Korekta preferencji gracza</summary><div class="special-ops-admin-pref-row"><select id="special-ops-admin-player" aria-label="Gracz">${players.map(row=>`<option value="${escapeHtml(row.nickKey)}">${escapeHtml(row.nick)}</option>`).join("")}</select><select id="special-ops-admin-item" aria-label="Przedmiot">${items.map(row=>`<option value="${escapeHtml(row.itemKey)}">${escapeHtml(row.itemName)}</option>`).join("")}</select><select id="special-ops-admin-enabled" aria-label="Udział"><option value="1">Bierze udział</option><option value="0">Nie potrzebuje</option></select><button type="button" id="special-ops-admin-pref-save">Zapisz korektę</button></div><small>Zmiana jest publicznie zapisywana wraz z nickiem administratora.</small></details>`;
     el("special-ops-admin-pref-save")?.addEventListener("click",()=>specialOpsSavePreferenceGlobal(el("special-ops-admin-item").value,el("special-ops-admin-enabled").value==="1",el("special-ops-admin-player").value));
   }
