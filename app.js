@@ -163,8 +163,8 @@
   function experimentalUiRefreshAttention() {
     const reset=()=>{
       experimentalUiMark('[data-module="garden"], [data-module="distillery"], [data-module="gang"], [data-module="builds"]');
-      experimentalUiMark('[data-subtab="payments-view"], [data-subtab="demand-view"], [data-subtab="optimizer-view"]');
-      experimentalUiMark('[data-gang-menu-target="payments-view"], [data-gang-menu-target="demand-view"]');
+      experimentalUiMark('[data-subtab="payments-view"], [data-subtab="company-view"], [data-subtab="demand-view"], [data-subtab="optimizer-view"]');
+      experimentalUiMark('[data-gang-menu-target="payments-view"], [data-gang-menu-target="company-view"], [data-gang-menu-target="demand-view"]');
     };
     const testState=experimentalUiTestState();
     let gardenReady=Boolean(testState.gardenReady);
@@ -206,15 +206,19 @@
       gardenReady?"action":gardenQuestion?"info":"",
       gardenReady?"Możliwy zbiór":gardenQuestion?"Opcjonalne pytanie o etap":""
     );
-    experimentalUiMark('[data-module="distillery"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja: < 1 godz.":"");
+    const pendingSubmissions=Math.max(0,Number(adminModuleAttentionGlobal?.pendingSubmissions)||0);
+    const companyChanges=Math.max(0,Number(adminModuleAttentionGlobal?.companyChanges)||0);
+    experimentalUiMark('[data-module="distillery"]',pendingSubmissions?"critical":distillerySoon?"action":"",pendingSubmissions?`${pendingSubmissions} receptur do akceptacji`:distillerySoon?"Rezerwacja: < 1 godz.":"");
     const buildIncomplete=Boolean(testState.buildIncomplete||experimentalUiBuildIncomplete());
     experimentalUiMark('[data-module="builds"]',buildIncomplete?"suggestion":"",buildIncomplete?"Build do uzupełnienia":"");
     experimentalUiMark('.build-card-list > [data-build-scope="mine"]:first-child',testState.buildIncomplete?"suggestion":"",testState.buildIncomplete?"Test: build wymaga uzupełnienia":"");
-    experimentalUiMark('[data-module="gang"]',paymentProblem?"critical":demandOffer?"action":"",paymentProblem?"Sprawdź wpłaty":demandOffer?"Ktoś ma Twój przedmiot":"");
+    experimentalUiMark('[data-module="gang"]',paymentProblem?"critical":companyChanges||demandOffer?"action":"",paymentProblem?"Sprawdź wpłaty":companyChanges?"Sprawdź zmiany w Spółce":demandOffer?"Ktoś ma Twój przedmiot":"");
     experimentalUiMark('[data-subtab="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
     experimentalUiMark('[data-subtab="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś ma Twój przedmiot":"");
-    experimentalUiMark('[data-subtab="optimizer-view"]',distillerySoon?"action":"",distillerySoon?"Rezerwacja: < 1 godz.":"");
+    experimentalUiMark('[data-subtab="optimizer-view"]',pendingSubmissions?"critical":distillerySoon?"action":"",pendingSubmissions?`${pendingSubmissions} receptur do akceptacji`:distillerySoon?"Rezerwacja: < 1 godz.":"");
+    experimentalUiMark('[data-subtab="company-view"]',companyChanges?"action":"",companyChanges?"Plan Spółki wymaga uwagi":"");
     experimentalUiMark('[data-gang-menu-target="payments-view"]',paymentProblem?"critical":"",paymentProblem?"Dług lub blokada kopania":"");
+    experimentalUiMark('[data-gang-menu-target="company-view"]',companyChanges?"action":"",companyChanges?"Plan Spółki wymaga uwagi":"");
     experimentalUiMark('[data-gang-menu-target="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś ma Twój przedmiot":"");
   }
 
@@ -5562,23 +5566,56 @@ let latestGangPayloadAt = 0;
 const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
 let gangSessionValidationAt = 0;
 
-function setupFinanceAdminTools() {
+function ensureModuleAdminTools(viewId,id,title,subtitle) {
+  const host=el(viewId)?.querySelector(":scope > .panel > .panel-body");
+  if(!host)return null;
+  let section=el(id);
+  if(!section){
+    section=document.createElement("section");
+    section.id=id;
+    section.className="module-admin-tools";
+    section.hidden=true;
+    section.innerHTML=`<div class="module-admin-tools-head"><span>🛠️</span><div><strong>${escapeHtml(title)}</strong><small>${escapeHtml(subtitle)}</small></div></div><div class="module-admin-tools-body"></div>`;
+    host.appendChild(section);
+  }
+  return section.querySelector(".module-admin-tools-body");
+}
+
+function moveAdminSectionToModule(sectionId,body) {
+  const section=el(sectionId);
+  if(!section||!body)return;
+  section.hidden=false;
+  body.appendChild(section);
+}
+
+function setupContextualAdminTools() {
   const source=el("admin-section-payments"),sourceBody=source?.querySelector(":scope > .admin-accordion-body");
   const paymentsBody=el("payments-admin-tools-body"),companyBody=el("company-admin-tools-body");
-  if(!sourceBody||!paymentsBody||!companyBody)return;
+  if(sourceBody&&paymentsBody&&companyBody){
+    const companyTools=sourceBody.querySelector(":scope > .admin-company-settings");
+    if(companyTools)companyBody.appendChild(companyTools);
+    Array.from(sourceBody.children).forEach(node=>paymentsBody.appendChild(node));
+    source.hidden=true;
+  }
 
-  const companyTools=sourceBody.querySelector(":scope > .admin-company-settings");
-  if(companyTools)companyBody.appendChild(companyTools);
-  Array.from(sourceBody.children).forEach(node=>paymentsBody.appendChild(node));
-  source.hidden=true;
+  const distilleryBody=ensureModuleAdminTools("optimizer-view","distillery-admin-tools","Zarządzanie Destylarnią","Akceptacja receptur i aktywne rezerwacje");
+  moveAdminSectionToModule("admin-section-submissions",distilleryBody);
+  moveAdminSectionToModule("admin-section-reservations",distilleryBody);
+  moveAdminSectionToModule("admin-section-builds",ensureModuleAdminTools("builds-view","builds-admin-tools","Moderacja buildów PvP","Zarządzanie publiczną listą buildów"));
+  moveAdminSectionToModule("admin-section-polls",ensureModuleAdminTools("polls-view","polls-admin-tools","Zarządzanie ankietami","Tworzenie i zamykanie ankiet gangu"));
+  moveAdminSectionToModule("admin-section-goal",ensureModuleAdminTools("goals-view","goals-admin-tools","Zarządzanie celami gangu","Edycja i usuwanie aktualnego celu"));
+  moveAdminSectionToModule("admin-section-announcements",ensureModuleAdminTools("announcements-view","announcements-admin-tools","Zarządzanie ogłoszeniami","Dodawanie i moderacja komunikatów gangu"));
+
+  const oldGangTools=document.querySelector("#admin-content .admin-gang-tools");
+  if(oldGangTools&&!oldGangTools.querySelector("details"))oldGangTools.hidden=true;
   syncFinanceAdminToolsVisibility(cachedAccountStatus);
 }
 
 function syncFinanceAdminToolsVisibility(account=cachedAccountStatus) {
   const visible=Boolean(account&&account.admin&&playerAccountSessionToken());
-  const payments=el("payments-admin-tools"),company=el("company-admin-tools");
-  if(payments)payments.hidden=!visible;
-  if(company)company.hidden=!visible;
+  ["payments-admin-tools","company-admin-tools","distillery-admin-tools","builds-admin-tools","polls-admin-tools","goals-admin-tools","announcements-admin-tools"].forEach(id=>{
+    const section=el(id);if(section)section.hidden=!visible;
+  });
 }
 
 
@@ -6688,6 +6725,7 @@ async function loadAdminBuilds() {
 
 
 let adminDashboardStatusInFlight = null;
+let adminModuleAttentionGlobal={pendingSubmissions:0,companyChanges:0};
 
 // v20.73 — cache sekcji Admina z TTL.
 // Sekcja pokazuje od razu ostatnio wyrenderowane dane,
@@ -6741,12 +6779,16 @@ function setAdminGlobalBadge(count) {
 
 function applyAdminDashboardStatus(payload) {
   const pending = Math.max(0,Number(payload && payload.pendingSubmissions) || 0);
-  const company = Math.max(0,Number(payload && payload.companyChanges) || 0);
+  const company = Object.prototype.hasOwnProperty.call(payload||{},"companyChanges")
+    ? Math.max(0,Number(payload.companyChanges)||0)
+    : Math.max(0,Number(adminModuleAttentionGlobal.companyChanges)||0);
   const total = Math.max(0,Number(payload && payload.totalAttention) || pending + company);
 
+  adminModuleAttentionGlobal={pendingSubmissions:pending,companyChanges:company};
   setAdminSectionBadge("admin-section-submissions",pending);
   setAdminSectionBadge("admin-section-payments",company);
-  setAdminGlobalBadge(total);
+  setAdminGlobalBadge(Math.max(0,total-pending-company));
+  experimentalUiRefreshAttention();
 
   const count = el("admin-submissions-count");
   if (count) {
@@ -6765,7 +6807,7 @@ async function loadAdminDashboardStatus() {
   if (!token) return null;
 
   const requestPromise = (async () => {
-    let payload = {ok:true,pendingSubmissions:0,companyChanges:0,totalAttention:0};
+    let payload = {ok:true,pendingSubmissions:0,totalAttention:0};
     const distillery=await cloudflareApi("/admin/distillery",{
       token:await cloudflareEnsureSession()
     });
@@ -6905,7 +6947,7 @@ async function loadAdminSection(
 
 function setupAdminAccordionLazyLoad() {
   document
-    .querySelectorAll("#admin-content details.admin-accordion")
+    .querySelectorAll("details.admin-accordion")
     .forEach(details => {
       if (details.dataset.lazyBound === "1") return;
       details.dataset.lazyBound = "1";
@@ -9146,6 +9188,9 @@ async function loadAdminPaymentsStatus() {
 
     adminPaymentsSnapshot =
       payload;
+
+    adminModuleAttentionGlobal.companyChanges=(!payload.hasActivePlan||payload.proposalChanged)?1:0;
+    experimentalUiRefreshAttention();
 
     const dailyMinimumInput=el("admin-payments-daily-minimum");
     if(dailyMinimumInput)dailyMinimumInput.value=String(Number(payload.paymentDailyMinimum)||2000);
@@ -17221,7 +17266,7 @@ function setupAdmin() {
     ].forEach(([target,text]) => {
       setGangOptionalButtonState(
         target,
-        false,
+        Boolean(cachedAccountStatus?.admin),
         text
       );
     });
@@ -17229,6 +17274,7 @@ function setupAdmin() {
 
 
   function applyGangMenuStatus(payload) {
+    const admin=Boolean(cachedAccountStatus?.admin&&playerAccountSessionToken());
     const pollsCount =
       Math.max(
         0,
@@ -17246,19 +17292,19 @@ function setupAdmin() {
 
     setGangOptionalButtonState(
       "polls-view",
-      pollsCount > 0,
+      admin || pollsCount > 0,
       "Brak ankiet."
     );
 
     setGangOptionalButtonState(
       "goals-view",
-      hasGoal,
+      admin || hasGoal,
       "Brak aktywnego celu."
     );
 
     setGangOptionalButtonState(
       "announcements-view",
-      announcementsCount > 0,
+      admin || announcementsCount > 0,
       "Brak ogłoszeń."
     );
   }
@@ -17740,8 +17786,9 @@ setupBuildCreator();
 setupPayments();
 setupGangDemand();
 setupSpecialOperationsGlobal();
-setupFinanceAdminTools();
+setupContextualAdminTools();
 setupAdmin();
+setupAdminAccordionLazyLoad();
 
 showToolView("home-view", "");
 if (el("admin-view")) el("admin-view").hidden = true;
