@@ -4399,6 +4399,14 @@ body.experimental-ui .ai-dump-access.blocked{background:linear-gradient(180deg,#
 .payments-snapshot-copy small{color:#74644f;font-size:10px;line-height:1.2}
 .payments-snapshot-copy strong{overflow:hidden;text-overflow:ellipsis;color:#352719;font-size:13px;line-height:1.25;white-space:nowrap}
 .payments-player-count{margin:0 0 10px 3px}
+.module-admin-tools{margin-top:14px;padding:12px;border:1px solid #d3b77d;border-radius:12px;background:linear-gradient(180deg,#fff9eb,#f8ecd3);box-shadow:0 3px 9px rgba(80,55,24,.08)}
+.module-admin-tools[hidden]{display:none!important}
+.module-admin-tools-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;padding-bottom:9px;border-bottom:1px solid rgba(151,112,51,.25)}
+.module-admin-tools-head>span{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:#ead6af;font-size:17px}
+.module-admin-tools-head>div{display:grid;gap:2px}
+.module-admin-tools-head strong{font-size:14px;color:#3d2a17}
+.module-admin-tools-head small{font-size:10px;color:#75624c}
+.module-admin-tools .admin-company-settings{margin:0}
 body.experimental-ui .payments-snapshot-card{border-color:#bea67f;box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 4px rgba(69,46,22,.08)}
 
 body.experimental-ui .content-accordion,body.experimental-ui .admin-accordion{border-color:#c6ad87;box-shadow:0 2px 5px rgba(68,45,22,.07)}

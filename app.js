@@ -3637,6 +3637,7 @@ function mapRenderRouteResult() {
       cachedAccountStatusAt=0;
       cachedAccountStatusToken="";
       experimentalUiApply(null);
+      syncFinanceAdminToolsVisibility(null);
       return null;
     }
 
@@ -3654,6 +3655,7 @@ function mapRenderRouteResult() {
       setCloudflareSessionToken(cloudToken);
       updateHomeAccountState(result);
       experimentalUiApply(result);
+      syncFinanceAdminToolsVisibility(result);
       return result;
     } catch(err) {
       if (err&&err.status===401) setPlayerAccountSessionToken("");
@@ -5559,6 +5561,25 @@ let latestGangPayload = null;
 let latestGangPayloadAt = 0;
 const GANG_PAYLOAD_TTL_MS = 10 * 60 * 1000;
 let gangSessionValidationAt = 0;
+
+function setupFinanceAdminTools() {
+  const source=el("admin-section-payments"),sourceBody=source?.querySelector(":scope > .admin-accordion-body");
+  const paymentsBody=el("payments-admin-tools-body"),companyBody=el("company-admin-tools-body");
+  if(!sourceBody||!paymentsBody||!companyBody)return;
+
+  const companyTools=sourceBody.querySelector(":scope > .admin-company-settings");
+  if(companyTools)companyBody.appendChild(companyTools);
+  Array.from(sourceBody.children).forEach(node=>paymentsBody.appendChild(node));
+  source.hidden=true;
+  syncFinanceAdminToolsVisibility(cachedAccountStatus);
+}
+
+function syncFinanceAdminToolsVisibility(account=cachedAccountStatus) {
+  const visible=Boolean(account&&account.admin&&playerAccountSessionToken());
+  const payments=el("payments-admin-tools"),company=el("company-admin-tools");
+  if(payments)payments.hidden=!visible;
+  if(company)company.hidden=!visible;
+}
 
 
 // ============================================================
@@ -17417,6 +17438,7 @@ function setupAdmin() {
 
       await loadPayments({background:true,force:forceRefresh});
       if (latestGangPayload) renderGangPayload(latestGangPayload);
+      if(cachedAccountStatus?.admin)loadAdminPaymentsStatus().catch(()=>{});
       validateGangSessionInBackground();
       return;
     }
@@ -17713,6 +17735,7 @@ setupBuildCreator();
 setupPayments();
 setupGangDemand();
 setupSpecialOperationsGlobal();
+setupFinanceAdminTools();
 setupAdmin();
 
 showToolView("home-view", "");
