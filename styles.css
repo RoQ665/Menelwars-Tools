@@ -4399,7 +4399,7 @@ body.experimental-ui .ai-dump-access.blocked{background:linear-gradient(180deg,#
 .payments-snapshot-copy small{color:#74644f;font-size:10px;line-height:1.2}
 .payments-snapshot-copy strong{overflow:hidden;text-overflow:ellipsis;color:#352719;font-size:13px;line-height:1.25;white-space:nowrap}
 .payments-player-count{margin:0 0 10px 3px}
-.module-admin-tools{margin-top:14px;padding:12px;border:1px solid #d3b77d;border-radius:12px;background:linear-gradient(180deg,#fff9eb,#f8ecd3);box-shadow:0 3px 9px rgba(80,55,24,.08)}
+.module-admin-tools{margin:14px 0;padding:12px;border:1px solid #d3b77d;border-radius:12px;background:linear-gradient(180deg,#fff9eb,#f8ecd3);box-shadow:0 3px 9px rgba(80,55,24,.08)}
 .module-admin-tools[hidden]{display:none!important}
 .module-admin-tools-head{display:flex;align-items:center;gap:9px;margin-bottom:11px;padding-bottom:9px;border-bottom:1px solid rgba(151,112,51,.25)}
 .module-admin-tools-head>span{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:#ead6af;font-size:17px}
