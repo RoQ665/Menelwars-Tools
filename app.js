@@ -7722,7 +7722,8 @@ function specialOpsItemIconGlobal(name){
   const normalized=String(name||"").trim().toLocaleLowerCase("pl-PL");
   const item=(Array.isArray(window.MENELWARS_GAME_ITEMS)?window.MENELWARS_GAME_ITEMS:[])
     .find(row=>String(row?.[1]||"").trim().toLocaleLowerCase("pl-PL")===normalized);
-  const icon=String(item?.[2]||"").trim();
+  const specialIcons={ak47:"https://images.menelgame.online/items/ak47_20260914_v1.png"};
+  const icon=String(item?.[2]||specialIcons[normalized]||"").trim();
   return icon?`<img src="${escapeHtml(icon)}" alt="" loading="lazy">`:`<span aria-hidden="true">🎁</span>`;
 }
 
@@ -7778,9 +7779,9 @@ function specialOpsRenderPreferencesGlobal(payload){
   box.innerHTML=visible.map(item=>{
     const enabled=specialOpsPreferenceEnabledGlobal(payload,me,item.itemKey),cycle=specialOpsCurrentCycleGlobal(payload,item.itemKey);
     const received=item.kind==="single"&&(payload.receipts||[]).some(row=>row.itemKey===item.itemKey&&row.nickKey===me&&Number(row.cycleNo)===cycle);
-    return `<article class="special-ops-pref-card${enabled?"":" disabled"}"><div class="special-ops-item-icon">${specialOpsItemIconGlobal(item.itemName)}</div><div class="special-ops-pref-copy"><strong>${escapeHtml(item.itemName)}</strong><small>${item.kind==="single"?`Pojedynczy · cykl ${cycle}`:"Wielosztukowy · każda sztuka osobno"}${received?" · ✅ już otrzymany w tym cyklu":""}</small></div><label class="special-ops-switch"><input type="checkbox" data-special-pref="${escapeHtml(item.itemKey)}" ${enabled?"checked":""}><span aria-hidden="true"></span><b>${enabled?"Chcę":"Nie chcę"}</b></label></article>`;
+    return `<article class="special-ops-pref-card${enabled?"":" disabled"}"><div class="special-ops-item-icon">${specialOpsItemIconGlobal(item.itemName)}</div><div class="special-ops-pref-copy"><strong>${escapeHtml(item.itemName)}</strong><small>${item.kind==="single"?`Pojedynczy · cykl ${cycle}`:"Wielosztukowy · każda sztuka osobno"}${received?" · ✅ już otrzymany w tym cyklu":""}</small></div><button type="button" class="special-ops-switch${enabled?" active":""}" role="switch" aria-checked="${enabled?"true":"false"}" data-special-pref="${escapeHtml(item.itemKey)}" data-special-enabled="${enabled?"1":"0"}"><span aria-hidden="true"></span><b>${enabled?"Chcę":"Nie chcę"}</b></button></article>`;
   }).join("")||'<div class="empty">Nie znaleziono przedmiotów dla wybranego filtra.</div>';
-  box.querySelectorAll("[data-special-pref]").forEach(input=>input.addEventListener("change",()=>specialOpsSavePreferenceGlobal(input.dataset.specialPref,input.checked,me,input)));
+  box.querySelectorAll("[data-special-pref]").forEach(button=>button.addEventListener("click",()=>specialOpsSavePreferenceGlobal(button.dataset.specialPref,button.dataset.specialEnabled!=="1",me,button)));
 }
 
 function specialOpsRenderStashGlobal(payload){
@@ -7833,9 +7834,10 @@ async function loadSpecialOperationsGlobal(options={}){
 }
 
 async function specialOpsSavePreferenceGlobal(itemKey,enabled,nickKey,input){
-  if(input)input.disabled=true;const status=el("special-ops-admin-status");
-  try{await cloudflareApi("/gang/special-operations/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{itemKey,enabled,nickKey,requestId:makeRecipeNonce()}});specialOpsCacheGlobal=null;if(status)status.textContent="✅ Preferencja została zapisana.";await loadSpecialOperationsGlobal({force:true});}
-  catch(err){if(input){input.checked=!enabled;input.disabled=false;}if(status)status.textContent="❌ "+(err?.message||"Nie udało się zapisać preferencji.");}
+  if(input)input.disabled=true;const status=el("special-ops-preference-status"),adminStatus=el("special-ops-admin-status");
+  if(status)status.textContent="⏳ Zapisuję preferencję…";
+  try{await cloudflareApi("/gang/special-operations/preference",{method:"POST",token:await cloudflareEnsureSession(),body:{itemKey,enabled:Boolean(enabled),nickKey,requestId:makeRecipeNonce()}});specialOpsCacheGlobal=null;if(status)status.textContent=enabled?"✅ Bierzesz udział w losowaniu tego przedmiotu.":"✅ Nie bierzesz udziału w losowaniu tego przedmiotu.";if(adminStatus)adminStatus.textContent="✅ Preferencja została zapisana.";await loadSpecialOperationsGlobal({force:true});}
+  catch(err){if(input)input.disabled=false;const message="❌ "+(err?.message||"Nie udało się zapisać preferencji.");if(status)status.textContent=message;if(adminStatus)adminStatus.textContent=message;}
 }
 
 async function specialOpsImportGlobal(kind){
