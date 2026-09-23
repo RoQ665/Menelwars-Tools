@@ -2551,6 +2551,38 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
 .admin-company-instruction.waiver-change { background:rgba(184,70,58,.13); }
 .admin-company-instruction.waiver-change span { color:#8f3029; }
 
+.company-admin-waiver-btn {
+  margin-top:7px;
+  min-height:34px;
+  padding:6px 10px;
+  border:1px solid #76975f;
+  border-radius:8px;
+  background:#edf7e8;
+  color:#315c29;
+  font-weight:700;
+  cursor:pointer;
+}
+.company-admin-waiver-btn.is-waived {
+  border-color:#c5a26b;
+  background:#fff7e8;
+  color:#725126;
+}
+.company-admin-waiver-btn:disabled { opacity:.65; cursor:wait; }
+.company-admin-waiver-help {
+  display:grid;
+  gap:2px;
+  margin:8px 0 4px;
+  padding:8px 10px;
+  border:1px solid #a9c698;
+  border-radius:8px;
+  background:#f1f8ed;
+}
+.company-admin-waiver-help span { color:#52654a; font-size:12px; }
+
+@media (max-width:600px) {
+  .company-admin-waiver-btn { width:100%; }
+}
+
 .debt-declaration-button {
   margin-top:6px;
   padding:5px 9px;

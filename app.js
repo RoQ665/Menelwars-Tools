@@ -5961,6 +5961,7 @@ const ADMIN_CRITICAL_ACTIONS = {
   adminClearAllReservations:"🧹 Czyszczę rezerwacje…",
   adminGenerateSalaryClaimCode:"🔑 Generuję kod aktywacyjny…",
   adminSetCompanyIncome:"💰 Aktualizuję dochód Spółki…",
+  adminSetPlayerSalaryWaiver:"💚 Aktualizuję zrzeczenie pensji…",
   adminActivateCompanySalaryPlan:"💰 Aktywuję plan pensji…",
   adminRenamePlayer:"✏️ Zmieniam nick gracza…",
   adminRevokePlayerIdentity:"🚫 Unieważniam tożsamość gracza…"
@@ -6006,6 +6007,7 @@ async function adminPostAction(action, data={}) {
       adminSetPaymentsDailyMinimum:["/admin/payments/daily-minimum",{amount:Number(data.amount)}],
       adminSetAiDumpDailyMinimum:["/admin/ai-dump/daily-minimum",{amount:Number(data.amount)}],
       adminSetCompanyMinimumContribution:["/admin/company/minimum-contribution",{amount:Number(data.amount)}],
+      adminSetPlayerSalaryWaiver:["/admin/company/salary-waiver",{nick:String(data.nick||""),waived:Boolean(data.waived)}],
       adminActivateCompanySalaryPlan:["/admin/company/activate-plan",{}]
     };
     const accessRoutes={
@@ -8862,6 +8864,7 @@ function renderAdminCompanyPlan(
       income
     );
   const companyMinimum = Number(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION);
+  const canManageSalaryWaivers=Boolean(cachedAccountStatus?.admin&&Number(cachedAccountStatus.adminTier)>=2);
 
   // Osoby, które były w ostatnim potwierdzonym planie, ale dziś
   // nie osiągają progu, znikają z listy pensji. Wymagają osobnej akcji w grze.
@@ -8976,6 +8979,14 @@ function renderAdminCompanyPlan(
           ${requestedWaiver
             ? `<div class="muted">Pełna należna: ${companyMoney(player.fullGameSalary)} zł · do Funduszu: ${companyMoney(player.waivedAmount)} zł</div>`
             : ""}
+          ${canManageSalaryWaivers ? `
+            <button
+              type="button"
+              class="company-admin-waiver-btn ${requestedWaiver ? "is-waived" : ""}"
+              data-company-waiver-nick="${escapeHtml(player.nick)}"
+              data-company-waiver-next="${requestedWaiver ? "0" : "1"}">
+              ${requestedWaiver ? "↩️ Przywróć pełną pensję" : "💚 Ustaw zrzeczenie pensji"}
+            </button>` : ""}
         </div>
         ${instruction}
       </div>`;
@@ -9113,6 +9124,13 @@ function renderAdminCompanyPlan(
       </span>
     </div>
 
+    ${canManageSalaryWaivers ? `
+      <div class="company-admin-waiver-help">
+        <strong>🛠 Administrator T2</strong>
+        <span>Możesz ustawić lub wycofać zrzeczenie w imieniu gracza, który Cię o to poprosił. Zmiana trafi do proponowanego planu pensji.</span>
+      </div>
+      <div id="admin-company-waiver-manager-status" class="submit-status"></div>` : ""}
+
     ${dismissRows.length ? `
       <div class="admin-company-salary-section dismiss-section">
         <div class="admin-company-salary-section-head">
@@ -9133,6 +9151,36 @@ function renderAdminCompanyPlan(
 
     ${rowsHtml}
   `;
+
+  if(canManageSalaryWaivers){
+    result.querySelectorAll("[data-company-waiver-nick]").forEach(button=>{
+      button.addEventListener("click",async()=>{
+        const nick=String(button.dataset.companyWaiverNick||"").trim();
+        const waived=button.dataset.companyWaiverNext==="1";
+        const status=el("admin-company-waiver-manager-status");
+        if(!nick)return;
+        const question=waived
+          ? `Ustawić zrzeczenie pensji graczowi ${nick}?\n\nZrób to tylko na jego prośbę.`
+          : `Przywrócić pełną pensję graczowi ${nick}?`;
+        if(!window.confirm(question))return;
+        setActionLoading(button,status,waived?`Ustawiam zrzeczenie dla ${nick}...`:`Przywracam pensję dla ${nick}...`);
+        try{
+          await adminPostAction("adminSetPlayerSalaryWaiver",{nick,waived});
+          if(status)status.textContent=waived
+            ? `✅ ${nick}: zapisano zrzeczenie pensji w proponowanym planie.`
+            : `✅ ${nick}: przywrócono pełną pensję w proponowanym planie.`;
+          await loadAdminPaymentsStatus();
+          await loadPayments({background:true,force:true});
+          await runtimeLoaderFinish("✅ Zrzeczenie pensji zaktualizowane");
+        }catch(err){
+          if(status)status.textContent=err?.message||"Nie udało się zmienić zrzeczenia pensji.";
+          await runtimeLoaderFinish("❌ Aktualizacja nieudana");
+        }finally{
+          clearActionLoading(button);
+        }
+      });
+    });
+  }
 
   const activeStatus=el("admin-company-active-plan-status");
 
