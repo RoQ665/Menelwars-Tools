@@ -7901,7 +7901,7 @@ function specialOpsRenderResultsGlobal(payload){
     if(row.action==="preference")return `<article><b>${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}</b><small>${specialOpsDateGlobal(row.createdAt)} · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}</small></article>`;
     if(row.action==="import_history"){
       const confirmed=Math.max(0,Number(row.details?.confirmed)||0),mismatches=Math.max(0,Number(row.details?.mismatches)||0),pending=Math.max(0,Number(row.details?.pending)||0),transferred=confirmed+mismatches;
-      return `<article><b>${escapeHtml(row.actor)} potwierdził Historię gry</b><small>${specialOpsDateGlobal(row.createdAt)} · przekazano ${transferred} szt.${mismatches?` · różnice: ${mismatches}`:""}${pending?` · pozostało: ${pending}`:" · seria rozliczona"}</small></article>`;
+      return `<article><b>${escapeHtml(row.actor)} zaimportował Historię przydziałów</b><small>${specialOpsDateGlobal(row.createdAt)} · usunięto ze schowka ${transferred} przekazanych szt.${mismatches?` · różnice: ${mismatches}`:""}${pending?` · pozostało w schowku: ${pending}`:" · schowek serii rozliczony"}</small></article>`;
     }
     return `<article><b>${escapeHtml(row.actor)} zamknął serię ręcznie</b><small>${specialOpsDateGlobal(row.createdAt)}${row.details?.reason?` · ${escapeHtml(row.details.reason)}`:""}</small></article>`;
   }).join("")}</details>`:"";
