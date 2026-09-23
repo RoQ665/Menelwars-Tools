@@ -7895,8 +7895,16 @@ function specialOpsRenderStashGlobal(payload){
 
 function specialOpsRenderResultsGlobal(payload){
   const box=el("special-ops-results"),batch=payload.batch;if(!box)return;
-  const auditRows=(payload.audit||[]).filter(row=>row.action==="manual_close"||(row.action==="preference"&&row.actorKey!==row.targetNickKey)).slice(0,20);
-  const auditHtml=auditRows.length?`<details class="special-ops-proof"><summary>📜 Historia zmian (${auditRows.length})</summary>${auditRows.map(row=>{const target=(payload.players||payload.contributions||[]).find(player=>player.nickKey===row.targetNickKey)?.nick||row.targetNickKey||"gracz";return `<article><b>${row.action==="preference"?`${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}`:`${escapeHtml(row.actor)} zamknął serię ręcznie`}</b><small>${specialOpsDateGlobal(row.createdAt)}${row.action==="preference"?` · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}`:""}</small></article>`;}).join("")}</details>`:"";
+  const auditRows=(payload.audit||[]).filter(row=>row.action==="manual_close"||row.action==="import_history"||(row.action==="preference"&&row.actorKey!==row.targetNickKey)).slice(0,20);
+  const auditHtml=auditRows.length?`<details class="special-ops-proof"><summary>📜 Historia zmian (${auditRows.length})</summary>${auditRows.map(row=>{
+    const target=(payload.players||payload.contributions||[]).find(player=>player.nickKey===row.targetNickKey)?.nick||row.targetNickKey||"gracz";
+    if(row.action==="preference")return `<article><b>${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}</b><small>${specialOpsDateGlobal(row.createdAt)} · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}</small></article>`;
+    if(row.action==="import_history"){
+      const confirmed=Math.max(0,Number(row.details?.confirmed)||0),mismatches=Math.max(0,Number(row.details?.mismatches)||0),pending=Math.max(0,Number(row.details?.pending)||0),transferred=confirmed+mismatches;
+      return `<article><b>${escapeHtml(row.actor)} potwierdził Historię gry</b><small>${specialOpsDateGlobal(row.createdAt)} · przekazano ${transferred} szt.${mismatches?` · różnice: ${mismatches}`:""}${pending?` · pozostało: ${pending}`:" · seria rozliczona"}</small></article>`;
+    }
+    return `<article><b>${escapeHtml(row.actor)} zamknął serię ręcznie</b><small>${specialOpsDateGlobal(row.createdAt)}${row.details?.reason?` · ${escapeHtml(row.details.reason)}`:""}</small></article>`;
+  }).join("")}</details>`:"";
   if(!batch||!Array.isArray(batch.draws)||!batch.draws.length){box.innerHTML='<div class="empty">Nie wykonano jeszcze żadnego losowania.</div>'+auditHtml;return;}
   const byItem=new Map(),byPlayer=new Map();
   for(const draw of batch.draws){
