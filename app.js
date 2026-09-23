@@ -7895,7 +7895,7 @@ function specialOpsRenderStashGlobal(payload){
 
 function specialOpsRenderResultsGlobal(payload){
   const box=el("special-ops-results"),batch=payload.batch;if(!box)return;
-  const auditRows=(payload.audit||[]).filter(row=>row.action==="manual_close"||row.action==="import_history"||(row.action==="preference"&&row.actorKey!==row.targetNickKey)).slice(0,20);
+  const auditRows=(payload.audit||[]).filter(row=>row.action==="manual_close"||(row.action==="import_history"&&Number(row.details?.units)>0)||(row.action==="preference"&&row.actorKey!==row.targetNickKey)).slice(0,20);
   const auditHtml=auditRows.length?`<details class="special-ops-proof"><summary>📜 Historia zmian (${auditRows.length})</summary>${auditRows.map(row=>{
     const target=(payload.players||payload.contributions||[]).find(player=>player.nickKey===row.targetNickKey)?.nick||row.targetNickKey||"gracz";
     if(row.action==="preference")return `<article><b>${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}</b><small>${specialOpsDateGlobal(row.createdAt)} · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}</small></article>`;
