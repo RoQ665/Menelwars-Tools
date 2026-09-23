@@ -16050,6 +16050,45 @@ function setupAdmin() {
       boss:true,
       description:"Boss potwierdzony w pięciu pełnych walkach: 998 ATK · 1354 DEF · 4863 HP. Statystyki PvP pochodzą bezpośrednio z logów gry; model obrażeń jest eksperymentalny."
     });
+
+    // Cinkciarz Wiesiek został potwierdzony w dwóch kolejnych pełnych walkach
+    // z 23.09.2026. W obu próbach miał identyczne statystyki; druga walka
+    // dostarczyła pełną sekwencję krwawienia od T2 aż do śmierci RoQ w T12.
+    out.push({
+      id:"boss-24-cinkciarz-wiesiek",
+      name:"Cinkciarz Wiesiek · Lvl 26 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:26,
+      attributes:{strength:46,endurance:44,agility:58,vitality:42,precision:54},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1314,combatDefense:1219,combatHp:5399,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:26,
+        // Kalibracja z obu logów: 717 ATK, 37,2% przebicia, 1219 DEF
+        // i 20,5% redukcji bossa odtwarza 186 obrażeń w pierwszej turze.
+        defenseK:351,
+        primary:{attack:1314,defense:1219,hp:5399},
+        stats:{
+          accuracy:126,initiative:19.2,firstStrike:20.5,
+          critChance:53.4,critDmg:64.6,execute:10.1,lifesteal:8.1,
+          armorPen:21.9,stun:21.6,bleed:42,bleedDamage:0,
+          evasion:31.3,doubleStrike:37,counter:24.4,
+          healingReduction:50,damageReduction:20.5,
+          critResist:17.6,stunResist:17.6,bleedResist:21,
+          hpRegen:6.3
+        }
+      },
+      boss:true,
+      description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 1314 ATK · 1219 DEF · 5399 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
