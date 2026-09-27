@@ -7815,14 +7815,17 @@ function specialOpsTransferStateGlobal(payload){
 }
 function specialOpsSaveTransferStateGlobal(batchId,state){try{localStorage.setItem(specialOpsTransferStorageKeyGlobal(batchId),JSON.stringify(state));}catch{}}
 function specialOpsTransferGroupsGlobal(payload){
-  const groups=new Map();
+  const groups=new Map(),itemOrder=new Map();
   for(const draw of payload?.batch?.draws||[]){
     if(draw.status!=="pending")continue;
+    const order=Number(draw.drawOrder)||999999;
+    if(!itemOrder.has(draw.itemKey))itemOrder.set(draw.itemKey,order);
+    else itemOrder.set(draw.itemKey,Math.min(itemOrder.get(draw.itemKey),order));
     const key=`${draw.itemKey}|${draw.winnerKey}`,existing=groups.get(key);
-    if(existing){existing.quantity++;existing.order=Math.min(existing.order,Number(draw.drawOrder)||999999);}
-    else groups.set(key,{key,itemKey:draw.itemKey,itemName:draw.itemName,winnerKey:draw.winnerKey,winner:draw.winner,quantity:1,order:Number(draw.drawOrder)||999999});
+    if(existing){existing.quantity++;existing.order=Math.min(existing.order,order);}
+    else groups.set(key,{key,itemKey:draw.itemKey,itemName:draw.itemName,winnerKey:draw.winnerKey,winner:draw.winner,quantity:1,order});
   }
-  return [...groups.values()].sort((a,b)=>a.order-b.order||a.itemName.localeCompare(b.itemName,"pl")||a.winner.localeCompare(b.winner,"pl"));
+  return [...groups.values()].sort((a,b)=>(itemOrder.get(a.itemKey)||999999)-(itemOrder.get(b.itemKey)||999999)||a.order-b.order||a.winner.localeCompare(b.winner,"pl"));
 }
 
 function specialOpsRenderTransferGlobal(payload){
