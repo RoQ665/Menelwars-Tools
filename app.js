@@ -7802,6 +7802,54 @@ let specialOpsCacheGlobal=null;
 let specialOpsLoadInFlightGlobal=null;
 let specialOpsFilterGlobal="all";
 let specialOpsPreferenceStatusTimerGlobal=null;
+let specialOpsTransferIndexGlobal=0;
+
+function specialOpsTransferStorageKeyGlobal(batchId){return `menelwars-special-transfer:${String(batchId||"")}`;}
+function specialOpsTransferStateGlobal(payload){
+  const batch=payload?.batch;if(!batch)return {checked:[],historyAt:0};
+  const historyAt=Number((payload.imports||[]).find(row=>row.kind==="history")?.createdAt)||0,key=specialOpsTransferStorageKeyGlobal(batch.id);
+  let state={checked:[],historyAt};
+  try{const parsed=JSON.parse(localStorage.getItem(key)||"null");if(parsed&&Array.isArray(parsed.checked))state={checked:parsed.checked.map(String),historyAt:Number(parsed.historyAt)||0};}catch{}
+  if(historyAt>state.historyAt){state={checked:[],historyAt};try{localStorage.setItem(key,JSON.stringify(state));}catch{}}
+  return state;
+}
+function specialOpsSaveTransferStateGlobal(batchId,state){try{localStorage.setItem(specialOpsTransferStorageKeyGlobal(batchId),JSON.stringify(state));}catch{}}
+function specialOpsTransferGroupsGlobal(payload){
+  const groups=new Map();
+  for(const draw of payload?.batch?.draws||[]){
+    if(draw.status!=="pending")continue;
+    const key=`${draw.itemKey}|${draw.winnerKey}`,existing=groups.get(key);
+    if(existing){existing.quantity++;existing.order=Math.min(existing.order,Number(draw.drawOrder)||999999);}
+    else groups.set(key,{key,itemKey:draw.itemKey,itemName:draw.itemName,winnerKey:draw.winnerKey,winner:draw.winner,quantity:1,order:Number(draw.drawOrder)||999999});
+  }
+  return [...groups.values()].sort((a,b)=>a.order-b.order||a.itemName.localeCompare(b.itemName,"pl")||a.winner.localeCompare(b.winner,"pl"));
+}
+
+function specialOpsRenderTransferGlobal(payload){
+  const box=el("special-ops-transfer"),batch=payload?.batch;if(!box)return;
+  const active=payload?.permissions?.admin&&batch&&(batch.status==="pending"||batch.status==="needs_attention");
+  if(!active){box.hidden=true;box.innerHTML="";return;}
+  const groups=specialOpsTransferGroupsGlobal(payload);if(!groups.length){box.hidden=true;box.innerHTML="";return;}
+  const state=specialOpsTransferStateGlobal(payload),checked=new Set(state.checked);
+  if(specialOpsTransferIndexGlobal>=groups.length)specialOpsTransferIndexGlobal=Math.max(0,groups.length-1);
+  const current=groups[specialOpsTransferIndexGlobal],isChecked=checked.has(current.key),done=groups.filter(row=>checked.has(row.key)).length;
+  const stashQuantity=Number((payload.stash||[]).find(row=>row.itemKey===current.itemKey)?.quantity)||0;
+  const markedSameItem=groups.filter(row=>row.itemKey===current.itemKey&&row.key!==current.key&&checked.has(row.key)).reduce((sum,row)=>sum+row.quantity,0);
+  const estimatedRemaining=Math.max(0,stashQuantity-markedSameItem),useAll=current.quantity>1&&current.quantity===estimatedRemaining;
+  const instruction=current.quantity===1
+    ?`Wybierz ${current.winner} i kliknij w grze „Przekaż”.`
+    :useAll?`Wybierz ${current.winner}, kliknij „Wszystkie” i przekaż cały pozostały stos.`:`Wybierz ${current.winner}, wpisz ${current.quantity} i przekaż wpisaną ilość.`;
+  box.hidden=false;
+  box.innerHTML=`<section class="special-ops-transfer-card"><header><b>Przekazywanie nagród</b><span>Przydział ${specialOpsTransferIndexGlobal+1} z ${groups.length}</span></header><div class="special-ops-transfer-recipient"><small>ODBIORCA</small><strong>${escapeHtml(current.winner)}</strong></div><div class="special-ops-transfer-item"><small>PRZEKAŻ</small><strong>${escapeHtml(current.itemName)} <b>×${current.quantity}</b></strong></div><p>${escapeHtml(instruction)}</p><div class="special-ops-transfer-progress"><b>${done} z ${groups.length} oznaczonych</b><span>${groups.length-done} pozostało · maks. ${groups.length} wpisów Historii</span></div><div class="special-ops-transfer-nav"><button type="button" data-special-transfer-prev ${specialOpsTransferIndexGlobal===0?"disabled":""}>← Poprzedni</button><button type="button" data-special-transfer-next ${specialOpsTransferIndexGlobal===groups.length-1?"disabled":""}>Następny →</button></div><button type="button" class="primary-btn special-ops-transfer-confirm" data-special-transfer-confirm>${isChecked?"Cofnij oznaczenie":"Przekazane — pokaż następny"}</button><small class="special-ops-transfer-note">To robocza checklista. Ostatecznie przekazania potwierdza import Historii gry.</small></section>`;
+  box.querySelector("[data-special-transfer-prev]")?.addEventListener("click",()=>{specialOpsTransferIndexGlobal=Math.max(0,specialOpsTransferIndexGlobal-1);specialOpsRenderTransferGlobal(payload);});
+  box.querySelector("[data-special-transfer-next]")?.addEventListener("click",()=>{specialOpsTransferIndexGlobal=Math.min(groups.length-1,specialOpsTransferIndexGlobal+1);specialOpsRenderTransferGlobal(payload);});
+  box.querySelector("[data-special-transfer-confirm]")?.addEventListener("click",()=>{
+    if(isChecked)checked.delete(current.key);else checked.add(current.key);
+    const nextState={checked:[...checked],historyAt:Number((payload.imports||[]).find(row=>row.kind==="history")?.createdAt)||state.historyAt||0};specialOpsSaveTransferStateGlobal(batch.id,nextState);
+    if(!isChecked){const next=groups.findIndex((row,index)=>index>specialOpsTransferIndexGlobal&&!checked.has(row.key));const wrapped=groups.findIndex(row=>!checked.has(row.key));specialOpsTransferIndexGlobal=next>=0?next:(wrapped>=0?wrapped:specialOpsTransferIndexGlobal);}
+    specialOpsRenderTransferGlobal(payload);
+  });
+}
 
 function specialOpsItemIconGlobal(name){
   const normalized=String(name||"").trim().toLocaleLowerCase("pl-PL");
@@ -7930,7 +7978,7 @@ function specialOpsRenderAdminGlobal(payload){
 }
 
 function specialOpsRenderGlobal(payload){
-  if(!payload)return;specialOpsRenderSummaryGlobal(payload);specialOpsRenderPreferencesGlobal(payload);specialOpsRenderStashGlobal(payload);specialOpsRenderResultsGlobal(payload);specialOpsRenderAdminGlobal(payload);
+  if(!payload)return;specialOpsRenderSummaryGlobal(payload);specialOpsRenderPreferencesGlobal(payload);specialOpsRenderStashGlobal(payload);specialOpsRenderTransferGlobal(payload);specialOpsRenderResultsGlobal(payload);specialOpsRenderAdminGlobal(payload);
 }
 
 async function loadSpecialOperationsGlobal(options={}){
