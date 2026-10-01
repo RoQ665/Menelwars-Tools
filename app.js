@@ -12751,8 +12751,9 @@ function setupAdmin() {
     }
 
     privateButton.hidden = !accountNick;
-    guestRow.hidden = Boolean(accountNick);
+    guestRow.hidden = true;
     publicButton.classList.toggle("build-full-action",!accountNick);
+    publicButton.disabled = !accountNick;
 
     if (accountNick) {
       hint.className = "submit-info known-recipe";
@@ -12761,7 +12762,7 @@ function setupAdmin() {
     } else {
       hint.className = "submit-info unknown-recipe";
       hint.innerHTML =
-        `🌍 Kreator działa bez konta. Bez logowania możesz udostępnić build publicznie. Prywatny zapis jest dostępny po zalogowaniu.`;
+        `🌍 Kreator i symulator działają bez konta. Zaloguj się, aby zapisać lub udostępnić build.`;
     }
   }
 
@@ -12900,7 +12901,10 @@ function setupAdmin() {
     const status = el("build-save-status");
     const name = el("build-name")?.value.trim() || "";
     const accountNick = cachedAccountNick();
-    const guestAuthor = el("build-guest-author")?.value.trim() || "";
+    if (!accountNick) {
+      status.textContent = "Zaloguj się, aby zapisać lub udostępnić build.";
+      return false;
+    }
 
     if (!name) {
       status.textContent = "Podaj nazwę buildu.";
@@ -12909,11 +12913,6 @@ function setupAdmin() {
 
     if (!isPublic && !accountNick) {
       status.textContent = "Prywatny build wymaga zalogowanego konta.";
-      return false;
-    }
-
-    if (isPublic && !accountNick && !guestAuthor) {
-      status.textContent = "Podaj nick autora przed udostępnieniem buildu.";
       return false;
     }
 
@@ -15412,6 +15411,11 @@ function setupAdmin() {
     const button = el("garden-start");
     const status = el("garden-action-status");
     if (!button || button.disabled) return;
+
+    if (!cachedAccountNick()) {
+      if (status) status.textContent = "🔒 Zaloguj się, aby zapisać uprawę. Kalkulator możesz przeglądać bez konta.";
+      return;
+    }
 
     const nick = await gardenResolveNick();
     if (!nick) return;
