@@ -10473,7 +10473,7 @@ function setupAdmin() {
       description:"Atak, przebicie pancerza, obrażenia krytyczne, krwawienie",
       perks:[
         [["Brutalny Buc","+3% przebicia pancerza"],["Ciężka Łapa","+8% ataku"]],
-        [["Kat Żulików","+2% progu egzekucji"],["Wściekły Pijak","+5% ataku gdy HP<30%"]],
+        [["Kat Zaułków","+2% progu egzekucji"],["Wściekły Pijak","+5% ataku gdy HP<30%"]],
         [["Łamacz Kości","+10% obrażeń krytycznych"],["Niszczyciel","+5% przebicia pancerza"]],
         [["Krwiopijca","+2% kradzieży życia"],["Nabrany Rozpęd","+2% ataku za turę"]],
         [["Szał Bitewny","+12% ataku"],["Roztrzaskiwacz","+7% przebicia pancerza"]],
@@ -10489,16 +10489,16 @@ function setupAdmin() {
       icon:"🛡️",
       description:"Obrona, redukcja obrażeń, odporności",
       perks:[
-        [["Skóra jak Beton","+8% obrony"],["Gruba Skóra","-5% otrzymywanych obrażeń"]],
+        [["Skóra jak Beton","+6,8% obrony"],["Gruba Skóra","-3,75% otrzymywanych obrażeń"]],
         [["Trudny do Zbicia","+6% odporności na trafienia krytyczne"],["Łeb jak Mur","+8% odporności na ogłuszenie"]],
-        [["Ostatni Bastion","-8% otrzymywanych obrażeń gdy HP<30%"],["Nie do Złamania","-6% otrzymywanych obrażeń"]],
-        [["Żywa Barykada","+10% obrony"],["Jak Skała","+2% regeneracji HP"]],
-        [["Tarcza Menela","+8% odporności na trafienia krytyczne"],["Nieporuszony","-8% otrzymywanych obrażeń"]],
-        [["Strażnik Ulicy","+12% obrony"],["Kuloodporny","+10% odporności na ogłuszenie i krwawienie"]],
-        [["Forteca","-10% otrzymywanych obrażeń gdy HP<40%"],["Mur nie do Przebicia","+12% obrony"]],
-        [["Pancerna Skóra","-10% otrzymywanych obrażeń"],["Niezłomny Kozak","+10% odporności na trafienia krytyczne"]],
-        [["Nieśmiertelna Skorupa","+14% obrony, +3% regeneracji HP"],["Wieczna Straż","-12% otrzymywanych obrażeń gdy HP<50%"]],
-        [["Niezwyciężony","+10% obrony, -5% otrzymywanych obrażeń"],["Boska Tarcza","+12% wszystkich odporności"]]
+        [["Ostatni Bastion","-6% otrzymywanych obrażeń gdy HP<30%"],["Nie do Złamania","-4,5% otrzymywanych obrażeń"]],
+        [["Żywa Barykada","+8,5% obrony"],["Jak Skała","+2 regeneracji HP"]],
+        [["Tarcza Menela","+8% odporności na trafienia krytyczne"],["Nieporuszony","-6% otrzymywanych obrażeń"]],
+        [["Strażnik Ulicy","+10,2% obrony"],["Kuloodporny","+10% odporności na ogłuszenie i krwawienie"]],
+        [["Forteca","-7,5% otrzymywanych obrażeń gdy HP<40%"],["Mur nie do Przebicia","+10,2% obrony"]],
+        [["Pancerna Skóra","-7,5% otrzymywanych obrażeń"],["Niezłomny Kozak","+10% odporności na trafienia krytyczne"]],
+        [["Nieśmiertelna Skorupa","+11,9% obrony, +4 regeneracji HP"],["Wieczna Straż","-9% otrzymywanych obrażeń gdy HP<50%"]],
+        [["Niezwyciężony","+8,5% obrony, -3,75% otrzymywanych obrażeń"],["Boska Tarcza","+12% wszystkich odporności"]]
       ]
     },
     agility: {
@@ -10515,7 +10515,7 @@ function setupAdmin() {
         [["Miraż","+4% uniku, +5% kontrataku"],["Mistrz Riposty","+5% kontrataku, +3% podwójnego uderzenia"]],
         [["Nie do Złapania","+6% szansy na unik"],["Mistrzowskie Cięcie","+4% podwójnego uderzenia, +3% szansy na krytyka"]],
         [["Transcendencja","+6% uniku, +5% kontrataku"],["Zakrzywienie Czasu","+5% podwójnego uderzenia, +3% kontrataku"]],
-        [["Boska Szybkość","+7% uniku, +6% kontrataku"],["Wszechuderzenie","+6% podwójnego uderzenia, +4% kontrataku, +5% szansy na krytyka"]]
+        [["Boska Szybkość","+7% uniku, +6% kontrataku"],["Wszechuderzenie","+6% podwójnego uderzenia, +4% kontrataku, +3% szansy na krytyka"]]
       ]
     },
     vitality: {
@@ -10526,12 +10526,12 @@ function setupAdmin() {
         [["Żyłka Życia","+3% maksymalnego HP"],["Regenerator","+1 regeneracji HP za turę"]],
         [["Gęsta Krew","+12% odporności na krwawienie"],["Drugi Oddech","+2 regeneracji HP gdy HP<35%"]],
         [["Wiecznie Żywy","+3% maksymalnego HP"],["Wyssany Sok","+1% kradzieży życia"]],
-        [["Siła Życia","+4% maksymalnego HP"],["Szybka Regeneracja","+2 regeneracji HP za turę"]],
+        [["Siła Życia","+4% maksymalnego HP"],["Szybka Regeneracja","+2% maksymalnego HP/turę"]],
         [["Twarde Ciało","+4% maksymalnego HP, +5% odporności na krwawienie"],["Syfon","+2% kradzieży życia"]],
         [["Krew Tytana","+6% maksymalnego HP"],["Pijawka","+2% kradzieży życia"]],
         [["Feniks","+5 regeneracji HP gdy HP<40%"],["Pakt Krwi","+3% kradzieży życia, +3% maksymalnego HP"]],
         [["Nieśmiertelny Wigor","+14% maksymalnego HP"],["Wysysacz Dusz","+6% kradzieży życia"]],
-        [["Wieczny Płomień","+18% maksymalnego HP, +4 regeneracji HP"],["Drenaż Esencji","+6% kradzieży życia, +10% maksymalnego HP"]],
+        [["Wieczny Płomień","+18% maksymalnego HP, +3% maksymalnego HP/turę"],["Drenaż Esencji","+6% kradzieży życia, +10% maksymalnego HP"]],
         [["Nieumarły","+22% maksymalnego HP, +6 regeneracji HP gdy HP<50%"],["Bóg Życia","+7% kradzieży życia, +14% maksymalnego HP, +8% odporności na krwawienie"]]
       ]
     },
@@ -10543,13 +10543,13 @@ function setupAdmin() {
         [["Bystre Oko","+2% szansy na trafienie krytyczne"],["Pewna Ręka","+2% celności, +3% obrażeń krytycznych"]],
         [["Wampiryzm","+1% kradzieży życia"],["Naznaczony Śmiercią","+1% progu egzekucji"]],
         [["Śmiertelny Cios","+3% szansy na trafienie krytyczne"],["Krwotok","+5% obrażeń krytycznych"]],
-        [["Snajper","+3% szansy na krytyka, +2% celności"],["Rozpruwacz","+7% obrażeń krytycznych"]],
+        [["Snajper","+3% szansy na krytyka, +2% celności"],["Rozpruwacz","+2% ataku"]],
         [["Drapieżnik","+1% progu egzekucji, +2% szansy na krytyka"],["Słaby Punkt","+2% kradzieży życia, +6% obrażeń krytycznych"]],
-        [["Znak Łowcy","+1% progu egzekucji"],["Skrytobójstwo","+6% szansy na trafienie krytyczne"]],
-        [["Perfekcyjny Cel","+7% szansy na krytyka, +3% celności"],["Mistrz Krwawienia","+12% obrażeń krytycznych; krytyki automatycznie nakładają krwawienie"]],
-        [["Oko Kata","+2% progu egzekucji, +6% szansy na krytyka"],["Szkarłatne Ostrze","+4% kradzieży życia, +15% obrażeń krytycznych"]],
+        [["Znak Łowcy","+2,5% ataku"],["Skrytobójstwo","+6% szansy na trafienie krytyczne"]],
+        [["Perfekcyjny Cel","+7% szansy na krytyka, +3% celności"],["Mistrz Krwawienia","+12% obrażeń krytycznych; krytyki mogą nałożyć krwawienie, redukowane odpornością"]],
+        [["Oko Kata","+2% progu egzekucji, +6% szansy na krytyka"],["Szkarłatne Ostrze","+15% obrażeń krytycznych, +2,5% ataku"]],
         [["Oko Śmierci","+10% szansy na krytyka, +3% progu egzekucji"],["Wykrwawienie","+4% kradzieży życia, +18% obrażeń krytycznych"]],
-        [["Jeden Strzał","+12% szansy na krytyka, +3% progu egzekucji, +25% obrażeń krytycznych"],["Bóg Krwi","+5% kradzieży życia, +25% obrażeń krytycznych, +7% szansy na krytyka"]]
+        [["Jeden Strzał","+12% szansy na krytyka, +3% progu egzekucji, +25% obrażeń krytycznych"],["Bóg Krwi","+25% obrażeń krytycznych, +7% szansy na krytyka, +3% ataku"]]
       ]
     }
   };
@@ -10582,6 +10582,8 @@ function setupAdmin() {
     critResist:["Odporność na kryt","%"],
     stunResist:["Odporność na ogłuszenie","%"],
     bleedResist:["Odporność na krwawienie","%"],
+    critBonusReduction:["Osłabienie obrażeń kryt.","%"],
+    critResistBypass:["Przebicie odporności na kryt","%"],
     hpRegen:["Regeneracja HP / turę",""]
   };
 
@@ -10601,7 +10603,7 @@ function setupAdmin() {
     critResist:50,
     stunResist:60,
     bleedResist:60,
-    hpRegen:20
+    hpRegen:1000000
   };
 
   // Oficjalny frontend MenelWars pobiera `statCaps` z PvP Summary i używa
@@ -10706,6 +10708,8 @@ function setupAdmin() {
       critResist:0,
       stunResist:0,
       bleedResist:0,
+      critBonusReduction:0,
+      critResistBypass:0,
       hpRegen:0,
       hpRegenPct:0,
       levelHp:0
@@ -10778,10 +10782,11 @@ function setupAdmin() {
         return;
       }
 
-      if (partLower.includes("krytyki mogą nałożyć krwawienie") || partLower.includes("krytyki automatycznie nakładają krwawienie")) {
-        // Mistrz Krwawienia: krytyk AUTOMATYCZNIE nakłada bleed.
-        // Source mapa bitwy pokazuje osobny boolean `appliesBleed`, a użytkownik
-        // potwierdził semantykę mechaniki. Nie traktujemy tego jako szansy.
+      if (partLower.includes("krytyki mogą nałożyć krwawienie")) {
+        // W v6 odporność nadal redukuje próbę z krytyka. To nie jest już
+        // bezwarunkowe, automatyczne nałożenie statusu.
+        extras.special.push("Krytyki mogą nałożyć krwawienie (po odporności)");
+      } else if (partLower.includes("krytyki automatycznie nakładają krwawienie")) {
         stats.appliesBleed = 1;
         extras.special.push("Krytyk automatycznie nakłada krwawienie");
       } else if (partLower.includes("gdy hp<")) {
@@ -10872,6 +10877,10 @@ function setupAdmin() {
       buildEffectNumber(
         calcText,
         /([+-]?\d+(?:[.,]\d+)?)%\s*regeneracji hp/i
+      ) ||
+      buildEffectNumber(
+        calcText,
+        /([+-]?\d+(?:[.,]\d+)?)%\s*maks(?:ymalnego|\.)?\s*hp\s*\/\s*turę/i
       );
     if (regenPct) {
       stats.hpRegenPct += regenPct;
@@ -10930,6 +10939,9 @@ function setupAdmin() {
     "szansa krwawienia":{key:"bleed",label:"Szansa krwawienia",unit:"pct"},
     "szansa na krwawienie":{key:"bleed",label:"Szansa krwawienia",unit:"pct"},
     "obrazenia krwawienia":{key:"bleedDamage",label:"Obrażenia krwawienia",unit:"pct"},
+    "oslabienie obrazen kryt":{key:"critBonusReduction",label:"Osłabienie obrażeń kryt.",unit:"pct"},
+    "oslabienie obrazen krytycznych":{key:"critBonusReduction",label:"Osłabienie obrażeń kryt.",unit:"pct"},
+    "przebicie odpornosci na kryt":{key:"critResistBypass",label:"Przebicie odporności na kryt",unit:"pct"},
     "redukcja leczenia wroga":{key:"healingReduction",label:"Redukcja leczenia wroga",unit:"pct"},
     "podwojne uderzenie":{key:"doubleStrike",label:"Podwójne uderzenie",unit:"pct"},
     "kontratak":{key:"counter",label:"Kontratak",unit:"pct"},
@@ -11706,6 +11718,7 @@ function setupAdmin() {
       combatAttack:cleanPositive(profile.combatAttack,0),
       combatDefense:cleanPositive(profile.combatDefense,0),
       combatHp:cleanPositive(profile.combatHp,0),
+      breakthroughs:buildNormalizeBreakthroughs(profile.breakthroughs),
       provided:{
         attack:has("attack") && validPositive("attack"),
         defense:has("defense") && validPositive("defense"),
@@ -11755,8 +11768,8 @@ function setupAdmin() {
     stats.attackFlat = profile.attack + STR * 0.5 + AGI * 0.5 + PRC * 0.4;
     stats.attackPct = STR * 0.45;
 
-    stats.defenseFlat = profile.defense + END * 1.65;
-    stats.defensePct = END * 0.65;
+    stats.defenseFlat = profile.defense + END * 1.4025;
+    stats.defensePct = END * 0.5525;
 
     stats.levelHp =
       characterLevel * 5;
@@ -11767,7 +11780,7 @@ function setupAdmin() {
       profile.petHp +
       profile.eqHp +
       VIT * 1.5;
-    stats.maxHpPct = VIT * 1.1;
+    stats.maxHpPct = VIT * 0.95;
 
     stats.accuracy = 85 + PRC * 0.5;
     stats.initiative = 3 + PRC * 0.3;
@@ -11788,10 +11801,12 @@ function setupAdmin() {
     stats.counter = AGI * 0.3;
     stats.healingReduction = AGI * 0.8;
 
-    stats.damageReduction = END * 0.18 + VIT * 0.3;
+    stats.damageReduction = END * 0.135 + VIT * 0.15;
     stats.critResist = END * 0.4;
     stats.stunResist = END * 0.4;
     stats.bleedResist = VIT * 0.5;
+    stats.critBonusReduction = VIT * 0.2;
+    stats.critResistBypass = PRC * 0.2;
 
     stats.hpRegen = VIT * 0.15;
 
@@ -11841,6 +11856,21 @@ function setupAdmin() {
     const rawStats = {};
     const capInfo = {};
     const effectiveStatCaps = buildStatCapsForSource(source || {});
+    // Silnik v6 rozszerza limity dopiero na końcu odpowiednich drzewek.
+    // Między 40 a 50 pkt wzrost jest liniowy.
+    const suppliedCaps = buildNormalizeDynamicStatCaps(
+      source && source.statCaps && typeof source.statCaps === "object"
+        ? source.statCaps
+        : (source?.profile?.statCaps || {})
+    );
+    if (!Object.prototype.hasOwnProperty.call(suppliedCaps,"critChance")) effectiveStatCaps.critChance = 65 + Math.max(0,Math.min(10,PRC - 40)) * 1.5;
+    if (!Object.prototype.hasOwnProperty.call(suppliedCaps,"doubleStrike")) effectiveStatCaps.doubleStrike = 40 + Math.max(0,Math.min(10,AGI - 40)) * 1.5;
+    if (!Object.prototype.hasOwnProperty.call(suppliedCaps,"evasion")) effectiveStatCaps.evasion = 55 + Math.max(0,Math.min(10,AGI - 40)) * 0.5;
+    if (!Object.prototype.hasOwnProperty.call(suppliedCaps,"hpRegen")) {
+      effectiveStatCaps.hpRegen = buildStatNumber(
+        maxHpForRegen * Math.min(3,VIT * 0.06) / 100
+      );
+    }
 
     Object.keys(stats).forEach(key => {
       const info = buildCapInfo(key,stats[key],effectiveStatCaps);
@@ -12013,7 +12043,7 @@ function setupAdmin() {
         finalLabel:"Atak po przeliczeniu",
         keys:[
           "attackFlat","attackPct","accuracy","initiative","firstStrike",
-          "critChance","critDmg","execute","lifesteal","armorPen","stun","bleed","bleedDamage"
+          "critChance","critDmg","execute","lifesteal","armorPen","stun","bleed","bleedDamage","critResistBypass"
         ]
       },
       {
@@ -12026,7 +12056,7 @@ function setupAdmin() {
         finalLabel:"Obrona po przeliczeniu",
         keys:[
           "defenseFlat","defensePct","damageReduction",
-          "critResist","stunResist","bleedResist"
+          "critResist","stunResist","bleedResist","critBonusReduction"
         ]
       },
       {
@@ -12402,6 +12432,7 @@ function setupAdmin() {
         combatAttack:0,
         combatDefense:0,
         combatHp:0,
+        breakthroughs:[{key:"",tier:0},{key:"",tier:0},{key:"",tier:0}],
         provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:false,combatDefense:false,combatHp:false},
         bonusesConfirmed:false
       },
@@ -12760,7 +12791,8 @@ function setupAdmin() {
         combatDefense:validPositiveInput("build-combat-defense"),
         combatHp:validPositiveInput("build-combat-hp")
       },
-      bonusesConfirmed:Boolean(buildState.profile && buildState.profile.bonusesConfirmed)
+      bonusesConfirmed:Boolean(buildState.profile && buildState.profile.bonusesConfirmed),
+      breakthroughs:buildReadBreakthroughInputs()
     };
 
     return buildState.profile;
@@ -12777,6 +12809,44 @@ function setupAdmin() {
     setValue("build-combat-attack","combatAttack",clean.combatAttack);
     setValue("build-combat-defense","combatDefense",clean.combatDefense);
     setValue("build-combat-hp","combatHp",clean.combatHp);
+    buildRenderBreakthroughInputs(clean.breakthroughs);
+  }
+
+  function buildReadBreakthroughInputs() {
+    return [0,1,2].map(index=>({
+      key:String(el(`build-breakthrough-${index}-key`)?.value||""),
+      tier:Number(el(`build-breakthrough-${index}-tier`)?.value)||0
+    })).map(row=>buildNormalizeBreakthroughs([row])[0]);
+  }
+
+  function buildRenderBreakthroughInputs(value) {
+    const host=el("build-breakthrough-slots");
+    if (!host) return;
+    const rows=buildNormalizeBreakthroughs(value);
+    const options=['<option value="">Brak programu</option>'].concat(
+      Object.entries(BUILD_BREAKTHROUGHS).map(([key,item])=>`<option value="${key}">${escapeHtml(item.name)}</option>`)
+    ).join("");
+    host.innerHTML=rows.map((row,index)=>`<div class="build-breakthrough-slot"><strong>Slot ${index+1}</strong><label><span>Program</span><select id="build-breakthrough-${index}-key">${options}</select></label><label><span>Tier</span><select id="build-breakthrough-${index}-tier">${[1,2,3,4,5].map(tier=>`<option value="${tier}">Tier ${["I","II","III","IV","V"][tier-1]}</option>`).join("")}</select></label></div>`).join("");
+    rows.forEach((row,index)=>{
+      const keyInput=el(`build-breakthrough-${index}-key`);
+      const tierInput=el(`build-breakthrough-${index}-tier`);
+      if (keyInput) keyInput.value=row.key;
+      if (tierInput) tierInput.value=String(row.tier||1);
+      if (tierInput) tierInput.disabled=!row.key;
+    });
+    const refresh=()=>{
+      const current=buildReadBreakthroughInputs();
+      if (!buildState.profile || typeof buildState.profile!=="object") buildState.profile=buildEmptyState().profile;
+      buildState.profile.breakthroughs=current;
+      rows.forEach((unused,index)=>{const tierInput=el(`build-breakthrough-${index}-tier`);if(tierInput) tierInput.disabled=!current[index].key;});
+      const active=current.filter(row=>row.key);
+      const status=el("build-breakthrough-status");
+      if (status) status.innerHTML=active.length
+        ? active.map(row=>{const item=BUILD_BREAKTHROUGHS[row.key];return `<b>${escapeHtml(item.name)} · Tier ${["I","II","III","IV","V"][row.tier-1]}</b> — ${escapeHtml(item.effect)} (${item.values[row.tier-1]}%)`;}).join("<br>")
+        : "Brak aktywnych Przełamań.";
+    };
+    host.querySelectorAll("select").forEach(input=>input.addEventListener("change",refresh));
+    refresh();
   }
 
 
@@ -15728,7 +15798,9 @@ function setupAdmin() {
   // Znane reguły są odtwarzane wprost, a brakujące elementy silnika
   // pozostają parametrami użytkownika. Nie jest to klon backendu gry.
   // ============================================================
-  const PVP_ESCALATION = [3,7,10,13,16,20,23,26,29,33,36,39,42,46,49];
+  // v6 zachowuje dotychczasowy mnożnik, a od T12 dokłada kumulacyjnie
+  // +20 p.p. na rundę (do dodatkowych +180 p.p. w T20).
+  const PVP_ESCALATION = [3,7,10,13,16,20,23,26,29,33,36,59,82,106,129,153,176,200,223,245];
   let pvpGeneratedPresetsCache = null;
 
   function buildSimulationReadiness(source) {
@@ -16250,6 +16322,35 @@ function setupAdmin() {
     {id:"pvp-boss-tajfun",name:"Tajfun",bonuses:{attack:20},label:"+20 ATK",bossOnly:true}
   ];
 
+  const BUILD_BREAKTHROUGHS = {
+    second_liver:{name:"Druga wątroba",values:[2,3,4,5,6],effect:"Awaryjne leczenie poniżej 40% HP"},
+    sure_thing:{name:"Pewniak",values:[10.8,15.1,19.4,23.8,28.1],effect:"Pierwszy zwykły cios jako osłabiony krytyk"},
+    echo:{name:"Echo uderzenia",values:[4.3,5.9,7.6,9.7,13],effect:"Silniejszy pierwszy krytyk"},
+    last_word:{name:"Ostatnie słowo",values:[0.68,0.83,1.05,1.35,1.8],effect:"Obrażenia z brakującego HP poniżej 25%"},
+    crowbar:{name:"Łom",values:[2.2,3.6,5,7,9.7],effect:"Dwa trafienia częściowo przebijają obronę"},
+    third_time:{name:"Trzeci raz",values:[10.8,16.2,21.6,27,32.4],effect:"Trzeci cios po podwójnym uderzeniu"},
+    clinch:{name:"Klincz",values:[6.9,10.4,14.7,19.9,25.9],effect:"Osłabienie po ogłuszeniu lub jego odparciu"},
+    scratch:{name:"Draśnięcie",values:[3.2,4.3,6.5,8.6,11.3],effect:"Część obrażeń po uniku wroga"},
+    sidestep:{name:"Zejście z linii",values:[2.2,3,4.3,5.6,7.3],effect:"Silniejszy cios po własnym uniku"},
+    thick_neck:{name:"Gruby kark",values:[7.6,13,18.4,23.8,30.2],effect:"Słabszy pierwszy krytyk wroga"},
+    tooth_for_tooth:{name:"Ząb za ząb",values:[28.1,45.4,67,91.8,118.8],effect:"Silniejszy pierwszy kontratak"},
+    hard_head:{name:"Twardy łeb",values:[3.2,5.4,7.6,10.8,14],effect:"Osłabienie pierwszego ciężkiego trafienia"},
+    leech:{name:"Pijawka",values:[17.3,30.2,43.2,60.5,77.8],effect:"Jedno silniejsze leczenie LS przy niskim HP"},
+    salt:{name:"Sól w ranę",values:[21.6,29.7,37.8,45.9,54],effect:"Osłabia trzy leczenia przeciwnika"},
+    clotting:{name:"Krzepnięcie",values:[5.2,7.8,11.6,16.2,22.7],effect:"Słabsze pierwsze krwawienie"},
+    concrete:{name:"Beton",values:[6.4,10.8,14,18.4,23.8],effect:"Odwet po odparciu ogłuszenia"}
+  };
+
+  function buildNormalizeBreakthroughs(value) {
+    const rows=Array.isArray(value)?value:[];
+    return [0,1,2].map(index=>{
+      const row=rows[index]&&typeof rows[index]==="object"?rows[index]:{};
+      const key=Object.prototype.hasOwnProperty.call(BUILD_BREAKTHROUGHS,String(row.key||""))?String(row.key):"";
+      const tier=key?Math.max(1,Math.min(5,Math.floor(Number(row.tier)||1))):0;
+      return {key,tier};
+    });
+  }
+
   function pvpIsBossSource(item) {
     return Boolean(item && item.group==="preset" && item.source && item.source.boss===true);
   }
@@ -16303,6 +16404,16 @@ function setupAdmin() {
     if (regular.length) rows.push(`🍖 Aktywne efekty: ${regular.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · ")}`);
     if (pvpIsBossSource(rightItem)) rows.push(`🧪 Dopalacze bossowe: ${boss.length?boss.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · "):"brak"}`);
     return rows.length?`<div class="pvp-boss-consumables-result">${rows.join("<br>")}</div>`:"";
+  }
+
+  function pvpBreakthroughSummaryHtml(leftItem,rightItem) {
+    const side=item=>{
+      const rows=buildNormalizeBreakthroughs(item?.source?.profile?.breakthroughs).filter(row=>row.key);
+      return rows.length
+        ? rows.map(row=>`${escapeHtml(BUILD_BREAKTHROUGHS[row.key].name)} T${["I","II","III","IV","V"][row.tier-1]}`).join(" · ")
+        : "brak";
+    };
+    return `<div class="pvp-boss-consumables-result">⚡ <b>${escapeHtml(leftItem.label)}</b>: ${side(leftItem)}<br>⚡ <b>${escapeHtml(rightItem.label)}</b>: ${side(rightItem)}</div>`;
   }
 
   function pvpUpdateReadiness() {
@@ -16408,11 +16519,20 @@ function setupAdmin() {
           hp:buildStatNumber(exact.primary?.hp)
         }
       : buildFinalPrimaryStats(calculated);
+    const breakthroughs=buildNormalizeBreakthroughs(source?.profile?.breakthroughs);
+    const breakthroughMap={};
+    breakthroughs.forEach(row=>{
+      if (!row.key || !BUILD_BREAKTHROUGHS[row.key]) return;
+      breakthroughMap[row.key]=BUILD_BREAKTHROUGHS[row.key].values[row.tier-1];
+    });
     return {
       source,label,calculated,stats:calculated.stats,primary,
       combatLevel:exactLevel || Math.max(1,Number(calculated.characterLevel)||1),
       maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
-      bleeding:null,stunned:false,firstAttack:true,
+      bleeding:null,stunned:false,stunUsed:false,firstAttack:true,
+      breakthroughs:breakthroughMap,
+      breakthroughUsed:{},
+      saltCharges:Number.isFinite(breakthroughMap.salt)?3:0,
       procMeters:{crit:0,double:0,counter:0,stun:0,bleed:0,bleedTickResist:0,evasion:0},
       metrics:{
         damage:0,crit:0,double:0,counter:0,bleed:0,bleedProc:0,stun:0,execute:0,evade:0,miss:0,hit:0,hitAttempts:0,lifesteal:0,regen:0,
@@ -16427,11 +16547,27 @@ function setupAdmin() {
 
   function pvpHeal(fighter,amount,enemy,metricKey) {
     const reduction=pvpClamp(Number(enemy.stats.healingReduction)||0,0,100);
-    const heal=Math.max(0,Math.round(Number(amount||0)*(1-reduction/100)));
+    let requested=Number(amount||0);
+    if (metricKey==="lifesteal" && !fighter.breakthroughUsed.leech && Number.isFinite(fighter.breakthroughs.leech) && 100*fighter.hp/fighter.maxHp<40) {
+      requested*=1+fighter.breakthroughs.leech/100;
+      fighter.breakthroughUsed.leech=true;
+    }
+    let heal=Math.max(0,Math.round(requested*(1-reduction/100)));
+    if (heal>0 && enemy.saltCharges>0 && Number.isFinite(enemy.breakthroughs.salt)) {
+      heal=Math.max(0,Math.round(heal*(1-enemy.breakthroughs.salt/100)));
+      enemy.saltCharges--;
+    }
     const actual=Math.max(0,Math.min(heal,fighter.maxHp-fighter.hp));
     fighter.hp += actual;
     if (actual && metricKey) fighter.metrics[metricKey]+=actual;
     return actual;
+  }
+
+  function pvpTryEmergencyHeal(fighter,enemy) {
+    if (fighter.hp<=0 || fighter.breakthroughUsed.second_liver || !Number.isFinite(fighter.breakthroughs.second_liver)) return 0;
+    if (100*fighter.hp/fighter.maxHp>=40) return 0;
+    fighter.breakthroughUsed.second_liver=true;
+    return pvpHeal(fighter,fighter.maxHp*fighter.breakthroughs.second_liver/100,enemy,"regen");
   }
 
   function pvpDamageFormula(attacker,defender,round,params,isCrit,isFirst,options={}) {
@@ -16468,17 +16604,19 @@ function setupAdmin() {
       ? loggedDefenseK
       : 175+1.5*(defenderLevel-1);
     const defenseFactor=defenseK/(effectiveDefense+defenseK);
-    // Pełne logi walk z Panem Pawłem podają osobno evasionDR, ale końcowy
-    // damageTakenMult obu stron odpowiada wyłącznie właściwej Redukcji obrażeń
-    // (RoQ: 47 przy DR 53; boss: 79,8 przy DR 20,2). Unik rozstrzyga więc
-    // trafienie, lecz nie obniża ponownie obrażeń każdego udanego ciosu.
-    // Warunkowy DR low HP pozostaje osobnym, późniejszym efektem.
+    // v6 daje dodatkową redukcję równą unikowi / 3,5. Jest to osobna warstwa,
+    // a nie część limitowanej statystyki Redukcja obrażeń.
     const normalDamageReduction=pvpClamp(Number(defender.stats.damageReduction)||0,0,60);
-    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(14,round-1))]||0)/100;
+    const evasionDamageReduction=pvpClamp((Number(defender.stats.evasion)||0)/3.5,0,100);
+    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(19,round-1))]||0)/100;
     let damage=attack*defenseFactor*(1-normalDamageReduction/100);
+    damage*=1-evasionDamageReduction/100;
     damage*=1-condD.damageReduction/100;
     damage*=escalation;
-    if (isCrit) damage*=1+(Number(attacker.stats.critDmg)||0)/100;
+    if (isCrit) {
+      const critBonus=Math.max(0,(Number(attacker.stats.critDmg)||0)-(Number(defender.stats.critBonusReduction)||0));
+      damage*=1+critBonus/100;
+    }
     if (isFirst) damage*=1+(Number(attacker.stats.firstStrike)||0)/100;
     // Logi z kontrolowanych walk 361/418 ATK potwierdzają próg równy 15%
     // bieżącego ATK po momentum i bonusach low HP, ale przed eskalacją oraz
@@ -16496,7 +16634,7 @@ function setupAdmin() {
   function pvpNormalDamageByRound(leftSource,rightSource,params) {
     const left=pvpPrepareFighter(leftSource,"left");
     const right=pvpPrepareFighter(rightSource,"right");
-    return Array.from({length:15},(_,index)=>{
+    return Array.from({length:20},(_,index)=>{
       const round=index+1;
       const leftBaseDamage=pvpDamageFormula(left,right,round,params,false,false);
       const rightBaseDamage=pvpDamageFormula(right,left,round,params,false,false);
@@ -16531,7 +16669,7 @@ function setupAdmin() {
     // rozstrzygana wyłącznie przy nakładaniu statusu. Po udanym proc bleed
     // każdy kolejny tick wchodzi aż do końca walki bez ponownego testu.
     const source=victim.bleeding;
-    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(14,round-1))]||0)/100;
+    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(19,round-1))]||0)/100;
     const damage=Math.max(1,Math.round(victim.maxHp*0.02*(1+(Number(source.stats.bleedDamage)||0)/100)*escalation));
     victim.hp=Math.max(0,victim.hp-damage);
     source.metrics.damage+=damage;
@@ -16555,9 +16693,10 @@ function setupAdmin() {
     if (options.consumeFirst!==false) attacker.firstAttack=false;
 
     const finalHit=pvpClamp((Number(attacker.stats.accuracy)||0)-(Number(defender.stats.evasion)||0),5,99);
-    const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-(Number(defender.stats.critResist)||0));
+    const effectiveCritResist=Math.max(0,(Number(defender.stats.critResist)||0)-(Number(attacker.stats.critResistBypass)||0));
+    const critChance=Math.max(0,(Number(attacker.stats.critChance)||0)-effectiveCritResist);
     const bleedChance=Math.max(0,(Number(attacker.stats.bleed)||0)-(Number(defender.stats.bleedResist)||0));
-    const stunChance=Math.max(0,(Number(attacker.stats.stun)||0)-(Number(defender.stats.stunResist)||0));
+    const stunChance=(Number(attacker.stats.stun)||0)*(1-pvpClamp(Number(defender.stats.stunResist)||0,0,100)/100);
     attacker.metrics.hitAttempts++;
     const evadeChance=100-finalHit;
     if (pvpProc(defender,"evasion",evadeChance)) {
@@ -16576,7 +16715,7 @@ function setupAdmin() {
         attacker.metrics.bleedChanceSum+=pvpClamp(bleedChance,0,100);
         pvpFailProc(attacker,"bleed",bleedChance);
       }
-      pvpFailProc(attacker,"stun",stunChance);
+      if (options.allowStun!==false && !attacker.stunUsed) pvpFailProc(attacker,"stun",stunChance);
       if (allowCounter) {
         const counterChance=pvpClamp(Number(defender.stats.counter)||0,0,100);
         defender.metrics.counterOpportunities++;
@@ -16584,7 +16723,7 @@ function setupAdmin() {
         if (pvpProc(defender,"counter",counterChance)) {
           defender.metrics.counter++;
           defender.metrics.eventTurns.counter.push(round);
-          const counterResult=pvpStrike(defender,attacker,round,params,{allowExecute:false,allowCounter:false,consumeFirst:false,damageMultiplier:params.counterMult,isCounter:true});
+          const counterResult=pvpStrike(defender,attacker,round,params,{allowExecute:false,allowCounter:false,allowStun:false,consumeFirst:false,damageMultiplier:params.counterMult,isCounter:true});
           if (counterResult.killed) return {killed:true,cause:"counter"};
         }
       }
@@ -16626,6 +16765,7 @@ function setupAdmin() {
       attacker.metrics.normalHitCount++;
     }
 
+    pvpTryEmergencyHeal(defender,attacker);
     if (actual>0 && Number(attacker.stats.lifesteal)>0) {
       pvpHeal(attacker,actual*(Number(attacker.stats.lifesteal)||0)/100,defender,"lifesteal");
     }
@@ -16648,11 +16788,17 @@ function setupAdmin() {
         defender.bleeding=attacker;
       }
     }
-    attacker.metrics.stunOpportunities++;
-    attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
-    if (pvpProc(attacker,"stun",stunChance)) {
-      defender.stunned=true; attacker.metrics.stun++;
-      attacker.metrics.eventTurns.stun.push(round);
+    if (options.allowStun!==false && !attacker.stunUsed) {
+      if (options.allowStun!==false && !attacker.stunUsed) {
+        attacker.metrics.stunOpportunities++;
+        attacker.metrics.stunChanceSum+=pvpClamp(stunChance,0,100);
+      }
+      if (pvpProc(attacker,"stun",stunChance)) {
+        defender.stunned=true;
+        attacker.stunUsed=true;
+        attacker.metrics.stun++;
+        attacker.metrics.eventTurns.stun.push(round);
+      }
     }
     return {killed:false,cause:crit?"crit":"hit"};
   }
@@ -16661,19 +16807,12 @@ function setupAdmin() {
     const bleedTick=pvpApplyBleedTick(actor,round);
     if (bleedTick.killed) return {winner:enemy,cause:"bleed"};
 
-    // Z logów: po ticku krwawienia postać dostaje zwykłą regenerację,
-    // a dopiero potem wykonuje swoją część tury. Dodatek low HP oceniamy
-    // po zwykłej regeneracji, jako osobny efekt warunkowy.
-    pvpHeal(actor,Number(actor.stats.hpRegen)||0,enemy,"regen");
-    const regenCond=pvpConditionalEffects(actor.calculated,100*actor.hp/actor.maxHp);
-    pvpHeal(actor,regenCond.regenFlat,enemy,"regen");
-
     if (actor.stunned) {
       actor.stunned=false;
       // Ogłuszenie odbiera atak, nie regenerację przypisaną do tej tury.
       return null;
     }
-    const main=pvpStrike(actor,enemy,round,params,{allowExecute:true,allowCounter:true,consumeFirst:true});
+    const main=pvpStrike(actor,enemy,round,params,{allowExecute:true,allowCounter:true,allowStun:true,consumeFirst:true});
     if (enemy.hp<=0) return {winner:actor,cause:main.cause||"damage"};
     // Kontratak jest rozstrzygany wewnątrz pvpStrike(). Jeśli zabił aktywnego
     // gracza, nie wolno pozwolić mu wykonać double strike ani przejść do
@@ -16697,7 +16836,7 @@ function setupAdmin() {
     if (pvpProc(actor,"double",doubleChance)) {
       actor.metrics.double++;
       actor.metrics.eventTurns.double.push(round);
-      const second=pvpStrike(actor,enemy,round,params,{allowExecute:false,allowCounter:true,consumeFirst:false});
+      const second=pvpStrike(actor,enemy,round,params,{allowExecute:false,allowCounter:true,allowStun:false,consumeFirst:false});
       if (enemy.hp<=0) return {winner:actor,cause:second.cause||"double"};
       if (actor.hp<=0) return {winner:enemy,cause:second.cause||"counter"};
     }
@@ -16706,24 +16845,36 @@ function setupAdmin() {
 
   function pvpPickFirst(a,b,params) {
     const ia=Number(a.stats.initiative)||0, ib=Number(b.stats.initiative)||0;
-    if (Math.abs(ia-ib)<1e-9) return Math.random()<0.5 ? a : b;
-    return ia>ib ? a : b;
+    // Oficjalny przykład v6: remis = 50%, przewaga 5 pkt ≈ 73%.
+    const chanceA=1/(1+Math.exp(-0.1989*(ia-ib)));
+    return Math.random()<chanceA ? a : b;
+  }
+
+  function pvpApplyRoundRegen(fighter,enemy) {
+    if (fighter.hp<=0 || enemy.hp<=0) return 0;
+    const conditional=pvpConditionalEffects(fighter.calculated,100*fighter.hp/fighter.maxHp);
+    const requested=(Number(fighter.stats.hpRegen)||0)+(Number(conditional.regenFlat)||0);
+    const roundCap=Math.max(20,2*Math.max(1,Number(fighter.combatLevel)||1));
+    return pvpHeal(fighter,Math.min(requested,roundCap),enemy,"regen");
   }
 
   function pvpOneBattle(sourceA,sourceB,params,defenderSide="B") {
     const a=pvpPrepareFighter(sourceA,"A"), b=pvpPrepareFighter(sourceB,"B");
-    let cause="timeout_hp", rounds=15, winner=null;
+    let cause="timeout_hp", rounds=20, winner=null;
 
     // Inicjatywa wyznacza pierwszy ruch; przy idealnym remisie losujemy raz
     // na całą walkę.
     const first=pvpPickFirst(a,b,params);
     const second=first===a?b:a;
 
-    for (let round=1;round<=15;round++) {
+    for (let round=1;round<=20;round++) {
       const r1=pvpActivity(first,second,round,params);
       if (r1) { winner=r1.winner;cause=r1.cause;rounds=round;break; }
       const r2=pvpActivity(second,first,round,params);
       if (r2) { winner=r2.winner;cause=r2.cause;rounds=round;break; }
+      // W PvP v6 regeneracja następuje na końcu rundy, wyłącznie gdy obaj żyją.
+      pvpApplyRoundRegen(first,second);
+      pvpApplyRoundRegen(second,first);
     }
 
     // Techniczny limit rund nie tworzy remisu:
@@ -16993,7 +17144,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftSource,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftSource,rightItem.source,params);
-      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika</summary><div>hit = clamp(Celność − Unik, 5–99%), crit/unik/double/kontra/stun/bleed używają wygładzonego proc metera PRD: chwilowa szansa rośnie po pudłach o 25% szybciej niż bazowy PRD, przy zachowaniu średniej statystyki. Pudło nabija meter crita, stuna i standardowego bleed. Crit/stun/standardowy bleed pomniejszane są o odpowiednią odporność, Mistrz Krwawienia nakłada bleed automatycznie po krycie. Aktywne krwawienie pozostaje do końca walki; odporność jest sprawdzana przy jego nakładaniu, a nie ponownie przy każdym ticku. Unik rozstrzyga trafienie, ale nie jest drugi raz doliczany do stałej redukcji obrażeń; DR low HP jest osobnym późniejszym efektem. Execute wymaga trafienia i nie działa na Double Strike. Normalne obrażenia używają bezpośrednio startowych ATK i DEF z gry oraz ukrytego +5 do głównego wzoru, bez dodatkowego ATK/DEF za poziom. Minimalny zwykły i podwójny cios to 15% bieżącego ATK po bonusach, przed eskalacją; kontra zachowuje osobny próg. DEF zwykłych buildów graczy używa modelu zależnego od poziomu broniącego: K = 175 + 1,5 × (poziom − 1); dokładne bossy nadpisują K danymi z logów. Bleed tick następuje przed regeneracją, a regeneracja przed atakiem; kontra ×75%, jest zaokrąglana w dół i może krytować. Wyższa inicjatywa zawsze zaczyna; przy remisie inicjatywy kolejność jest losowa. Po limicie 15 rund wygrywa wyższy % HP.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}${pvpBreakthroughSummaryHtml(leftItem,rightItem)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika v6</summary><div>Walka trwa maksymalnie 20 rund. Od T12 działa nowa późna eskalacja obrażeń. Inicjatywa daje losową przewagę (remis 50%, +5 około 73%), a nie pewny pierwszy ruch. Ogłuszenie jest redukowane proporcjonalnie przez odporność, może wejść raz na zawodnika i nie jest nakładane przez Double ani kontrę. Regeneracja odbywa się na końcu rundy, gdy obaj żyją, z limitem 2 × poziom postaci; lifesteal jest liczony osobno. Żywotność osłabia dodatkową część krytyka, Precyzja przebija odporność na kryt, a unik daje osobną redukcję równą Unik / 3,5. Przełamania Druga wątroba, Pijawka i Sól w ranę są już liczone jako efekty jednorazowe. Pozostałe programy są zapisywane przy buildzie, ale wymagają jeszcze kalibracji z logów zanim wpłyną na wynik.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;

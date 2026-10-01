@@ -2562,6 +2562,14 @@ footer{text-align:center;color:#7c6c57;font-size:12px;padding:16px}
   font-weight:700;
   cursor:pointer;
 }
+
+.build-breakthrough-slots{display:grid;gap:9px}
+.build-breakthrough-slot{display:grid;grid-template-columns:auto minmax(0,1fr) 92px;gap:8px;align-items:end;padding:9px;border:1px solid #d7c49e;border-radius:10px;background:rgba(255,255,255,.48)}
+.build-breakthrough-slot>strong{align-self:center;white-space:nowrap}
+.build-breakthrough-slot label{display:grid;gap:4px;font-size:11px;font-weight:800;color:#685640}
+.build-breakthrough-slot select{width:100%;min-height:40px}
+.build-breakthroughs .submit-info{margin-top:9px}
+@media(max-width:600px){.build-breakthrough-slot{grid-template-columns:1fr 82px}.build-breakthrough-slot>strong{grid-column:1/-1}}
 .company-admin-waiver-btn.is-waived {
   border-color:#c5a26b;
   background:#fff7e8;
