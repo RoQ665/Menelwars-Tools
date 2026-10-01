@@ -15800,7 +15800,7 @@ function setupAdmin() {
   // ============================================================
   // v6 zachowuje dotychczasowy mnożnik, a od T12 dokłada kumulacyjnie
   // +20 p.p. na rundę (do dodatkowych +180 p.p. w T20).
-  const PVP_ESCALATION = [3,7,10,13,16,20,23,26,29,33,36,59,82,106,129,153,176,200,223,245];
+  const PVP_ESCALATION = [3,7,10,13,16,20,23,26,29,33,36,59,82,106,129,152,175,199,222,245];
   let pvpGeneratedPresetsCache = null;
 
   function buildSimulationReadiness(source) {
@@ -16548,7 +16548,7 @@ function setupAdmin() {
   function pvpHeal(fighter,amount,enemy,metricKey) {
     const reduction=pvpClamp(Number(enemy.stats.healingReduction)||0,0,100);
     let requested=Number(amount||0);
-    if (metricKey==="lifesteal" && !fighter.breakthroughUsed.leech && Number.isFinite(fighter.breakthroughs.leech) && 100*fighter.hp/fighter.maxHp<40) {
+    if (metricKey==="lifesteal" && !fighter.breakthroughUsed.leech && Number.isFinite(fighter.breakthroughs.leech) && 100*fighter.hp/fighter.maxHp<50) {
       requested*=1+fighter.breakthroughs.leech/100;
       fighter.breakthroughUsed.leech=true;
     }
@@ -16614,7 +16614,9 @@ function setupAdmin() {
     damage*=1-condD.damageReduction/100;
     damage*=escalation;
     if (isCrit) {
-      const critBonus=Math.max(0,(Number(attacker.stats.critDmg)||0)-(Number(defender.stats.critBonusReduction)||0));
+      // Osłabienie krytyków zmniejsza dodatkową część krytyka procentowo.
+      // Log: 41,2% bonusu przeciw 10% osłabienia => 37,08% (mnożnik 1,3708).
+      const critBonus=Math.max(0,(Number(attacker.stats.critDmg)||0)*(1-pvpClamp(Number(defender.stats.critBonusReduction)||0,0,100)/100));
       damage*=1+critBonus/100;
     }
     if (isFirst) damage*=1+(Number(attacker.stats.firstStrike)||0)/100;
