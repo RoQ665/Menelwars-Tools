@@ -1293,8 +1293,8 @@ function mapRenderRouteResult() {
       );
       const result=await cloudflareApi("/distillery/reservations",{
         method:"POST",
-        token:await cloudflareEnsureSession(),
-        body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program}
+        token:playerAccountSessionToken()?await cloudflareEnsureSession():"",
+        body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program,nick:cleanNick,ownerToken:owner&&owner.token||""}
       });
       if (result.ownerToken) saveReservationOwner(recipe,result.ownerToken,result.reservation);
       showRecipeActionNotice(result.message||"✅ Receptura zarezerwowana na 24 godziny.","success");
@@ -1398,8 +1398,8 @@ function mapRenderRouteResult() {
     try {
       const result=await cloudflareApi("/distillery/reservations/submit",{
         method:"POST",
-        token:await cloudflareEnsureSession(),
-        body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program,litry}
+        token:playerAccountSessionToken()?await cloudflareEnsureSession():"",
+        body:{requestId:nonce,baza:recipe.baza,drozdze:recipe.drozdze,woda:recipe.woda,program:recipe.program,litry,ownerToken:owner&&owner.token||""}
       });
       if (!result||!result.ok) throw new Error(result&&result.error||"Nie udało się wysłać wyniku.");
       showRecipeActionNotice("✅ Wynik został wysłany do weryfikacji.","success");
@@ -2386,7 +2386,7 @@ function mapRenderRouteResult() {
     try {
       const result=await cloudflareApi("/distillery/submissions",{
         method:"POST",
-        token:await cloudflareEnsureSession(),
+        token:playerAccountSessionToken()?await cloudflareEnsureSession():"",
         body:{requestId:nonce,items:[{...payload,uwagi:payload.uwagi||"Ręczne zgłoszenie z MenelWars Tools."}]}
       });
       if (Number(result.insertedCount) > 0) {
@@ -2712,7 +2712,7 @@ function mapRenderRouteResult() {
     try {
       const result=await cloudflareApi("/distillery/submissions",{
         method:"POST",
-        token:await cloudflareEnsureSession(),
+        token:playerAccountSessionToken()?await cloudflareEnsureSession():"",
         body:{requestId:nonce,items}
       });
       status.textContent =
