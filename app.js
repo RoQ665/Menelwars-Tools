@@ -15799,9 +15799,19 @@ function setupAdmin() {
   // Znane reguły są odtwarzane wprost, a brakujące elementy silnika
   // pozostają parametrami użytkownika. Nie jest to klon backendu gry.
   // ============================================================
-  // v6 zachowuje dotychczasowy mnożnik, a od T12 dokłada kumulacyjnie
-  // +20 p.p. na rundę (do dodatkowych +180 p.p. w T20).
+  // Pełny log Doktora Spirytusa (balance v6-2026-10-01-pve20-r4)
+  // potwierdza równomierną eskalację także po T11. Wartości odpowiadają
+  // dokładnie polu `escalation` raportowanemu przez grę dla tur 1–20.
+  // Pełny log PvP RoQ–Piecyk potwierdza silną eskalację od T12 do T20.
+  // Bossowie zachowują łagodną tabelę (potwierdzone logami Ojca Chrzestnego).
   const PVP_ESCALATION = [3,7,10,13,16,20,23,26,29,33,36,59,82,106,129,152,175,199,222,245];
+  const PVP_BOSS_ESCALATION = [3,7,10,13,16,20,23,26,29,33,36,39,42,46,49,52,55,59,62,65];
+
+  function pvpEscalationForRound(round,first,second) {
+    const boss=first?.source?.boss===true || second?.source?.boss===true;
+    const table=boss ? PVP_BOSS_ESCALATION : PVP_ESCALATION;
+    return 1+(table[Math.max(0,Math.min(19,round-1))]||0)/100;
+  }
   let pvpGeneratedPresetsCache = null;
 
   function buildSimulationReadiness(source) {
@@ -16276,6 +16286,272 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 1314 ATK · 1219 DEF · 5399 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
+
+    // Bimbrownik Kazik został potwierdzony w dwóch pełnych walkach z 2.10.2026.
+    // Obie próby miały identyczny profil bossa. K=422 odtwarza pierwszy zwykły
+    // cios RoQ: 731 ATK, 38,35% przebicia, 1285 DEF i 16% redukcji daje
+    // 206 obrażeń w T1 po uwzględnieniu redukcji wynikającej z uniku bossa.
+    out.push({
+      id:"boss-22-bimbrownik-kazik",
+      name:"Bimbrownik Kazik · Lvl 27 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:27,
+      attributes:{strength:49,endurance:46,agility:52,vitality:45,precision:56},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1213,combatDefense:1285,combatHp:5714,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:27,
+        defenseK:422,
+        primary:{attack:1213,defense:1285,hp:5714},
+        stats:{
+          accuracy:127,initiative:19.8,firstStrike:14,
+          critChance:46.6,critDmg:67.4,execute:13.4,lifesteal:8.4,
+          armorPen:23.1,stun:26.4,bleed:50.5,bleedDamage:18,
+          evasion:24.2,doubleStrike:26,counter:15.6,
+          healingReduction:50,damageReduction:16,
+          critResist:24.4,stunResist:18.4,bleedResist:30.5,
+          hpRegen:6.8,critResistBypass:11.2,critBonusReduction:9
+        }
+      },
+      boss:true,
+      description:"Dokładny boss potwierdzony w dwóch pełnych walkach: 1213 ATK · 1285 DEF · 5714 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
+    });
+
+    // Doktor Spirytus pochodzi z pełnej 19-turowej walki z 4.10.2026.
+    // K=410 odtwarza całą sekwencję zwykłych i krytycznych ciosów RoQ
+    // (błąd zaokrągleń łącznie 7 pkt na 25 trafień).
+    out.push({
+      id:"boss-26-doktor-spirytus",
+      name:"Doktor Spirytus · Lvl 28 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:28,
+      attributes:{strength:52,endurance:48,agility:48,vitality:48,precision:58},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1319,combatDefense:1407,combatHp:6278,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:28,
+        defenseK:410,
+        primary:{attack:1319,defense:1407,hp:6278},
+        stats:{
+          accuracy:128,initiative:20.4,firstStrike:14.5,
+          critChance:46.4,critDmg:70.2,execute:14.7,lifesteal:8.7,
+          armorPen:24.3,stun:28.2,bleed:52.6,bleedDamage:22,
+          evasion:18.8,doubleStrike:24,counter:14.4,
+          healingReduction:50,damageReduction:16.7,
+          critResist:25.2,stunResist:19.2,bleedResist:34,
+          hpRegen:7.2,critResistBypass:11.6,critBonusReduction:9.6
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z pełnej 19-turowej walki: 1319 ATK · 1407 DEF · 6278 HP. Wszystkie efektywne statystyki PvP i eskalacja pochodzą bezpośrednio z gry."
+    });
+
+    // Gwardzista Cesarza pochodzi z pełnej 20-turowej walki z 5.10.2026.
+    // RoQ walczył na pełnych buffach (586 ATK · 1207 DEF · 3783 HP).
+    // K=423 najlepiej odtwarza sekwencję zwykłych i krytycznych ciosów z logu.
+    out.push({
+      id:"boss-27-gwardzista-cesarza",
+      name:"Gwardzista Cesarza · Lvl 29 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:29,
+      attributes:{strength:51,endurance:49,agility:47,vitality:48,precision:55},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1320,combatDefense:1460,combatHp:6787,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:29,
+        defenseK:423,
+        primary:{attack:1320,defense:1460,hp:6787},
+        stats:{
+          accuracy:128.5,initiative:19.5,firstStrike:13.8,
+          critChance:51.6,critDmg:86.1,execute:15.3,lifesteal:14.3,
+          armorPen:30.6,stun:22,bleed:40.4,bleedDamage:0,
+          evasion:18.5,doubleStrike:23.5,counter:14.1,
+          healingReduction:50,damageReduction:18.8,
+          critResist:27.6,stunResist:27.6,bleedResist:32,
+          hpRegen:12.2,critResistBypass:11,critBonusReduction:9.6
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z pełnej 20-turowej walki przeciwko RoQ na pełnych buffach: 1320 ATK · 1460 DEF · 6787 HP. Wszystkie efektywne statystyki PvP i eskalacja pochodzą bezpośrednio z gry."
+    });
+
+    // Cesarz Meneli pochodzi z pełnej 18-turowej walki z 6.10.2026.
+    // RoQ walczył na pełnych buffach (589 ATK · 1207 DEF · 3808 HP).
+    // K=451 odtwarza późniejsze ciosy z błędem łącznie 1 pkt. Pierwsze
+    // uderzenia ujawniły dodatkowo właściwy temu bossowi próg 150 obrażeń.
+    out.push({
+      id:"boss-23-cesarz-meneli",
+      name:"Cesarz Meneli · Lvl 30 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:30,
+      attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1388,combatDefense:1589,combatHp:7513,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:30,
+        defenseK:451,
+        minimumDamage:150,
+        primary:{attack:1388,defense:1589,hp:7513},
+        stats:{
+          accuracy:129,initiative:19.5,firstStrike:13.8,
+          critChance:50.8,critDmg:86,execute:15.3,lifesteal:15.8,
+          armorPen:30.8,stun:22,bleed:39.2,bleedDamage:0,
+          evasion:18.1,doubleStrike:23,counter:13.8,
+          healingReduction:50,damageReduction:19.9,
+          critResist:30,stunResist:30,bleedResist:34,
+          hpRegen:13.2,critResistBypass:11,critBonusReduction:9.6
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z pełnej 18-turowej walki przeciwko RoQ na pełnych buffach: 1388 ATK · 1589 DEF · 7513 HP. Uwzględnia próg minimum 150 obrażeń, pełne statystyki PvP i egzekucję."
+    });
+
+    // Komornik Wiesław pochodzi z dwóch pełnych walk z 6.10.2026.
+    // RoQ walczył na pełnych buffach (601 ATK · 1276 DEF · 3932 HP).
+    // K=479 odtwarza ciosy RoQ po wyjściu ponad próg minimum 158 obrażeń.
+    out.push({
+      id:"boss-31-komornik-wieslaw",
+      name:"Komornik Wiesław · Lvl 31 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:31,
+      attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1450,combatDefense:1653,combatHp:7894,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:31,
+        defenseK:479,
+        minimumDamage:158,
+        primary:{attack:1450,defense:1653,hp:7894},
+        stats:{
+          accuracy:129,initiative:18.6,firstStrike:13,
+          critChance:50.8,critDmg:86,execute:15.8,lifesteal:15.8,
+          armorPen:30.8,stun:20.8,bleed:39.2,bleedDamage:0,
+          evasion:18.1,doubleStrike:23,counter:13.8,
+          healingReduction:50,damageReduction:19.9,
+          critResist:30,stunResist:30,bleedResist:34,
+          hpRegen:13.2,critResistBypass:10.4,critBonusReduction:9.6
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1450 ATK · 1653 DEF · 7894 HP. Uwzględnia próg minimum 158 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
+    });
+
+    // Prezes Wysypiska pochodzi z dwóch pełnych walk z 13.10.2026:
+    // jednej przegranej w 17. turze i wygranej przez krwawienie w 19. turze.
+    // RoQ walczył na pełnych buffach (659 ATK · 1341 DEF · 3970 HP).
+    // K=493 odtwarza zarejestrowane zwykłe ciosy RoQ od 167 do 221 obrażeń.
+    out.push({
+      id:"boss-32-prezes-wysypiska",
+      name:"Prezes Wysypiska · Lvl 32 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:32,
+      attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1532,combatDefense:1736,combatHp:8276,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:32,
+        defenseK:493,
+        minimumDamage:166,
+        primary:{attack:1532,defense:1736,hp:8276},
+        stats:{
+          accuracy:129,initiative:18.6,firstStrike:13,
+          critChance:50.8,critDmg:86,execute:15.8,lifesteal:15.8,
+          armorPen:30.8,stun:20.8,bleed:39.2,bleedDamage:0,
+          evasion:18.1,doubleStrike:23,counter:13.8,
+          healingReduction:50,damageReduction:19.9,
+          critResist:30,stunResist:30,bleedResist:34,
+          hpRegen:13.2,critResistBypass:10.4,critBonusReduction:9.6
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1532 ATK · 1736 DEF · 8276 HP. Uwzględnia próg minimum 166 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
+    });
+
+    // Ojciec Chrzestny Melin pochodzi z dwóch pełnych walk z 14.10.2026.
+    // RoQ walczył na pełnych buffach (666 ATK · 1348 DEF · 3982 HP).
+    // K=510 odtwarza zwykłe ciosy RoQ po wyjściu ponad próg 175 obrażeń.
+    out.push({
+      id:"boss-33-ojciec-chrzestny-melin",
+      name:"Ojciec Chrzestny Melin · Lvl 33 · Boss",
+      authorNick:"MenelWars · Bossowie",
+      ownerNick:"",
+      public:false,
+      level:33,
+      attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52},
+      perks:{},
+      profile:{
+        attack:1,defense:1,baseHp:100,petHp:0,eqHp:0,
+        combatAttack:1660,combatDefense:1819,combatHp:8732,
+        provided:{attack:false,defense:false,baseHp:false,petHp:false,eqHp:false,combatAttack:true,combatDefense:true,combatHp:true},
+        bonusesConfirmed:true
+      },
+      bonuses:[],
+      exactCombat:{
+        level:33,
+        defenseK:510,
+        minimumDamage:175,
+        primary:{attack:1660,defense:1819,hp:8732},
+        stats:{
+          accuracy:129,initiative:18.6,firstStrike:13,
+          critChance:50.8,critDmg:86,execute:15.8,lifesteal:15.8,
+          armorPen:30.8,stun:20.8,bleed:39.2,bleedDamage:0,
+          evasion:18.1,doubleStrike:23,counter:13.8,
+          healingReduction:50,damageReduction:19.9,
+          critResist:30,stunResist:30,bleedResist:34,
+          hpRegen:13.2,critResistBypass:10.4,critBonusReduction:9.6
+        }
+      },
+      boss:true,
+      description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1660 ATK · 1819 DEF · 8732 HP. Uwzględnia próg minimum 175 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
+    });
     pvpGeneratedPresetsCache = out;
     return out;
   }
@@ -16531,6 +16807,7 @@ function setupAdmin() {
       combatLevel:exactLevel || Math.max(1,Number(calculated.characterLevel)||1),
       maxHp:Math.max(1,primary.hp),hp:Math.max(1,primary.hp),
       bleeding:null,stunned:false,stunUsed:false,firstAttack:true,
+      armorBroken:false,sidestepReady:false,
       breakthroughs:breakthroughMap,
       breakthroughUsed:{},
       saltCharges:Number.isFinite(breakthroughMap.salt)?3:0,
@@ -16593,7 +16870,13 @@ function setupAdmin() {
     const attackForMinimum=attacker.primary.attack*(1+(dynamicPct+condA.attackPct)/100);
     const normalAttack=attacker.primary.attack*(1+dynamicPct/100)+5;
     const attack=normalAttack*(1+condA.attackPct/100);
-    const effectiveDefense=Math.max(0,defender.primary.defense*(1-pvpClamp(attacker.stats.armorPen,0,100)/100));
+    // Łom aktywuje się po pierwszym trafieniu. Od kolejnego trafienia
+    // zwiększa przebicie pancerza o wartość przełamania aż do końca walki.
+    const crowbarBonus=attacker.armorBroken && Number.isFinite(attacker.breakthroughs.crowbar)
+      ? attacker.breakthroughs.crowbar
+      : 0;
+    const effectiveArmorPen=pvpClamp((Number(attacker.stats.armorPen)||0)+crowbarBonus,0,100);
+    const effectiveDefense=Math.max(0,defender.primary.defense*(1-effectiveArmorPen/100));
     // K zależy od poziomu BRONIĄCEGO, nie atakującego. Pełny log xBuLax
     // kontra RoQ (obaj lvl 55) kalibruje zwykłe buildy graczy na całej tabeli:
     // 485 ATK, 21,75% przebicia, 1126 DEF i 53% DR daje 73 dmg do T12,
@@ -16609,7 +16892,7 @@ function setupAdmin() {
     // a nie część limitowanej statystyki Redukcja obrażeń.
     const normalDamageReduction=pvpClamp(Number(defender.stats.damageReduction)||0,0,60);
     const evasionDamageReduction=pvpClamp((Number(defender.stats.evasion)||0)/3.5,0,100);
-    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(19,round-1))]||0)/100;
+    const escalation=pvpEscalationForRound(round,attacker,defender);
     let damage=attack*defenseFactor*(1-normalDamageReduction/100);
     damage*=1-evasionDamageReduction/100;
     damage*=1-condD.damageReduction/100;
@@ -16625,9 +16908,14 @@ function setupAdmin() {
     // bieżącego ATK po momentum i bonusach low HP, ale przed eskalacją oraz
     // bez ukrytego +5. Kontra ma w grze osobny, niedawno obniżony próg, więc
     // nie stosujemy do niej tego minimum bez kolejnego pomiaru.
+    const exactMinimumDamage=Number(defender.source?.exactCombat?.minimumDamage);
     const minimumDamage=options.applyMinimum===false
       ? 1
-      : Math.max(1,Math.round(attackForMinimum*0.15));
+      : Math.max(
+          1,
+          Math.round(attackForMinimum*0.15),
+          Number.isFinite(exactMinimumDamage) && exactMinimumDamage>0 ? Math.round(exactMinimumDamage) : 0
+        );
     return Math.max(minimumDamage,Math.round(damage));
   }
 
@@ -16672,8 +16960,13 @@ function setupAdmin() {
     // rozstrzygana wyłącznie przy nakładaniu statusu. Po udanym proc bleed
     // każdy kolejny tick wchodzi aż do końca walki bez ponownego testu.
     const source=victim.bleeding;
-    const escalation=1+(PVP_ESCALATION[Math.max(0,Math.min(19,round-1))]||0)/100;
-    const damage=Math.max(1,Math.round(victim.maxHp*0.02*(1+(Number(source.stats.bleedDamage)||0)/100)*escalation));
+    const escalation=pvpEscalationForRound(round,source,victim);
+    let damage=Math.max(1,Math.round(victim.maxHp*0.02*(1+(Number(source.stats.bleedDamage)||0)/100)*escalation));
+    // Krzepnięcie osłabia wyłącznie pierwszy tick krwawienia otrzymany w walce.
+    if (!victim.breakthroughUsed.clotting && Number.isFinite(victim.breakthroughs.clotting)) {
+      damage=Math.max(1,Math.round(damage*(1-victim.breakthroughs.clotting/100)));
+      victim.breakthroughUsed.clotting=true;
+    }
     victim.hp=Math.max(0,victim.hp-damage);
     source.metrics.damage+=damage;
     return {damage,killed:victim.hp<=0};
@@ -16719,6 +17012,22 @@ function setupAdmin() {
         pvpFailProc(attacker,"bleed",bleedChance);
       }
       if (options.allowStun!==false && !attacker.stunUsed) pvpFailProc(attacker,"stun",stunChance);
+
+      // Draśnięcie zadaje po uniku wskazaną część zwykłych obrażeń ciosu.
+      // Nie może krytować, leczyć ani nakładać statusów.
+      if (!attacker.breakthroughUsed.scratch && Number.isFinite(attacker.breakthroughs.scratch)) {
+        attacker.breakthroughUsed.scratch=true;
+        const scratchBase=pvpDamageFormula(attacker,defender,round,params,false,isFirst,{applyMinimum:!options.isCounter});
+        const scratchDamage=Math.max(1,Math.round(scratchBase*attacker.breakthroughs.scratch/100));
+        const actual=Math.min(defender.hp,scratchDamage);
+        defender.hp-=actual;
+        attacker.metrics.damage+=actual;
+        pvpTryEmergencyHeal(defender,attacker);
+        if (defender.hp<=0) return {killed:true,cause:"scratch",damage:actual};
+      }
+
+      // Po własnym uniku Zejście z linii wzmacnia następny trafiony cios.
+      if (Number.isFinite(defender.breakthroughs.sidestep)) defender.sidestepReady=true;
       if (allowCounter) {
         const counterChance=pvpClamp(Number(defender.stats.counter)||0,0,100);
         defender.metrics.counterOpportunities++;
@@ -16730,7 +17039,7 @@ function setupAdmin() {
           if (counterResult.killed) return {killed:true,cause:"counter"};
         }
       }
-      return {killed:false,cause:"evade"};
+      return {killed:false,cause:"evade",damage:0};
     }
 
     attacker.metrics.hit++;
@@ -16741,26 +17050,82 @@ function setupAdmin() {
       if (100*defender.hp/defender.maxHp < (Number(attacker.stats.execute)||0)) {
         defender.hp=0; attacker.metrics.execute++;
         attacker.metrics.eventTurns.execute.push(round);
-        return {killed:true,cause:"execute"};
+        return {killed:true,cause:"execute",damage:0};
       }
     }
     attacker.metrics.critOpportunities++;
     attacker.metrics.critChanceSum+=pvpClamp(critChance,0,100);
-    const crit=pvpProc(attacker,"crit",critChance);
+    let crit=pvpProc(attacker,"crit",critChance);
     if (crit) {
       attacker.metrics.crit++;
       attacker.metrics.eventTurns.crit.push(round);
     }
-    let damage=pvpDamageFormula(attacker,defender,round,params,crit,isFirst,{applyMinimum:!options.isCounter});
+    let normalDamage=pvpDamageFormula(attacker,defender,round,params,false,isFirst,{applyMinimum:!options.isCounter});
+    let fullCritDamage=pvpDamageFormula(attacker,defender,round,params,true,isFirst,{applyMinimum:!options.isCounter});
+    const sidestepBonus=attacker.sidestepReady && Number.isFinite(attacker.breakthroughs.sidestep)
+      ? attacker.breakthroughs.sidestep
+      : 0;
+    if (sidestepBonus) attacker.sidestepReady=false;
+    let damage=crit?fullCritDamage:normalDamage;
+    let forcedCrit=false;
+
+    // Pewniak: pierwszy trafiony, niekrytyczny zwykły cios dostaje wskazaną
+    // część pełnej premii krytycznej. Nie działa na kontrę ani Double Strike.
+    if (!crit && !options.isCounter && !options.isDoubleStrike &&
+        !attacker.breakthroughUsed.sure_thing && Number.isFinite(attacker.breakthroughs.sure_thing)) {
+      const critBonus=Math.max(0,fullCritDamage-normalDamage);
+      damage+=Math.round(critBonus*attacker.breakthroughs.sure_thing/100);
+      attacker.breakthroughUsed.sure_thing=true;
+      forcedCrit=true;
+      attacker.metrics.crit++;
+      attacker.metrics.eventTurns.crit.push(round);
+    }
+
+    // Echo wzmacnia pierwszy naturalny krytyk. Gruby kark jednorazowo osłabia
+    // dodatkową część pierwszego krytyka przeciwnika. Oba efekty są liczone
+    // przed odjęciem HP, zgodnie z pojedynczym hp_update w logach gry.
+    if ((crit || forcedCrit) && !attacker.breakthroughUsed.echo && Number.isFinite(attacker.breakthroughs.echo)) {
+      damage+=Math.round(damage*attacker.breakthroughs.echo/100);
+      attacker.breakthroughUsed.echo=true;
+    }
+    if ((crit || forcedCrit) && !defender.breakthroughUsed.thick_neck && Number.isFinite(defender.breakthroughs.thick_neck)) {
+      const critBonus=Math.max(0,fullCritDamage-normalDamage);
+      damage=Math.max(normalDamage,damage-Math.round(critBonus*defender.breakthroughs.thick_neck/100));
+      defender.breakthroughUsed.thick_neck=true;
+    }
+
+    // Ostatnie słowo: przy celu poniżej 25% HP dodaje procent brakującego HP.
+    if (!options.isCounter && !options.isDoubleStrike && defender.hp>0 &&
+        100*defender.hp/defender.maxHp<25 && !attacker.breakthroughUsed.last_word &&
+        Number.isFinite(attacker.breakthroughs.last_word)) {
+      damage+=Math.round((defender.maxHp-defender.hp)*attacker.breakthroughs.last_word/100);
+      attacker.breakthroughUsed.last_word=true;
+    }
+
     // Log gry: 170 obrażeń zwykłego ciosu daje kontrę 127 (= floor(75%)).
-    if (Number.isFinite(options.damageMultiplier)) damage=Math.max(1,Math.floor(damage*options.damageMultiplier));
+    if (Number.isFinite(options.damageMultiplier)) {
+      let multiplier=options.damageMultiplier;
+      // Ząb za ząb wzmacnia tylko pierwszy skuteczny kontratak.
+      if (options.isCounter && !attacker.breakthroughUsed.tooth_for_tooth &&
+          Number.isFinite(attacker.breakthroughs.tooth_for_tooth)) {
+        multiplier*=1+attacker.breakthroughs.tooth_for_tooth/100;
+        attacker.breakthroughUsed.tooth_for_tooth=true;
+      }
+      damage=Math.max(1,Math.floor(damage*multiplier));
+    }
+    // Log RoQ–Żelazny, T15: cios 326, osobno Zejście +10,
+    // wyssanie 49 HP od 326, a nie od sumy 336. Premię dokładamy po
+    // rozstrzygnięciu zwykłego ciosu, bez wzmacniania Echo i Grubego karku.
+    const baseActual=Math.min(defender.hp,damage);
+    const sidestepDamage=Math.max(0,Math.round(damage*sidestepBonus/100));
+    damage+=sidestepDamage;
     const actual=Math.min(defender.hp,damage);
     defender.hp-=actual;
     attacker.metrics.damage+=actual;
     if (options.isCounter) {
       attacker.metrics.counterDamage+=actual;
       attacker.metrics.counterHitCount++;
-    } else if (crit) {
+    } else if (crit || forcedCrit) {
       attacker.metrics.critDamage+=actual;
       attacker.metrics.critHitCount++;
     } else {
@@ -16770,9 +17135,16 @@ function setupAdmin() {
 
     pvpTryEmergencyHeal(defender,attacker);
     if (actual>0 && Number(attacker.stats.lifesteal)>0) {
-      pvpHeal(attacker,actual*(Number(attacker.stats.lifesteal)||0)/100,defender,"lifesteal");
+      // Pewniak leczy wyłącznie od zwykłej części ciosu, bez premii krytycznej
+      // oraz Echo. Naturalny krytyk leczy od pełnych obrażeń podstawowego
+      // ciosu; osobny dodatek Zejścia z linii nie daje wyssania.
+      const lifestealBasis=forcedCrit?Math.min(baseActual,normalDamage):baseActual;
+      pvpHeal(attacker,lifestealBasis*(Number(attacker.stats.lifesteal)||0)/100,defender,"lifesteal");
     }
-    if (defender.hp<=0) return {killed:true,cause:options.damageMultiplier!=null?"counter":"damage"};
+    if (defender.hp<=0) return {killed:true,cause:options.damageMultiplier!=null?"counter":"damage",damage:actual};
+
+    // Pierwsze trafienie aktywuje Łom; bonus obowiązuje od następnego ciosu.
+    if (!attacker.armorBroken && Number.isFinite(attacker.breakthroughs.crowbar)) attacker.armorBroken=true;
 
     // Mistrz Krwawienia / applies_bleed: krytyk automatycznie nakłada bleed.
     // Po pierwszym skutecznym nałożeniu status trwa do końca walki, dlatego
@@ -16803,7 +17175,7 @@ function setupAdmin() {
         attacker.metrics.eventTurns.stun.push(round);
       }
     }
-    return {killed:false,cause:crit?"crit":"hit"};
+    return {killed:false,cause:(crit||forcedCrit)?"crit":"hit",damage:actual};
   }
 
   function pvpActivity(actor,enemy,round,params) {
@@ -16839,9 +17211,25 @@ function setupAdmin() {
     if (pvpProc(actor,"double",doubleChance)) {
       actor.metrics.double++;
       actor.metrics.eventTurns.double.push(round);
-      const second=pvpStrike(actor,enemy,round,params,{allowExecute:false,allowCounter:true,allowStun:false,consumeFirst:false});
+      const second=pvpStrike(actor,enemy,round,params,{allowExecute:false,allowCounter:true,allowStun:false,consumeFirst:false,isDoubleStrike:true});
       if (enemy.hp<=0) return {winner:actor,cause:second.cause||"double"};
       if (actor.hp<=0) return {winner:enemy,cause:second.cause||"counter"};
+
+      // Trzeci raz dla pewności: po trafionym Double Strike zadaje dodatkowe
+      // obrażenia równe części obrażeń drugiego ciosu. Nie krytuje, nie leczy,
+      // nie nakłada statusów i nie uruchamia egzekucji. Raz na walkę;
+      // unik drugiego ciosu nie zużywa Przełamania.
+      if (second.cause!=="evade" && !actor.breakthroughUsed.third_time && Number.isFinite(actor.breakthroughs.third_time)) {
+        const secondDamage=second.damage||0;
+        const thirdDamage=Math.max(0,Math.round(secondDamage*actor.breakthroughs.third_time/100));
+        if (thirdDamage>0) {
+          const actual=Math.min(enemy.hp,thirdDamage);
+          enemy.hp-=actual;
+          actor.metrics.damage+=actual;
+          actor.breakthroughUsed.third_time=true;
+          if (enemy.hp<=0) return {winner:actor,cause:"third_time"};
+        }
+      }
     }
     return null;
   }
@@ -17147,7 +17535,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftSource,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftSource,rightItem.source,params);
-      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}${pvpBreakthroughSummaryHtml(leftItem,rightItem)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika v6</summary><div>Walka trwa maksymalnie 20 rund. Od T12 działa nowa późna eskalacja obrażeń. Inicjatywa daje losową przewagę (remis 50%, +5 około 73%), a nie pewny pierwszy ruch. Ogłuszenie jest redukowane proporcjonalnie przez odporność, może wejść raz na zawodnika i nie jest nakładane przez Double ani kontrę. Regeneracja odbywa się na końcu rundy, gdy obaj żyją, z limitem 2 × poziom postaci; lifesteal jest liczony osobno. Żywotność osłabia dodatkową część krytyka, Precyzja przebija odporność na kryt, a unik daje osobną redukcję równą Unik / 3,5. Przełamania Druga wątroba, Pijawka i Sól w ranę są już liczone jako efekty jednorazowe. Pozostałe programy są zapisywane przy buildzie, ale wymagają jeszcze kalibracji z logów zanim wpłyną na wynik.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}${pvpBreakthroughSummaryHtml(leftItem,rightItem)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika v6</summary><div>Walka trwa maksymalnie 20 rund. Od T12 działa nowa późna eskalacja obrażeń. Inicjatywa daje losową przewagę (remis 50%, +5 około 73%), a nie pewny pierwszy ruch. Ogłuszenie jest redukowane proporcjonalnie przez odporność, może wejść raz na zawodnika i nie jest nakładane przez Double ani kontrę. Regeneracja odbywa się na końcu rundy, gdy obaj żyją, z limitem 2 × poziom postaci; lifesteal jest liczony osobno. Żywotność osłabia dodatkową część krytyka, Precyzja przebija odporność na kryt, a unik daje osobną redukcję równą Unik / 3,5. Silnik uwzględnia przełamania: Druga wątroba, Pewniak, Echo uderzenia, Ostatnie słowo, Łom, Trzeci raz, Draśnięcie, Zejście z linii, Gruby kark, Ząb za ząb, Pijawka, Sól w ranę i Krzepnięcie. Klincz, Twardy łeb oraz Beton pozostają zapisane przy buildzie, ale czekają na wystarczające logi do kalibracji.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
