@@ -89,30 +89,53 @@
     function render(data) {
         result.innerHTML = `<p>${escape(data.gangA)} / ${escape(data.gangB)} · ${data.fights.length} walk · w toku: ${data.fights.filter(f=>f.pending).length} · bilans ${escape(data.gangA)}: ${signed(data.xp)} XP</p>` + data.warnings.map(w=>`<p role="alert">⚠️ ${escape(w)}</p>`).join('') + [data.gangA,data.gangB].map(gang => `<h3>${escape(gang)}</h3><div style="overflow-x:auto"><table><thead><tr><th>Gracz</th><th>Ataki</th><th>Atak W/P</th><th>Obrony W/P</th><th>W toku A/O</th><th>XP atak</th><th>XP obrona</th><th>Bilans XP</th></tr></thead><tbody>${data.players.filter(p=>p.gang===gang).sort((a,b)=>b.xp-a.xp || a.name.localeCompare(b.name,'pl')).map(p=>`<tr><td>${escape(p.name)}</td><td>${p.attacks}</td><td>${p.attackWins}/${p.attackLosses}</td><td>${p.defenseWins}/${p.defenseLosses}</td><td>${p.pendingAttack}/${p.pendingDefense}</td><td>${signed(p.attackXP)}</td><td>${signed(p.defenseXP)}</td><td>${signed(p.xp)}</td></tr>`).join('')}</tbody></table></div>`).join('');
     }
-    function refreshHistory(selected) {
-      const history = readHistory(localStorage).map(entry => ({...entry, data:parse(entry.text)})).sort((a,b)=>b.data.date.localeCompare(a.data.date) || b.updatedAt.localeCompare(a.updatedAt));
-      historySelect.innerHTML = '<option value="">Wybierz zapisany mecz…</option>' + history.map(m=>`<option value="${escape(m.key)}">${escape(m.data.date)} · ${escape(m.data.gangA)} / ${escape(m.data.gangB)} · ${m.data.fights.length} walk</option>`).join('');
-      historySelect.value = selected || '';
-      return history;
+    let request = null, admin = false;
+    function applyPermissions(value) {
+      admin = Boolean(value);
+      document.getElementById('league-import-panel').hidden = !admin;
+      button.disabled = !admin;
     }
-    button.onclick = () => {
+    async function refreshHistory(selected) {
+      const payload = await request('/gang/league');
+      applyPermissions(payload.permissions?.admin);
+      const history = payload.matches || [];
+      historySelect.innerHTML = '<option value="">Wybierz zapisany mecz…</option>' + history.map(m=>`<option value="${escape(m.id)}">${escape(m.date)} · ${escape(m.gangA)} / ${escape(m.gangB)} · ${m.fightCount} walk</option>`).join('');
+      historySelect.value = selected || history[0]?.id || '';
+      if (historySelect.value) await loadSelected();
+      else { result.textContent = 'Nie zapisano jeszcze żadnego meczu.'; status.textContent = admin ? 'Wklej pierwszy raport meczu.' : 'Administrator nie wgrał jeszcze raportu.'; }
+    }
+    async function loadSelected() {
+      if (!historySelect.value) return;
+      const payload = await request('/gang/league?match=' + encodeURIComponent(historySelect.value));
+      render(payload.data);
+      status.textContent = 'Ostatni import: ' + new Date(payload.updatedAt).toLocaleString('pl-PL') + ' · ' + payload.updatedBy;
+    }
+    button.onclick = async () => {
+      if (!admin || !request) return;
+      button.disabled = true;
       try {
-        const saved = saveMatch(localStorage, document.getElementById('league-input').value);
-        refreshHistory(matchKey(saved.data));
-        render(saved.data);
-        status.textContent = `${saved.updated ? 'Zaktualizowano' : 'Zapisano'} mecz z ${saved.data.date}. Historia jest dostępna na tym urządzeniu i w tej przeglądarce.`;
-      } catch (e) { status.textContent = 'Nie zapisano meczu. ' + e.message; }
+        const text = document.getElementById('league-input').value;
+        const preview = parse(text);
+        if (preview.warnings.length) throw Error(preview.warnings.join(' '));
+        status.textContent = 'Zapisuję wspólny raport…';
+        const saved = await request('/admin/gang/league/import', {method:'POST',body:{text}});
+        await refreshHistory(saved.id);
+        document.getElementById('league-input').value = '';
+      } catch(e) { status.textContent = 'Nie zapisano meczu. ' + e.message; if (e.status===401 || e.status===403) applyPermissions(false); }
+      finally { button.disabled = !admin; }
     };
-    historySelect.onchange = () => {
-      try {
-        const entry = readHistory(localStorage).find(m=>m.key===historySelect.value);
-        if (entry) { render(parse(entry.text)); status.textContent = 'Ostatni import: ' + new Date(entry.updatedAt).toLocaleString('pl-PL'); }
-      } catch(e) { status.textContent = e.message; }
+    historySelect.onchange = () => loadSelected().catch(e=>{status.textContent=e.message;});
+    window.LeagueView = {
+      async open(api) {
+        request = api;
+        applyPermissions(false);
+        result.textContent = '';
+        historySelect.innerHTML = '<option value="">Ładowanie historii…</option>';
+        status.textContent = 'Pobieram wspólne wyniki…';
+        try { await refreshHistory(); }
+        catch(e) { status.textContent = 'Nie udało się pobrać wyników. ' + e.message; }
+      }
     };
-    try {
-      const history = refreshHistory();
-      if (history.length) { historySelect.value = history[0].key; historySelect.onchange(); }
-    } catch(e) { status.textContent = 'Nie można wczytać historii: ' + e.message; }
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

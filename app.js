@@ -18232,6 +18232,7 @@ function setupAdmin() {
     if (target === "league-view") {
       el("gang-tabs").hidden = false;
       showToolView("league-view","gang");
+      await window.LeagueView?.open(async (path,options={})=>cloudflareApi(path,{...options,token:await cloudflareEnsureSession()}));
       return;
     }
 

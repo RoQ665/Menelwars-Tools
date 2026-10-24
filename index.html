@@ -983,14 +983,16 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
   <div class="panel">
     <div class="panel-head">⚔️ Liga Meneli — analiza meczu</div>
     <div class="panel-body">
-      <p>Otwórz Szczegóły meczu w grze, skopiuj całą stronę (Ctrl+A, Ctrl+C) i wklej poniżej. Pierwszy gracz to atakujący, drugi — obrońca.</p>
+      <div id="league-import-panel" hidden>
+      <p>Import dla Administratorów: otwórz Szczegóły meczu w grze, skopiuj całą stronę (Ctrl+A, Ctrl+C) i wklej poniżej. Data pochodzi z raportu — możesz aktualizować także poprzednie dni.</p>
       <label for="league-input">Skopiowana strona meczu</label>
       <textarea id="league-input" rows="7" style="width:100%;box-sizing:border-box" placeholder="Wklej Szczegóły meczu…"></textarea>
       <button type="button" id="league-parse" class="primary-btn">Zapisz / aktualizuj mecz</button>
+      </div>
       <p id="league-status" role="status"></p>
       <label for="league-history">Historia meczów</label>
       <select id="league-history"><option value="">Wybierz zapisany mecz…</option></select>
-      <p class="muted">Historia jest zapisywana wyłącznie w tej przeglądarce — bez synchronizacji z innymi urządzeniami. Wyczyszczenie danych strony usuwa historię. Ta sama data i para gangów aktualizuje jeden mecz; inne dni pozostają w historii. Niepełny odczyt nie nadpisze zapisu. Bilans XP oznacza wkład do wyniku meczu, nie zawsze zmianę osobistego XP. Ataki obejmują także próby w toku. W/P = wygrane/przegrane, A/O = atak/obrona. Bez pełnego składu nie wykrywamy osób z zerem walk.</p>
+      <p class="muted">Wspólna historia dla zalogowanych członków gangu. Raporty wgrywają wyłącznie Administratorzy. Wyniki nie odświeżają się z gry automatycznie — wymagają kolejnego importu. Pierwszy gracz to atakujący, drugi — obrońca. Bilans XP to wkład do wyniku meczu. Ataki obejmują próby w toku. W/P = wygrane/przegrane, A/O = atak/obrona. Bez pełnego składu nie wykrywamy osób z zerem walk. Dawne lokalne zapisy nie są publikowane automatycznie; administrator może ponownie wkleić raport.</p>
       <div id="league-result" aria-live="polite"></div>
     </div>
   </div>
@@ -2277,7 +2279,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.12"></script>
-  <script src="app.js?v=24.12"></script>
+  <script src="league-parser.js?v=24.13"></script>
+  <script src="app.js?v=24.13"></script>
 </body>
 </html>
