@@ -86,9 +86,48 @@
     const status = document.getElementById('league-status');
     const escape = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const signed = n => n > 0 ? '+' + n : String(n);
+    let selectedGang = '', currentReport = null;
+    const tone = n => n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral';
     function render(data) {
-        result.innerHTML = `<p>${escape(data.gangA)} / ${escape(data.gangB)} · ${data.fights.length} walk · w toku: ${data.fights.filter(f=>f.pending).length} · bilans ${escape(data.gangA)}: ${signed(data.xp)} XP</p>` + data.warnings.map(w=>`<p role="alert">⚠️ ${escape(w)}</p>`).join('') + [data.gangA,data.gangB].map(gang => `<h3>${escape(gang)}</h3><div style="overflow-x:auto"><table><thead><tr><th>Gracz</th><th>Ataki</th><th>Atak W/P</th><th>Obrony W/P</th><th>W toku A/O</th><th>XP atak</th><th>XP obrona</th><th>Bilans XP</th></tr></thead><tbody>${data.players.filter(p=>p.gang===gang).sort((a,b)=>b.xp-a.xp || a.name.localeCompare(b.name,'pl')).map(p=>`<tr><td>${escape(p.name)}</td><td>${p.attacks}</td><td>${p.attackWins}/${p.attackLosses}</td><td>${p.defenseWins}/${p.defenseLosses}</td><td>${p.pendingAttack}/${p.pendingDefense}</td><td>${signed(p.attackXP)}</td><td>${signed(p.defenseXP)}</td><td>${signed(p.xp)}</td></tr>`).join('')}</tbody></table></div>`).join('');
+      currentReport = data;
+      if (![data.gangA,data.gangB].includes(selectedGang)) selectedGang = data.gangA;
+      const pending = data.fights.filter(f=>f.pending).length;
+      const rows = data.players.filter(p=>p.gang===selectedGang).sort((a,b)=>b.xp-a.xp || a.name.localeCompare(b.name,'pl'));
+      const total = key => rows.reduce((sum,p)=>sum+p[key],0);
+      const win = total('attackWins')+total('defenseWins'), loss = total('attackLosses')+total('defenseLosses');
+      const teamXP = selectedGang===data.gangA ? data.xp : -data.xp;
+      result.innerHTML = `
+        <div class="league-scoreboard">
+          <div class="league-eyebrow">LIGA MENELI <span>${escape(data.date.split('-').reverse().join('.'))}</span></div>
+          <div class="league-scoreline">
+            <div><strong>${escape(data.gangA)}</strong><b class="${tone(data.xp)}">${signed(data.xp)} <small>XP</small></b></div>
+            <span class="league-versus">VS</span>
+            <div><strong>${escape(data.gangB)}</strong><b class="${tone(-data.xp)}">${signed(-data.xp)} <small>XP</small></b></div>
+          </div>
+          <div class="league-score-foot"><span>${data.fights.length} walk  ·  ${data.fights.length-pending} rozstrzygniętych</span><span class="league-live">${pending} w toku</span></div>
+        </div>
+        ${data.warnings.map(w=>`<p class="league-warning" role="alert">${escape(w)}</p>`).join('')}
+        <div class="league-team-tabs" role="group" aria-label="Wybierz gang">${[data.gangA,data.gangB].map(g=>`<button type="button" data-league-team="${escape(g)}" aria-pressed="${g===selectedGang}" class="${g===selectedGang?'active':''}">${escape(g)}</button>`).join('')}</div>
+        <div class="league-metrics">
+          <div><span>Rozpoczęte ataki</span><strong>${total('attacks')}</strong><small>${total('pendingAttack')} w toku</small></div>
+          <div><span>Wygrane / przegrane</span><strong>${win} <i>/</i> ${loss}</strong><small>ataki i obrony</small></div>
+          <div><span>Bilans gangu</span><strong class="${tone(teamXP)}">${signed(teamXP)}</strong><small>XP z rozstrzygniętych walk</small></div>
+        </div>
+        <div class="league-table-wrap"><table class="league-table">
+          <thead><tr><th>Gracz</th><th>Ataki</th><th>Obrony</th><th>XP atak / obrona</th><th>Bilans XP ↓</th></tr></thead>
+          <tbody>${rows.map((p,index)=>`<tr>
+            <td class="league-player"><span class="league-rank">${index+1}</span><strong>${escape(p.name)}</strong></td>
+            <td data-label="Ataki"><b>${p.attacks}</b><small><span class="positive">${p.attackWins} W</span> / <span class="negative">${p.attackLosses} P</span>${p.pendingAttack?` · ${p.pendingAttack} w toku`:''}</small></td>
+            <td data-label="Obrony"><b>${p.defenses}</b><small><span class="positive">${p.defenseWins} W</span> / <span class="negative">${p.defenseLosses} P</span>${p.pendingDefense?` · ${p.pendingDefense} w toku`:''}</small></td>
+            <td class="league-xp-split" data-label="XP atak / obrona"><span class="${tone(p.attackXP)}">${signed(p.attackXP)}</span><span class="${tone(p.defenseXP)}">${signed(p.defenseXP)}</span></td>
+            <td class="league-net" data-label="Bilans XP"><b class="${tone(p.xp)}">${signed(p.xp)}</b></td>
+          </tr>`).join('')}</tbody></table></div>
+        <p class="league-caption">W = wygrane, P = przegrane. Ataki i obrony obejmują próby w toku. Kolejność według bilansu XP.</p>`;
     }
+    result.onclick = event => {
+      const tab = event.target.closest('[data-league-team]');
+      if (tab && currentReport) { selectedGang = tab.dataset.leagueTeam; render(currentReport); }
+    };
     let request = null, admin = false;
     function applyPermissions(value) {
       admin = Boolean(value);

@@ -9,6 +9,7 @@
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
+  <link rel="stylesheet" href="league.css?v=24.14">
   <title>MenelWars Tools</title>
 
   <style>
@@ -992,7 +993,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <p id="league-status" role="status"></p>
       <label for="league-history">Historia meczów</label>
       <select id="league-history"><option value="">Wybierz zapisany mecz…</option></select>
-      <p class="muted">Wspólna historia dla zalogowanych członków gangu. Raporty wgrywają wyłącznie Administratorzy. Wyniki nie odświeżają się z gry automatycznie — wymagają kolejnego importu. Pierwszy gracz to atakujący, drugi — obrońca. Bilans XP to wkład do wyniku meczu. Ataki obejmują próby w toku. W/P = wygrane/przegrane, A/O = atak/obrona. Bez pełnego składu nie wykrywamy osób z zerem walk. Dawne lokalne zapisy nie są publikowane automatycznie; administrator może ponownie wkleić raport.</p>
+      <details class="league-help"><summary>Jak czytać wyniki?</summary><p>Wspólna historia dla zalogowanych członków gangu. Raporty wgrywają wyłącznie Administratorzy. Wyniki wymagają kolejnego importu — nie odświeżają się z gry automatycznie. Bilans XP to wkład do wyniku meczu. Ataki obejmują próby w toku. Bez pełnego składu nie wykrywamy osób z zerem walk. Dawne lokalne zapisy nie są publikowane automatycznie.</p></details>
       <div id="league-result" aria-live="polite"></div>
     </div>
   </div>
@@ -2279,7 +2280,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.13"></script>
-  <script src="app.js?v=24.13"></script>
+  <script src="league-parser.js?v=24.14"></script>
+  <script src="app.js?v=24.14"></script>
 </body>
 </html>
