@@ -148,7 +148,7 @@
       const tab = event.target.closest('[data-league-team]');
       if (tab && currentReport) { selectedGang = tab.dataset.leagueTeam; render(currentReport); }
     };
-    let request = null, admin = false;
+    let request = null, admin = false, syncAllowed = false;
     const targetBox = document.getElementById('league-targets');
     let targetData = null, targetGang = '', targetPlayer = '';
     function renderTargets() {
@@ -183,14 +183,16 @@
         event.target.textContent=expanded?'Pokaż tylko 6 celów':'Pokaż pozostałe cele';
       }
     };
-    function applyPermissions(value) {
+    function applyPermissions(value,tier=0) {
       admin = Boolean(value);
+      syncAllowed = admin && Number(tier)>=2;
+      document.getElementById('league-sync-panel').hidden = !syncAllowed;
       document.getElementById('league-import-panel').hidden = !admin;
       button.disabled = !admin;
     }
     async function refreshHistory(selected) {
       const payload = await request('/gang/league');
-      applyPermissions(payload.permissions?.admin);
+      applyPermissions(payload.permissions?.admin,payload.permissions?.adminTier);
       const history = payload.matches || [];
       historySelect.innerHTML = '<option value="">Wybierz zapisany mecz…</option>' + history.map(m=>`<option value="${escape(m.id)}">${escape(m.date)} · ${escape(m.gangA)} / ${escape(m.gangB)} · ${m.fightCount} walk</option>`).join('');
       historySelect.value = selected || history[0]?.id || '';
@@ -230,7 +232,7 @@
     };
     const syncStatus=document.getElementById('league-sync-status'),syncToken=document.getElementById('league-sync-token'),syncCopy=document.getElementById('league-sync-copy');
     document.getElementById('league-sync-create').onclick=async()=>{
-      if(!admin||!request)return;
+      if(!syncAllowed||!request)return;
       if(!window.confirm('Wygenerować klucz? Poprzedni klucz synchronizacji Twojego konta przestanie działać.'))return;
       const control=document.getElementById('league-sync-create');control.disabled=true;
       try{
@@ -241,11 +243,12 @@
       finally{control.disabled=false;}
     };
     syncCopy.onclick=async()=>{
+      if(!syncAllowed)return;
       try{await navigator.clipboard.writeText(syncToken.value);syncStatus.textContent='Skopiowano klucz. Wklej go w panelu skryptu w grze.';}
       catch(_){syncToken.type='text';syncToken.select();syncStatus.textContent='Skopiuj zaznaczony klucz ręcznie (Ctrl+C).';}
     };
     document.getElementById('league-sync-revoke').onclick=async()=>{
-      if(!admin||!request)return;
+      if(!syncAllowed||!request)return;
       try{await request('/admin/gang/league/sync-key/revoke',{method:'POST',body:{}});syncToken.value='';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='Twój klucz synchronizacji został unieważniony.';}
       catch(e){syncStatus.textContent=e.message;}
     };
