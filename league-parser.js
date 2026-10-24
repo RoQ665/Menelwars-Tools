@@ -161,8 +161,8 @@
         <label>Gang przeciwnika<select data-target-gang>${d.opponents.map(g=>`<option ${g===targetGang?'selected':''}>${escape(g)}</option>`).join('')}</select></label></div>
         <p class="league-caption">${escape(d.note)}</p>
         ${rows.length?`<div class="league-target-list">${rows.map(p=>`<article class="league-target-card ${escape(p.category)}"><div class="league-target-top"><strong>${escape(p.name)}</strong><span class="league-target-tag">${escape(p.label)}</span></div>
-          <div class="league-target-stats"><b>${p.lastXP?'+'+p.lastXP.value+' XP':'XP: brak danych'}</b><span>${p.sampleDate?`${p.wins} W / ${p.losses} P · ${escape(p.sampleDate)}`:'Brak świeżej próbki własnych walk'}</span></div>
-          <p>${escape(p.reason)}</p>${p.lastXP?`<small>Stawka za pokonanie celu zaobserwowana ${escape(p.lastXP.date)}; może się zmienić.</small>`:''}
+          <div class="league-target-stats"><b>Wygrana: ${p.lastXP?'+'+p.lastXP.value+' XP':'brak danych'}</b><span>Porażka ${escape(d.player)}: ${p.lossXP?'−'+p.lossXP.value+' XP':'brak danych'}</span><span>${p.sampleDate?`${p.wins} W / ${p.losses} P · ${escape(p.sampleDate)}`:'Brak świeżej próbki własnych walk'}</span></div>
+          <p>${escape(p.reason)}</p><small>${p.lastXP?`Wygrana: stawka celu z ${escape(p.lastXP.date)}. `:''}${p.lossXP?`Porażka: stawka ${escape(d.player)} z ${escape(p.lossXP.date)}. `:''}To wartości zaobserwowane, nie aktualny podgląd gry.</small>
           ${p.evidence.length?`<details><summary>Dowody (${p.totalEvidence})</summary>${p.evidence.map(f=>`<div class="league-target-proof"><span>${escape(f.date)} · ${escape(f.time)}</span><b>${escape(f.attacker)} → ${escape(f.defender)}</b><span>Wygrywa ${escape(f.winner)}</span></div>`).join('')}${p.totalEvidence>p.evidence.length?'<small>Pokazano 6 najnowszych walk.</small>':''}</details>`:''}</article>`).join('')}</div>${rows.length>6?`<button type="button" data-target-expand>Pokaż pozostałe cele (${rows.length-6})</button>`:''}`:'<p class="league-caption">Brak kandydatów — potrzebny raport z udziałem tego gracza.</p>'}`;
     }
     async function loadTargets() {
