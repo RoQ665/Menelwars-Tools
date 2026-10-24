@@ -228,6 +228,27 @@
       } catch(e) {status.textContent='Nie zapisano składu. '+e.message;}
       finally {control.disabled=false;}
     };
+    const syncStatus=document.getElementById('league-sync-status'),syncToken=document.getElementById('league-sync-token'),syncCopy=document.getElementById('league-sync-copy');
+    document.getElementById('league-sync-create').onclick=async()=>{
+      if(!admin||!request)return;
+      if(!window.confirm('Wygenerować klucz? Poprzedni klucz synchronizacji Twojego konta przestanie działać.'))return;
+      const control=document.getElementById('league-sync-create');control.disabled=true;
+      try{
+        const payload=await request('/admin/gang/league/sync-key',{method:'POST',body:{}});
+        syncToken.value=payload.token;syncToken.hidden=false;syncCopy.hidden=false;
+        syncStatus.textContent='Klucz ważny do '+new Date(payload.expiresAt).toLocaleString('pl-PL')+'. Skopiuj go teraz do skryptu; nie zapisujemy jego jawnej postaci w historii.';
+      }catch(e){syncStatus.textContent=e.message;}
+      finally{control.disabled=false;}
+    };
+    syncCopy.onclick=async()=>{
+      try{await navigator.clipboard.writeText(syncToken.value);syncStatus.textContent='Skopiowano klucz. Wklej go w panelu skryptu w grze.';}
+      catch(_){syncToken.type='text';syncToken.select();syncStatus.textContent='Skopiuj zaznaczony klucz ręcznie (Ctrl+C).';}
+    };
+    document.getElementById('league-sync-revoke').onclick=async()=>{
+      if(!admin||!request)return;
+      try{await request('/admin/gang/league/sync-key/revoke',{method:'POST',body:{}});syncToken.value='';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='Twój klucz synchronizacji został unieważniony.';}
+      catch(e){syncStatus.textContent=e.message;}
+    };
     historySelect.onchange = () => loadSelected().catch(e=>{status.textContent=e.message;});
     window.LeagueView = {
       async open(api) {
@@ -236,6 +257,7 @@
         targetData = null;
         targetBox.textContent = '';
         applyPermissions(false);
+        syncToken.value='';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='';
         result.textContent = '';
         historySelect.innerHTML = '<option value="">Ładowanie historii…</option>';
         status.textContent = 'Pobieram wspólne wyniki…';
