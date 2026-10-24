@@ -718,6 +718,7 @@
     <button data-subtab="announcements-view" data-group="gang">📢 Ogłoszenia</button>
     <button data-subtab="demand-view" data-group="gang">📦 Potrzeby</button>
     <button data-subtab="special-operations-view" data-group="gang">🎁 Operacje specjalne</button>
+    <button data-subtab="league-view" data-group="gang">⚔️ Liga Meneli</button>
   </nav>
 
   <section id="home-view" class="view">
@@ -970,10 +971,30 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
           <button type="button" data-gang-menu-target="special-operations-view">
             <span>🎁</span><b>Operacje specjalne</b><small>Preferencje, wkład i jawny podział łupów.</small>
           </button>
+          <button type="button" data-gang-menu-target="league-view">
+            <span>⚔️</span><b>Liga Meneli</b><small>Ataki, obrony i bilans XP każdego gracza.</small>
+          </button>
         </div>
       </div>
     </div>
   </section>
+
+<section id="league-view" class="view" hidden>
+  <div class="panel">
+    <div class="panel-head">⚔️ Liga Meneli — analiza meczu</div>
+    <div class="panel-body">
+      <p>Otwórz Szczegóły meczu w grze, skopiuj całą stronę (Ctrl+A, Ctrl+C) i wklej poniżej. Pierwszy gracz to atakujący, drugi — obrońca.</p>
+      <label for="league-input">Skopiowana strona meczu</label>
+      <textarea id="league-input" rows="7" style="width:100%;box-sizing:border-box" placeholder="Wklej Szczegóły meczu…"></textarea>
+      <button type="button" id="league-parse" class="primary-btn">Zapisz / aktualizuj mecz</button>
+      <p id="league-status" role="status"></p>
+      <label for="league-history">Historia meczów</label>
+      <select id="league-history"><option value="">Wybierz zapisany mecz…</option></select>
+      <p class="muted">Historia jest zapisywana wyłącznie w tej przeglądarce — bez synchronizacji z innymi urządzeniami. Wyczyszczenie danych strony usuwa historię. Ta sama data i para gangów aktualizuje jeden mecz; inne dni pozostają w historii. Niepełny odczyt nie nadpisze zapisu. Bilans XP oznacza wkład do wyniku meczu, nie zawsze zmianę osobistego XP. Ataki obejmują także próby w toku. W/P = wygrane/przegrane, A/O = atak/obrona. Bez pełnego składu nie wykrywamy osób z zerem walk.</p>
+      <div id="league-result" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
 
 <section id="gang-gate-view" class="view" hidden>
     <div class="panel">
@@ -2256,6 +2277,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="app.js?v=24.11"></script>
+  <script src="league-parser.js?v=24.12"></script>
+  <script src="app.js?v=24.12"></script>
 </body>
 </html>

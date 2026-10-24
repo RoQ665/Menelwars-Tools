@@ -18229,6 +18229,12 @@ function setupAdmin() {
       return;
     }
 
+    if (target === "league-view") {
+      el("gang-tabs").hidden = false;
+      showToolView("league-view","gang");
+      return;
+    }
+
     if (target === "special-operations-view") {
       el("gang-tabs").hidden = false;
       showToolView("special-operations-view","gang");
