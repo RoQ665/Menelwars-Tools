@@ -148,7 +148,7 @@
       const tab = event.target.closest('[data-league-team]');
       if (tab && currentReport) { selectedGang = tab.dataset.leagueTeam; render(currentReport); }
     };
-    let request = null, admin = false, syncAllowed = false;
+    let request = null, admin = false, syncAllowed = false, syncRequest = null, syncIdentity = '';
     const targetBox = document.getElementById('league-targets');
     let targetData = null, targetGang = '', targetPlayer = '';
     function renderTargets() {
@@ -185,8 +185,6 @@
     };
     function applyPermissions(value,tier=0) {
       admin = Boolean(value);
-      syncAllowed = admin && Number(tier)>=2;
-      document.getElementById('league-sync-panel').hidden = !syncAllowed;
       document.getElementById('league-import-panel').hidden = !admin;
       button.disabled = !admin;
     }
@@ -231,14 +229,23 @@
       finally {control.disabled=false;}
     };
     const syncStatus=document.getElementById('league-sync-status'),syncToken=document.getElementById('league-sync-token'),syncCopy=document.getElementById('league-sync-copy');
+    window.LeagueSyncPanel={configure(api,account){
+      syncAllowed=Boolean(account?.admin&&Number(account.adminTier)>=2);
+      syncRequest=syncAllowed?api:null;
+      document.getElementById('league-sync-panel').hidden=!syncAllowed;
+      const identity=syncAllowed?String(account.nick||'')+':'+account.adminTier:'';
+      if(identity!==syncIdentity||!syncAllowed){syncToken.value='';syncToken.type='password';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='';}
+      syncIdentity=identity;
+    }};
+    window.LeagueSyncPanel.configure(null,null);
     document.getElementById('league-sync-create').onclick=async()=>{
-      if(!syncAllowed||!request)return;
+      if(!syncAllowed||!syncRequest)return;
       if(!window.confirm('Wygenerować klucz? Poprzedni klucz synchronizacji Twojego konta przestanie działać.'))return;
       const control=document.getElementById('league-sync-create');control.disabled=true;
       try{
-        const payload=await request('/admin/gang/league/sync-key',{method:'POST',body:{}});
+        const payload=await syncRequest('/admin/gang/league/sync-key',{method:'POST',body:{payments:Boolean(document.getElementById('sync-payments-allow').checked),aiDump:Boolean(document.getElementById('sync-ai-dump-allow').checked)}});
         syncToken.value=payload.token;syncToken.hidden=false;syncCopy.hidden=false;
-        syncStatus.textContent='Klucz ważny do '+new Date(payload.expiresAt).toLocaleString('pl-PL')+'. Skopiuj go teraz do skryptu; nie zapisujemy jego jawnej postaci w historii.';
+        syncStatus.textContent='Zakres: '+String(payload.scope||'league').split(',').map(s=>({league:'Liga',payments:'Wpłaty',ai_dump:'Wysypisko AI',company:'Spółka'}[s]||s)).join(' + ')+'. Klucz ważny do '+new Date(payload.expiresAt).toLocaleString('pl-PL')+'. Skopiuj go teraz do skryptu; nie zapisujemy jego jawnej postaci w historii.';
       }catch(e){syncStatus.textContent=e.message;}
       finally{control.disabled=false;}
     };
@@ -248,8 +255,8 @@
       catch(_){syncToken.type='text';syncToken.select();syncStatus.textContent='Skopiuj zaznaczony klucz ręcznie (Ctrl+C).';}
     };
     document.getElementById('league-sync-revoke').onclick=async()=>{
-      if(!syncAllowed||!request)return;
-      try{await request('/admin/gang/league/sync-key/revoke',{method:'POST',body:{}});syncToken.value='';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='Twój klucz synchronizacji został unieważniony.';}
+      if(!syncAllowed||!syncRequest)return;
+      try{await syncRequest('/admin/gang/league/sync-key/revoke',{method:'POST',body:{}});syncToken.value='';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='Twój klucz synchronizacji został unieważniony.';}
       catch(e){syncStatus.textContent=e.message;}
     };
     historySelect.onchange = () => loadSelected().catch(e=>{status.textContent=e.message;});
@@ -260,7 +267,6 @@
         targetData = null;
         targetBox.textContent = '';
         applyPermissions(false);
-        syncToken.value='';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='';
         result.textContent = '';
         historySelect.innerHTML = '<option value="">Ładowanie historii…</option>';
         status.textContent = 'Pobieram wspólne wyniki…';

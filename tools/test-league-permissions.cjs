@@ -18,9 +18,9 @@ vm.runInContext(fs.readFileSync(require.resolve('../league-parser.js'),'utf8'),c
   assert.equal(get('league-import-panel').hidden,false);
   assert.equal(get('league-parse').disabled,false);
   assert.equal(get('league-sync-panel').hidden,true);
-  await context.window.LeagueView.open(async()=>({permissions:{admin:true,adminTier:2},matches:[]}));
+  context.window.LeagueSyncPanel.configure(async()=>({}),{admin:true,adminTier:2,nick:'Tester'});
   assert.equal(get('league-sync-panel').hidden,false);
-  await context.window.LeagueView.open(async()=>({permissions:{admin:true,adminTier:1},matches:[]}));
+  context.window.LeagueSyncPanel.configure(async()=>({}),{admin:true,adminTier:1,nick:'Tester'});
   assert.equal(get('league-import-panel').hidden,false);
   assert.equal(get('league-sync-panel').hidden,true);
   await context.window.LeagueView.open(async()=>{throw Error('session expired');});

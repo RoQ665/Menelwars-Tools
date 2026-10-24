@@ -3786,6 +3786,8 @@ function mapRenderRouteResult() {
         force:forceRefresh
       });
 
+    window.LeagueSyncPanel?.configure(async(path,options={})=>cloudflareApi(path,{...options,token:await cloudflareEnsureSession()}),account);
+
     if (!account) {
       box.innerHTML = `
         <div class="account-card">
@@ -4039,7 +4041,7 @@ function mapRenderRouteResult() {
         // Nie opieraj jej na wcześniejszym stanie DOM ani starym cache sesji.
         experimentalUiApply(account);
         playerAccountStatus().then(fresh=>{
-          if(fresh)experimentalUiApply(fresh);
+          if(fresh){experimentalUiApply(fresh);window.LeagueSyncPanel?.configure(async(path,options={})=>cloudflareApi(path,{...options,token:await cloudflareEnsureSession()}),fresh);}
         });
 
         closeAllAdminSections();

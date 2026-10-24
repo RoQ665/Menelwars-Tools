@@ -9,7 +9,7 @@
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
-  <link rel="stylesheet" href="league.css?v=24.23">
+  <link rel="stylesheet" href="league.css?v=24.24">
   <title>MenelWars Tools</title>
 
   <style>
@@ -995,17 +995,6 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
         <label for="league-roster-gang">Gang — tylko przy ręcznej liście nicków (opcjonalnie)</label><input id="league-roster-gang" placeholder="Przy wklejaniu profilu zostaw puste" maxlength="100">
         <button type="button" id="league-roster-save">Importuj skład gangu</button>
       </details>
-      <details id="league-sync-panel" class="league-help" hidden><summary>Automatyczna synchronizacja — Tampermonkey (T2)</summary>
-        <p>1. Zainstaluj <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a>. Prywatny skrypt z lokalnego pliku wklej w jego edytorze: „Utwórz nowy skrypt”. Skrypt nie jest udostępniany na stronie toola.</p>
-        <p>2. Wygeneruj klucz poniżej. W grze rozwiń panel „Liga → MenelWars Tools”, wklej klucz i zapisz ustawienia.</p>
-        <p>3. Otwórz Szczegóły meczu, wybierz 5, 10, 30 lub 60 minut i uruchom automat ręcznie. Skrypt przechwytuje tylko odpowiedzi Network, które gra sama pobiera. Brak nowych raportów przez 5 minut zatrzymuje automat. Po odświeżeniu strony, przerwie lub weryfikacji gry uruchom go ponownie ręcznie. Brak ataków, dodatkowego odpytywania gry i obchodzenia zabezpieczeń. Nie ma gwarancji niewykrywalności. Komputer musi działać.</p>
-        <p>Klucz jest ważny 30 dni i pozwala wyłącznie importować mecze. Nie jest hasłem ani pełną sesją konta. Nie udostępniaj go. Generowanie nowego unieważnia Twój poprzedni klucz.</p>
-        <button type="button" id="league-sync-create">Wygeneruj klucz synchronizacji</button>
-        <button type="button" id="league-sync-revoke">Unieważnij mój klucz</button>
-        <input id="league-sync-token" type="password" readonly autocomplete="off" hidden aria-label="Nowy klucz synchronizacji">
-        <button type="button" id="league-sync-copy" hidden>Kopiuj klucz</button>
-        <p id="league-sync-status" role="status"></p>
-      </details>
       </div>
       <p id="league-status" role="status"></p>
       <label for="league-history">Historia meczów</label>
@@ -1770,6 +1759,21 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
       <div id="admin-content" hidden>
 
+      <details id="league-sync-panel" class="league-help" hidden><summary>Prywatna synchronizacja danych (T2)</summary>
+        <p>1. Zainstaluj <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a>. Prywatny skrypt z lokalnego pliku wklej w jego edytorze: „Utwórz nowy skrypt”. Skrypt nie jest udostępniany na stronie toola.</p>
+        <p>2. Wygeneruj klucz poniżej. W grze rozwiń panel „Liga / Wysypisko AI → Tools”, wklej klucz i zapisz ustawienia.</p>
+        <p>3. Otwórz Szczegóły meczu, wybierz 5, 10, 30 lub 60 minut i uruchom automat ręcznie. Skrypt przechwytuje tylko odpowiedzi Network, które gra sama pobiera. Brak nowych raportów przez 5 minut zatrzymuje automat. Po odświeżeniu strony, przerwie lub weryfikacji gry uruchom go ponownie ręcznie. Brak ataków, dodatkowego odpytywania gry i obchodzenia zabezpieczeń. Nie ma gwarancji niewykrywalności. Komputer musi działać.</p>
+        <p>Wysypisko AI: otwórz w grze „Historycznie”, uruchom automat i włącz osobnym przyciskiem odczyt Wysypiska AI. Skrypt odczytuje widoczną listę zamiast Network; niczego nie klika. Wysyła tylko zmieniony ranking. Po 5 minutach bez nowego raportu automat zatrzymuje się zgodnie z ustawionym zabezpieczeniem.</p>
+        <p>Klucz jest ważny 30 dni i pozwala importować raporty ligi oraz zaznaczone dodatkowe źródła. Nie jest hasłem ani pełną sesją konta i nie daje prawa do operacji w grze. Generowanie nowego unieważnia Twój poprzedni klucz.</p>
+        <label><input id="sync-payments-allow" type="checkbox"> Zezwól również na aktualizację Wpłat (cała historia, wszyscy członkowie)</label>
+        <label><input id="sync-ai-dump-allow" type="checkbox"> Zezwól na import historycznego wkładu Wysypiska AI</label>
+        <button type="button" id="league-sync-create">Wygeneruj klucz synchronizacji</button>
+        <button type="button" id="league-sync-revoke">Unieważnij mój klucz</button>
+        <input id="league-sync-token" type="password" readonly autocomplete="off" hidden aria-label="Nowy klucz synchronizacji">
+        <button type="button" id="league-sync-copy" hidden>Kopiuj klucz</button>
+        <p id="league-sync-status" role="status"></p>
+      </details>
+
         <div class="admin-session-banner">
 
           <div>
@@ -2302,7 +2306,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.23"></script>
-  <script src="app.js?v=24.23"></script>
+  <script src="league-parser.js?v=24.24"></script>
+  <script src="app.js?v=24.24"></script>
 </body>
 </html>
