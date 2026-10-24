@@ -9,7 +9,7 @@
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
-  <link rel="stylesheet" href="league.css?v=24.19">
+  <link rel="stylesheet" href="league.css?v=24.20">
   <title>MenelWars Tools</title>
 
   <style>
@@ -990,10 +990,10 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <textarea id="league-input" rows="7" style="width:100%;box-sizing:border-box" placeholder="Wklej Szczegóły meczu…"></textarea>
       <button type="button" id="league-parse" class="primary-btn">Zapisz / aktualizuj mecz</button>
       <details class="league-help"><summary>Uzupełnij pełny skład gangu</summary>
-        <p>Wpisz dokładną nazwę gangu i pełną listę nicków, po jednym w wierszu. To uzupełni osoby bez walk. Nowa lista zastąpi poprzedni skład, ale nie usunie historii uczestników meczu.</p>
-        <label for="league-roster-gang">Gang</label><input id="league-roster-gang" placeholder="np. Jpg" maxlength="100">
-        <label for="league-roster-text">Pełny skład — jeden nick w wierszu</label><textarea id="league-roster-text" rows="5" style="width:100%;box-sizing:border-box"></textarea>
-        <button type="button" id="league-roster-save">Zapisz skład</button>
+        <p>W grze otwórz Profil gangu z listą członków, skopiuj całą stronę (Ctrl+A, Ctrl+C) i wklej poniżej. Tool rozpozna gang i sprawdzi liczbę członków. Ranking i nagłówek konta zostaną pominięte. Nowy skład zastąpi poprzednią listę, bez usuwania historii walk.</p>
+        <label for="league-roster-text">Cała strona Profilu gangu</label><textarea id="league-roster-text" rows="5" style="width:100%;box-sizing:border-box" placeholder="Wklej stronę zawierającą Profil gangu i Członkowie (…)"></textarea>
+        <label for="league-roster-gang">Gang — tylko przy ręcznej liście nicków (opcjonalnie)</label><input id="league-roster-gang" placeholder="Przy wklejaniu profilu zostaw puste" maxlength="100">
+        <button type="button" id="league-roster-save">Importuj skład gangu</button>
       </details>
       </div>
       <p id="league-status" role="status"></p>
@@ -2291,7 +2291,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.19"></script>
-  <script src="app.js?v=24.19"></script>
+  <script src="league-parser.js?v=24.20"></script>
+  <script src="app.js?v=24.20"></script>
 </body>
 </html>
