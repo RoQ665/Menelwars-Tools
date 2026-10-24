@@ -127,13 +127,13 @@
         <div class="league-table-wrap"><table class="league-table">
           <thead><tr><th aria-sort="${sortAria('name')}">${sortButton('name')}</th><th aria-sort="${sortAria('attacks')}">${sortButton('attacks')}</th><th aria-sort="${sortAria('defenses')}">${sortButton('defenses')}</th><th aria-sort="${sortField==='attackXP'||sortField==='defenseXP'?sortAria(sortField):'none'}">${sortButton('attackXP')} / ${sortButton('defenseXP')}</th><th aria-sort="${sortAria('xp')}">${sortButton('xp')}</th></tr></thead>
           <tbody>${rows.map((p,index)=>`<tr>
-            <td class="league-player"><span class="league-rank">${index+1}</span><strong>${escape(p.name)}</strong></td>
+            <td class="league-player"><span class="league-rank">${index+1}</span><strong>${escape(p.name)}${p.noMatchData?'<small>Brak walk w raporcie</small>':''}</strong></td>
             <td data-label="Ataki"><b>${p.attacks}</b><small><span class="positive">${p.attackWins} W</span> / <span class="negative">${p.attackLosses} P</span>${p.pendingAttack?` · ${p.pendingAttack} w toku`:''}</small></td>
             <td data-label="Obrony"><b>${p.defenses}</b><small><span class="positive">${p.defenseWins} W</span> / <span class="negative">${p.defenseLosses} P</span>${p.pendingDefense?` · ${p.pendingDefense} w toku`:''}</small></td>
             <td class="league-xp-split" data-label="XP atak / obrona"><span class="${tone(p.attackXP)}">${signed(p.attackXP)}</span><span class="${tone(p.defenseXP)}">${signed(p.defenseXP)}</span></td>
             <td class="league-net" data-label="Bilans XP"><b class="${tone(p.xp)}">${signed(p.xp)}</b></td>
           </tr>`).join('')}</tbody></table></div>
-        <p class="league-caption">W = wygrane, P = przegrane. Ataki i obrony obejmują próby w toku. Sortowanie: ${sortLabels[sortField]}, ${sortDirection==='desc'?'malejąco':'rosnąco'}.</p>`;
+        <p class="league-caption">${rows.length} graczy · W = wygrane, P = przegrane. Ataki i obrony obejmują próby w toku. Sortowanie: ${sortLabels[sortField]}, ${sortDirection==='desc'?'malejąco':'rosnąco'}. ${(data.rosterNotes||[]).map(escape).join(' ')}</p>`;
     }
     result.onclick = event => {
       const sort = event.target.closest('[data-league-sort]');
@@ -217,6 +217,16 @@
         document.getElementById('league-input').value = '';
       } catch(e) { status.textContent = 'Nie zapisano meczu. ' + e.message; if (e.status===401 || e.status===403) applyPermissions(false); }
       finally { button.disabled = !admin; }
+    };
+    document.getElementById('league-roster-save').onclick = async () => {
+      if(!admin||!request)return;
+      const control=document.getElementById('league-roster-save');control.disabled=true;
+      try {
+        const saved=await request('/admin/gang/league/roster',{method:'POST',body:{gang:document.getElementById('league-roster-gang').value,text:document.getElementById('league-roster-text').value}});
+        await refreshHistory(historySelect.value);
+        status.textContent=`Zapisano skład ${saved.gang}: ${saved.count} graczy. Tabela uzupełniona o osoby bez walk.`;
+      } catch(e) {status.textContent='Nie zapisano składu. '+e.message;}
+      finally {control.disabled=false;}
     };
     historySelect.onchange = () => loadSelected().catch(e=>{status.textContent=e.message;});
     window.LeagueView = {

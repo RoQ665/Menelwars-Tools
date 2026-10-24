@@ -9,7 +9,7 @@
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
-  <link rel="stylesheet" href="league.css?v=24.18">
+  <link rel="stylesheet" href="league.css?v=24.19">
   <title>MenelWars Tools</title>
 
   <style>
@@ -989,6 +989,12 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <label for="league-input">Skopiowana strona meczu</label>
       <textarea id="league-input" rows="7" style="width:100%;box-sizing:border-box" placeholder="Wklej Szczegóły meczu…"></textarea>
       <button type="button" id="league-parse" class="primary-btn">Zapisz / aktualizuj mecz</button>
+      <details class="league-help"><summary>Uzupełnij pełny skład gangu</summary>
+        <p>Wpisz dokładną nazwę gangu i pełną listę nicków, po jednym w wierszu. To uzupełni osoby bez walk. Nowa lista zastąpi poprzedni skład, ale nie usunie historii uczestników meczu.</p>
+        <label for="league-roster-gang">Gang</label><input id="league-roster-gang" placeholder="np. Jpg" maxlength="100">
+        <label for="league-roster-text">Pełny skład — jeden nick w wierszu</label><textarea id="league-roster-text" rows="5" style="width:100%;box-sizing:border-box"></textarea>
+        <button type="button" id="league-roster-save">Zapisz skład</button>
+      </details>
       </div>
       <p id="league-status" role="status"></p>
       <label for="league-history">Historia meczów</label>
@@ -2285,7 +2291,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.18"></script>
-  <script src="app.js?v=24.18"></script>
+  <script src="league-parser.js?v=24.19"></script>
+  <script src="app.js?v=24.19"></script>
 </body>
 </html>
