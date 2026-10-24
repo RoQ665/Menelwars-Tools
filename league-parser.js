@@ -99,8 +99,12 @@
     const sortAria = field => sortField===field?(sortDirection==='desc'?'descending':'ascending'):'none';
     const tone = n => n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral';
     function render(data) {
+      const gangs = [data.gangA,data.gangB];
+      if (gangs[1].trim().toLocaleLowerCase('pl') === 'dupkapupka') gangs.reverse();
+      const newMatch = !currentReport || matchKey(currentReport)!==matchKey(data);
       currentReport = data;
-      if (![data.gangA,data.gangB].includes(selectedGang)) selectedGang = data.gangA;
+      if (newMatch || !gangs.includes(selectedGang)) selectedGang = gangs[0];
+      const leftXP = gangs[0]===data.gangA ? data.xp : -data.xp;
       const pending = data.fights.filter(f=>f.pending).length;
       const rows = sortPlayers(data.players.filter(p=>p.gang===selectedGang),sortField,sortDirection);
       const total = key => rows.reduce((sum,p)=>sum+p[key],0);
@@ -110,14 +114,14 @@
         <div class="league-scoreboard">
           <div class="league-eyebrow">LIGA MENELI <span>${escape(data.date.split('-').reverse().join('.'))}</span></div>
           <div class="league-scoreline">
-            <div><strong>${escape(data.gangA)}</strong><b class="${tone(data.xp)}">${signed(data.xp)} <small>XP</small></b></div>
+            <div><strong>${escape(gangs[0])}</strong><b class="${tone(leftXP)}">${signed(leftXP)} <small>XP</small></b></div>
             <span class="league-versus">VS</span>
-            <div><strong>${escape(data.gangB)}</strong><b class="${tone(-data.xp)}">${signed(-data.xp)} <small>XP</small></b></div>
+            <div><strong>${escape(gangs[1])}</strong><b class="${tone(-leftXP)}">${signed(-leftXP)} <small>XP</small></b></div>
           </div>
           <div class="league-score-foot"><span>${data.fights.length} walk  ·  ${data.fights.length-pending} rozstrzygniętych</span><span class="league-live">${pending} w toku</span></div>
         </div>
         ${data.warnings.map(w=>`<p class="league-warning" role="alert">${escape(w)}</p>`).join('')}
-        <div class="league-team-tabs" role="group" aria-label="Wybierz gang">${[data.gangA,data.gangB].map(g=>`<button type="button" data-league-team="${escape(g)}" aria-pressed="${g===selectedGang}" class="${g===selectedGang?'active':''}">${escape(g)}</button>`).join('')}</div>
+        <div class="league-team-tabs" role="group" aria-label="Wybierz gang">${gangs.map(g=>`<button type="button" data-league-team="${escape(g)}" aria-pressed="${g===selectedGang}" class="${g===selectedGang?'active':''}">${escape(g)}</button>`).join('')}</div>
         <div class="league-metrics">
           <div><span>Rozpoczęte ataki</span><strong>${total('attacks')}</strong><small>${total('pendingAttack')} w toku</small></div>
           <div><span>Wygrane / przegrane</span><strong>${win} <i>/</i> ${loss}</strong><small>ataki i obrony</small></div>

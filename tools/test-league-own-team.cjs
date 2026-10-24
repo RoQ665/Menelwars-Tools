@@ -1,0 +1,25 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const nodes=new Map(),get=id=>{if(!nodes.has(id))nodes.set(id,{value:'',innerHTML:'',textContent:''});return nodes.get(id);};
+const context={document:{readyState:'complete',getElementById:get},window:{},Date};
+vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../league-parser.js'),'utf8'),context);
+let date='2026-10-24',gangA='Jpg',gangB='Dupkapupka';
+const player=(name,gang)=>({name,gang,attacks:0,defenses:0,attackXP:0,defenseXP:0,xp:0,attackWins:0,attackLosses:0,defenseWins:0,defenseLosses:0,pendingAttack:0,pendingDefense:0});
+const api=async path=>path.includes('/targets')?{opponents:[],targets:[],players:[],player:'RoQ',asOf:date}:path.includes('?match=')?{data:{date,gangA,gangB,xp:123,fights:[],warnings:[],players:[player('RoQ','Dupkapupka'),player('Enemy','Jpg')]},updatedAt:0,updatedBy:'Tester'}:{permissions:{admin:false},matches:[{id:'one',date,gangA,gangB,fightCount:0}]};
+(async()=>{
+  await context.window.LeagueView.open(api);
+  const result=get('league-result');
+  assert.ok(result.innerHTML.indexOf('<strong>Dupkapupka</strong>')<result.innerHTML.indexOf('<strong>Jpg</strong>'));
+  assert.ok(result.innerHTML.includes('<strong>Dupkapupka</strong><b class="negative">-123'));
+  assert.ok(result.innerHTML.includes('data-league-team="Dupkapupka" aria-pressed="true"'));
+  assert.ok(result.innerHTML.includes('<strong>RoQ</strong>'));assert.ok(!result.innerHTML.includes('<strong>Enemy</strong>'));
+  result.onclick({target:{closest:selector=>selector==='[data-league-team]'?{dataset:{leagueTeam:'Jpg'}}:null}});
+  assert.ok(result.innerHTML.includes('<strong>Enemy</strong>'));
+  await context.window.LeagueView.open(api);assert.ok(result.innerHTML.includes('data-league-team="Jpg" aria-pressed="true"'));
+  date='2026-10-25';await context.window.LeagueView.open(api);
+  assert.ok(result.innerHTML.includes('data-league-team="Dupkapupka" aria-pressed="true"'));
+  gangA='Dupkapupka';gangB='Jpg';await context.window.LeagueView.open(api);
+  assert.ok(result.innerHTML.includes('<strong>Dupkapupka</strong><b class="positive">+123'));
+  gangA='Other A';gangB='Other B';await context.window.LeagueView.open(api);
+  assert.ok(result.innerHTML.indexOf('<strong>Other A</strong>')<result.innerHTML.indexOf('<strong>Other B</strong>'));
+  console.log('Own gang left/default for either source order and next day; XP signs, manual tabs and unrelated matches preserved — OK');
+})().catch(e=>{console.error(e);process.exitCode=1;});
