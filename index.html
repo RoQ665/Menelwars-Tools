@@ -9,7 +9,7 @@
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
-  <link rel="stylesheet" href="league.css?v=24.16">
+  <link rel="stylesheet" href="league.css?v=24.17">
   <title>MenelWars Tools</title>
 
   <style>
@@ -993,9 +993,13 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
       <p id="league-status" role="status"></p>
       <label for="league-history">Historia meczów</label>
       <select id="league-history"><option value="">Wybierz zapisany mecz…</option></select>
-      <section id="league-targets" class="league-targets" aria-label="Cele do ataku"></section>
-      <details class="league-help"><summary>Jak czytać wyniki?</summary><p>Wspólna historia dla zalogowanych członków gangu. Raporty wgrywają wyłącznie Administratorzy. Wyniki wymagają kolejnego importu — nie odświeżają się z gry automatycznie. Bilans XP to wkład do wyniku meczu. Ataki obejmują próby w toku. Bez pełnego składu nie wykrywamy osób z zerem walk. Dawne lokalne zapisy nie są publikowane automatycznie.</p></details>
       <div id="league-result" aria-live="polite"></div>
+      <details class="league-target-drawer">
+        <summary><span>Cele do ataku <small>TEST</small></span><span class="league-drawer-hint">Rozwiń podpowiedzi</span></summary>
+        <p class="league-target-intro">Twoje walki są najważniejsze. Wyniki innych graczy dają tylko kandydatów „do sprawdzenia”, nie pewne wygrane. Rozwiń „Dowody” przy celu, aby zobaczyć, skąd pochodzi sugestia.</p>
+        <section id="league-targets" class="league-targets" aria-label="Cele do ataku"></section>
+      </details>
+      <details class="league-help"><summary>Jak czytać wyniki?</summary><p>Wspólna historia dla zalogowanych członków gangu. Raporty wgrywają wyłącznie Administratorzy. Wyniki wymagają kolejnego importu — nie odświeżają się z gry automatycznie. Bilans XP to wkład do wyniku meczu. Ataki obejmują próby w toku. Bez pełnego składu nie wykrywamy osób z zerem walk. Dawne lokalne zapisy nie są publikowane automatycznie.</p></details>
     </div>
   </div>
 </section>
@@ -2281,7 +2285,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.16"></script>
-  <script src="app.js?v=24.16"></script>
+  <script src="league-parser.js?v=24.17"></script>
+  <script src="app.js?v=24.17"></script>
 </body>
 </html>
