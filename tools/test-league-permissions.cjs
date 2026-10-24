@@ -20,5 +20,13 @@ vm.runInContext(fs.readFileSync(require.resolve('../league-parser.js'),'utf8'),c
   await context.window.LeagueView.open(async()=>{throw Error('session expired');});
   assert.equal(get('league-import-panel').hidden,true);
   assert.equal(get('league-parse').disabled,true);
+  await context.window.LeagueView.open(async path=>path.includes('/targets')?{
+    player:'Tester',asOf:'2026-10-24',admin:false,opponents:['Other'],players:['Tester'],note:'Test',targets:[{
+      name:'<img onerror=bad>',gang:'Other',category:'tested',label:'Sprawdzony',reason:'Dwie wygrane',lastXP:{value:230,date:'2026-10-24'},sampleDate:'2026-10-24',wins:2,losses:0,evidence:[],totalEvidence:2
+    }]
+  }:{permissions:{admin:false},matches:[]});
+  assert.ok(get('league-targets').innerHTML.includes('&lt;img onerror=bad&gt;'));
+  assert.ok(get('league-targets').innerHTML.includes('+230 XP'));
+  assert.ok(!get('league-targets').innerHTML.includes('data-target-player'));
   console.log('League UI: member read-only, admin import, failed auth hides import — OK');
 })().catch(e=>{console.error(e);process.exitCode=1;});

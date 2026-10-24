@@ -129,6 +129,40 @@
       if (tab && currentReport) { selectedGang = tab.dataset.leagueTeam; render(currentReport); }
     };
     let request = null, admin = false;
+    const targetBox = document.getElementById('league-targets');
+    let targetData = null, targetGang = '', targetPlayer = '';
+    function renderTargets() {
+      const d = targetData;
+      if (!d) return;
+      if (!d.opponents.includes(targetGang)) targetGang = d.opponents[0] || '';
+      const rows = d.targets.filter(p=>p.gang===targetGang);
+      targetBox.innerHTML = `<header class="league-target-head"><div><span class="league-beta">TEST</span><h3>Cele do ataku</h3><p>Dla: <b>${escape(d.player)}</b> · ${escape(d.asOf)}</p></div></header>
+        <div class="league-target-controls">${d.admin?`<label>Gracz<select data-target-player>${d.players.map(p=>`<option ${p===d.player?'selected':''}>${escape(p)}</option>`).join('')}</select></label>`:''}
+        <label>Gang przeciwnika<select data-target-gang>${d.opponents.map(g=>`<option ${g===targetGang?'selected':''}>${escape(g)}</option>`).join('')}</select></label></div>
+        <p class="league-caption">${escape(d.note)}</p>
+        ${rows.length?`<div class="league-target-list">${rows.map(p=>`<article class="league-target-card ${escape(p.category)}"><div class="league-target-top"><strong>${escape(p.name)}</strong><span class="league-target-tag">${escape(p.label)}</span></div>
+          <div class="league-target-stats"><b>${p.lastXP?'+'+p.lastXP.value+' XP':'XP: brak danych'}</b><span>${p.sampleDate?`${p.wins} W / ${p.losses} P · ${escape(p.sampleDate)}`:'Brak świeżej próbki własnych walk'}</span></div>
+          <p>${escape(p.reason)}</p>${p.lastXP?`<small>Stawka za pokonanie celu zaobserwowana ${escape(p.lastXP.date)}; może się zmienić.</small>`:''}
+          ${p.evidence.length?`<details><summary>Dowody (${p.totalEvidence})</summary>${p.evidence.map(f=>`<div class="league-target-proof"><span>${escape(f.date)} · ${escape(f.time)}</span><b>${escape(f.attacker)} → ${escape(f.defender)}</b><span>Wygrywa ${escape(f.winner)}</span></div>`).join('')}${p.totalEvidence>p.evidence.length?'<small>Pokazano 6 najnowszych walk.</small>':''}</details>`:''}</article>`).join('')}</div>${rows.length>6?`<button type="button" data-target-expand>Pokaż pozostałe cele (${rows.length-6})</button>`:''}`:'<p class="league-caption">Brak kandydatów — potrzebny raport z udziałem tego gracza.</p>'}`;
+    }
+    async function loadTargets() {
+      targetBox.textContent = 'Szukam celów w zapisanych raportach…';
+      try {
+        targetData = await request('/gang/league/targets'+(targetPlayer?'?player='+encodeURIComponent(targetPlayer):''));
+        renderTargets();
+      } catch(e) { targetBox.textContent = 'Nie udało się wczytać celów: '+e.message; }
+    }
+    targetBox.onchange = event => {
+      targetBox.classList?.remove('league-targets-expanded');
+      if (event.target.matches('[data-target-player]')) { targetPlayer=event.target.value; loadTargets(); }
+      if (event.target.matches('[data-target-gang]')) { targetGang=event.target.value; renderTargets(); }
+    };
+    targetBox.onclick = event => {
+      if (event.target.matches('[data-target-expand]')) {
+        const expanded=targetBox.classList.toggle('league-targets-expanded');
+        event.target.textContent=expanded?'Pokaż tylko 6 celów':'Pokaż pozostałe cele';
+      }
+    };
     function applyPermissions(value) {
       admin = Boolean(value);
       document.getElementById('league-import-panel').hidden = !admin;
@@ -142,6 +176,7 @@
       historySelect.value = selected || history[0]?.id || '';
       if (historySelect.value) await loadSelected();
       else { result.textContent = 'Nie zapisano jeszcze żadnego meczu.'; status.textContent = admin ? 'Wklej pierwszy raport meczu.' : 'Administrator nie wgrał jeszcze raportu.'; }
+      await loadTargets();
     }
     async function loadSelected() {
       if (!historySelect.value) return;
@@ -167,6 +202,9 @@
     window.LeagueView = {
       async open(api) {
         request = api;
+        targetPlayer = '';
+        targetData = null;
+        targetBox.textContent = '';
         applyPermissions(false);
         result.textContent = '';
         historySelect.innerHTML = '<option value="">Ładowanie historii…</option>';
