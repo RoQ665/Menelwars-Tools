@@ -76,7 +76,13 @@
     if (!Array.isArray(history) || history.some(m => !m || typeof m.text !== 'string' || m.key !== matchKey(parse(m.text)))) throw Error('Nie można odczytać historii. Dotychczasowe dane nie zostały nadpisane.');
     return history;
   }
-  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory};
+  const sortKeys = ['name','attacks','defenses','attackXP','defenseXP','xp'];
+  function sortPlayers(players, field = 'xp', direction = 'desc') {
+    const column = sortKeys.includes(field) ? field : 'xp';
+    const sign = direction === 'asc' ? 1 : -1;
+    return [...players].sort((a,b) => sign * (column === 'name' ? a.name.localeCompare(b.name,'pl') : a[column]-b[column]) || a.name.localeCompare(b.name,'pl'));
+  }
+  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory, sortPlayers};
   if (typeof document === 'undefined') return;
   const init = () => {
     const button = document.getElementById('league-parse');
@@ -87,12 +93,16 @@
     const escape = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const signed = n => n > 0 ? '+' + n : String(n);
     let selectedGang = '', currentReport = null;
+    let sortField = 'xp', sortDirection = 'desc';
+    const sortLabels = {name:'Gracz',attacks:'Ataki',defenses:'Obrony',attackXP:'XP atak',defenseXP:'XP obrona',xp:'Bilans XP'};
+    const sortButton = field => `<button type="button" data-league-sort="${field}" aria-label="${sortLabels[field]} — sortuj ${sortField===field&&sortDirection==='desc'?'rosnąco':'malejąco'}" class="${sortField===field?'active':''}">${sortLabels[field]} <span aria-hidden="true">${sortField===field?(sortDirection==='desc'?'↓':'↑'):'↕'}</span></button>`;
+    const sortAria = field => sortField===field?(sortDirection==='desc'?'descending':'ascending'):'none';
     const tone = n => n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral';
     function render(data) {
       currentReport = data;
       if (![data.gangA,data.gangB].includes(selectedGang)) selectedGang = data.gangA;
       const pending = data.fights.filter(f=>f.pending).length;
-      const rows = data.players.filter(p=>p.gang===selectedGang).sort((a,b)=>b.xp-a.xp || a.name.localeCompare(b.name,'pl'));
+      const rows = sortPlayers(data.players.filter(p=>p.gang===selectedGang),sortField,sortDirection);
       const total = key => rows.reduce((sum,p)=>sum+p[key],0);
       const win = total('attackWins')+total('defenseWins'), loss = total('attackLosses')+total('defenseLosses');
       const teamXP = selectedGang===data.gangA ? data.xp : -data.xp;
@@ -113,8 +123,9 @@
           <div><span>Wygrane / przegrane</span><strong>${win} <i>/</i> ${loss}</strong><small>ataki i obrony</small></div>
           <div><span>Bilans gangu</span><strong class="${tone(teamXP)}">${signed(teamXP)}</strong><small>XP z rozstrzygniętych walk</small></div>
         </div>
+        <div class="league-mobile-sort" role="group" aria-label="Sortowanie graczy">${sortKeys.map(sortButton).join('')}</div>
         <div class="league-table-wrap"><table class="league-table">
-          <thead><tr><th>Gracz</th><th>Ataki</th><th>Obrony</th><th>XP atak / obrona</th><th>Bilans XP ↓</th></tr></thead>
+          <thead><tr><th aria-sort="${sortAria('name')}">${sortButton('name')}</th><th aria-sort="${sortAria('attacks')}">${sortButton('attacks')}</th><th aria-sort="${sortAria('defenses')}">${sortButton('defenses')}</th><th aria-sort="${sortField==='attackXP'||sortField==='defenseXP'?sortAria(sortField):'none'}">${sortButton('attackXP')} / ${sortButton('defenseXP')}</th><th aria-sort="${sortAria('xp')}">${sortButton('xp')}</th></tr></thead>
           <tbody>${rows.map((p,index)=>`<tr>
             <td class="league-player"><span class="league-rank">${index+1}</span><strong>${escape(p.name)}</strong></td>
             <td data-label="Ataki"><b>${p.attacks}</b><small><span class="positive">${p.attackWins} W</span> / <span class="negative">${p.attackLosses} P</span>${p.pendingAttack?` · ${p.pendingAttack} w toku`:''}</small></td>
@@ -122,9 +133,18 @@
             <td class="league-xp-split" data-label="XP atak / obrona"><span class="${tone(p.attackXP)}">${signed(p.attackXP)}</span><span class="${tone(p.defenseXP)}">${signed(p.defenseXP)}</span></td>
             <td class="league-net" data-label="Bilans XP"><b class="${tone(p.xp)}">${signed(p.xp)}</b></td>
           </tr>`).join('')}</tbody></table></div>
-        <p class="league-caption">W = wygrane, P = przegrane. Ataki i obrony obejmują próby w toku. Kolejność według bilansu XP.</p>`;
+        <p class="league-caption">W = wygrane, P = przegrane. Ataki i obrony obejmują próby w toku. Sortowanie: ${sortLabels[sortField]}, ${sortDirection==='desc'?'malejąco':'rosnąco'}.</p>`;
     }
     result.onclick = event => {
+      const sort = event.target.closest('[data-league-sort]');
+      if (sort && currentReport && sortKeys.includes(sort.dataset.leagueSort)) {
+        const field = sort.dataset.leagueSort;
+        sortDirection = sortField===field && sortDirection==='desc' ? 'asc' : 'desc';
+        sortField = field;
+        render(currentReport);
+        result.querySelector?.(`[data-league-sort="${field}"]`)?.focus({preventScroll:true});
+        return;
+      }
       const tab = event.target.closest('[data-league-team]');
       if (tab && currentReport) { selectedGang = tab.dataset.leagueTeam; render(currentReport); }
     };

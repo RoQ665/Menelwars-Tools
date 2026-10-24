@@ -1,0 +1,28 @@
+const assert=require('node:assert/strict');
+const {sortPlayers}=require('../league-parser.js');
+const players=[{name:'Ala',attacks:2,defenses:0,attackXP:100,defenseXP:-300,xp:-200},{name:'Zenek',attacks:10,defenses:3,attackXP:20,defenseXP:0,xp:20},{name:'Bartek',attacks:0,defenses:5,attackXP:0,defenseXP:0,xp:0}];
+assert.deepEqual(sortPlayers(players).map(p=>p.name),['Zenek','Bartek','Ala']);
+assert.deepEqual(sortPlayers(players,'xp','asc').map(p=>p.name),['Ala','Bartek','Zenek']);
+assert.deepEqual(sortPlayers(players,'attacks').map(p=>p.attacks),[10,2,0]);
+assert.deepEqual(sortPlayers(players,'defenses').map(p=>p.defenses),[5,3,0]);
+assert.deepEqual(sortPlayers(players,'attackXP').map(p=>p.attackXP),[100,20,0]);
+assert.deepEqual(sortPlayers(players,'defenseXP','asc').map(p=>p.defenseXP),[-300,0,0]);
+assert.deepEqual(sortPlayers(players,'name').map(p=>p.name),['Zenek','Bartek','Ala']);
+assert.deepEqual(sortPlayers(players,'name','asc').map(p=>p.name),['Ala','Bartek','Zenek']);
+assert.equal(players[0].name,'Ala');
+console.log('League sorting: defaults, numeric values, negatives, names, both directions, immutable input — OK');
+const vm=require('node:vm'),fs=require('node:fs'),nodes=new Map();
+const get=id=>{if(!nodes.has(id))nodes.set(id,{value:'',innerHTML:'',textContent:''});return nodes.get(id);};
+const context={document:{readyState:'complete',getElementById:get},window:{},Date};
+vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../league-parser.js'),'utf8'),context);
+(async()=>{
+  await context.window.LeagueView.open(async path=>path.includes('/targets')?{opponents:[],targets:[],players:[],player:'Ala',asOf:'2026-10-24',note:''}:path.includes('?match=')?{data:{date:'2026-10-24',gangA:'X',gangB:'Y',xp:-180,fights:[],warnings:[],players:players.map(p=>({...p,gang:'X',attackWins:0,attackLosses:0,defenseWins:0,defenseLosses:0,pendingAttack:0,pendingDefense:0}))},updatedAt:0,updatedBy:'Tester'}:{permissions:{admin:false},matches:[{id:'one',date:'2026-10-24',gangA:'X',gangB:'Y',fightCount:0}]});
+  const result=get('league-result');
+  const click=field=>result.onclick({target:{closest:selector=>selector==='[data-league-sort]'?{dataset:{leagueSort:field}}:null}});
+  click('attacks');assert.ok(result.innerHTML.indexOf('<strong>Zenek</strong>')<result.innerHTML.indexOf('<strong>Ala</strong>'));
+  click('attacks');assert.ok(result.innerHTML.indexOf('<strong>Bartek</strong>')<result.innerHTML.indexOf('<strong>Ala</strong>'));
+  assert.ok(result.innerHTML.includes('Ataki, rosnąco'));
+  click('name');assert.ok(result.innerHTML.indexOf('<strong>Zenek</strong>')<result.innerHTML.indexOf('<strong>Ala</strong>'));
+  click('name');assert.ok(result.innerHTML.indexOf('<strong>Ala</strong>')<result.innerHTML.indexOf('<strong>Zenek</strong>'));
+  console.log('League UI sorting: first click descending, second ascending, field change resets direction — OK');
+})().catch(e=>{console.error(e);process.exitCode=1;});
