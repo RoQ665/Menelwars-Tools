@@ -3836,6 +3836,7 @@ function mapRenderRouteResult() {
           setPlayerAccountSessionToken(result.session.token);
           status.textContent="✅ Zalogowano.";
           await renderAccountView();
+          await window.ToolNavigation?.resume();
         } catch (err) {
           if (err.data && err.data.needsActivation) {
             pendingNick=nick;
@@ -3859,6 +3860,7 @@ function mapRenderRouteResult() {
           setPlayerAccountSessionToken(result.session.token);
           status.textContent="✅ Konto zostało aktywowane.";
           await renderAccountView();
+          await window.ToolNavigation?.resume();
         } catch(err) { status.textContent=err.message || "Nie udało się aktywować konta."; }
         finally { clearActionLoading(button); }
       });
@@ -3882,6 +3884,7 @@ function mapRenderRouteResult() {
           setPlayerAccountSessionToken(result.session.token);
           status.textContent="✅ Hasło zostało zmienione i zalogowano.";
           await renderAccountView();
+          await window.ToolNavigation?.resume();
         } catch(err) { status.textContent=err.message || "Nie udało się zresetować hasła."; }
         finally { clearActionLoading(button); }
       });
@@ -17706,6 +17709,7 @@ function setupAdmin() {
   let activeToolModule = "";
 
   function showToolView(viewId,moduleName) {
+    window.ToolNavigation?.showView(viewId);
     document.querySelectorAll(".view").forEach(view=>{
       view.hidden = view.id !== viewId;
     });
@@ -18935,7 +18939,7 @@ fetchModuleAccessPolicy().catch(()=>{});
     navigator.serviceWorker.addEventListener("controllerchange",()=>{
       if (pwaReloadingForUpdate) return;
       pwaReloadingForUpdate = true;
-      history.replaceState(null,"",location.pathname);
+      history.replaceState(null,"",location.pathname+location.search+location.hash);
       location.reload();
     });
 
@@ -18965,4 +18969,41 @@ fetchModuleAccessPolicy().catch(()=>{});
       });
   }
 
+  // Links use only the existing, allow-listed module entry points. No route
+  // exposes admin tools or bypasses server-side session checks.
+  window.ToolNavigation=window.ToolRoutes.create({
+    location,history,
+    authorize:async route=>{
+      const privateModule=route.module==='gang'||Boolean(route.module!=='account'&&route.module&&(await fetchModuleAccessPolicy({force:true}))?.[route.module]);
+      return !privateModule||Boolean(await playerAccountStatus({force:true,strict:true}));
+    },
+    onLoginRequired:async()=>{
+      await renderAccountView();showToolView('account-view','account');
+      const status=el('account-status');if(status)status.textContent='Zaloguj się, aby otworzyć zakładkę z linku.';
+    },
+    onError:async error=>{
+      await renderAccountView();showToolView('account-view','account');
+      const status=el('account-status');if(status)status.textContent=error.message||'Nie udało się otworzyć zakładki.';
+      console.warn('[MenelWars Tools] Link do zakładki:',error);
+    },
+    open:async route=>{
+      if(route.view==='home-view'){showToolView('home-view','');return;}
+      if(route.module==='gang'){if(route.view==='gang-menu-view')await openGangLanding();else await openGangModule(route.view);return;}
+      if(route.module==='distillery'){await openDistilleryModule(route.view);return;}
+      if(route.module==='garden'){await openGardenModule();return;}
+      if(route.module==='builds'){await openBuildModule();return;}
+      if(route.module==='map'){await openMapModule();return;}
+      await renderAccountView();showToolView('account-view','account');
+    }
+  });
+  window.addEventListener('hashchange',()=>window.ToolNavigation.changed());
+  window.addEventListener('popstate',()=>window.ToolNavigation.changed());
+  el('copy-view-link')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;
+    const url=new URL(location.href);url.search='';if(!url.hash)url.hash='start';
+    try{await navigator.clipboard.writeText(url.href);button.textContent='Skopiowano ✓';}
+    catch{window.prompt('Skopiuj link do zakładki:',url.href);}
+    setTimeout(()=>{button.textContent='🔗 Kopiuj link';},2000);
+  });
+  Promise.resolve().then(()=>window.ToolNavigation.start());
 })();
