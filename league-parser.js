@@ -76,7 +76,7 @@
     if (!Array.isArray(history) || history.some(m => !m || typeof m.text !== 'string' || m.key !== matchKey(parse(m.text)))) throw Error('Nie można odczytać historii. Dotychczasowe dane nie zostały nadpisane.');
     return history;
   }
-  const sortKeys = ['name','attacks','defenses','attackXP','defenseXP','xp','recommendation','certainty'];
+  const sortKeys = ['name','attacks','defenses','attackXP','defenseXP','xp','recommendation'];
   function sortPlayers(players, field = 'xp', direction = 'desc') {
     const column = sortKeys.includes(field) ? field : 'xp';
     const sign = direction === 'asc' ? 1 : -1;
@@ -100,7 +100,7 @@
     const signed = n => n > 0 ? '+' + n : String(n);
     let selectedGang = '', currentReport = null;
     let sortField = 'xp', sortDirection = 'desc';
-    const sortLabels = {name:'Gracz',attacks:'Ataki',defenses:'Obrony',attackXP:'XP atak',defenseXP:'XP obrona',xp:'Bilans XP',recommendation:'Dla Ciebie',certainty:'Pewność danych'};
+    const sortLabels = {name:'Gracz',attacks:'Ataki',defenses:'Obrony',attackXP:'XP atak',defenseXP:'XP obrona',xp:'Bilans XP',recommendation:'Rekomendacja silnika'};
     const sortButton = field => `<button type="button" data-league-sort="${field}" aria-label="${sortLabels[field]} — sortuj ${sortField===field&&sortDirection==='desc'?'rosnąco':'malejąco'}" class="${sortField===field?'active':''}">${sortLabels[field]} <span aria-hidden="true">${sortField===field?(sortDirection==='desc'?'↓':'↑'):'↕'}</span></button>`;
     const sortAria = field => sortField===field?(sortDirection==='desc'?'descending':'ascending'):'none';
     const tone = n => n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral';
