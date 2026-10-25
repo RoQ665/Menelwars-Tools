@@ -8,10 +8,15 @@ const analysis={confidenceLabel:'Średnia pewność',favorability:'favorable',co
   profile:{attackWins:1,attackLosses:2,defenseWins:0,defenseLosses:3,distinctAttackers:2,opponents:[{name:'Peer',wins:2,losses:1}]},
   proofs:[{date:'2026-10-24',time:'12:00',attacker:'Peer',defender:'Target',winner:'Peer'}]};
 (async()=>{
-  await context.window.LeagueView.open(async path=>path.includes('/targets')?{player:'RoQ',asOf:'2026-10-24',opponents:['Other'],players:['RoQ'],note:'Test',targets:[{name:'Target',gang:'Other',category:'candidate',label:'Cel do przetestowania',reason:'Porównanie profili.',wins:0,losses:0,evidence:[],totalEvidence:0,analysis}]}:{permissions:{admin:false},matches:[]});
+  await context.window.LeagueView.open(async path=>path.includes('/targets')?{player:'RoQ',asOf:'2026-10-24',opponents:['Other'],players:['RoQ'],note:'Test',targets:[{name:'Target',gang:'Other',category:'candidate',label:'Cel do przetestowania',reason:'Porównanie profili.',wins:0,losses:0,evidence:[],totalEvidence:0,analysis,lastXP:{value:237,date:'2026-10-25',source:'opponents'},lossXP:{value:264,date:'2026-10-25',source:'opponents'},prestige:{value:2456,date:'2026-10-25'}}]}:{permissions:{admin:false},matches:[]});
   const html=get('league-targets').innerHTML;
   for(const text of ['Średnia pewność','Korzystne wskazówki','Podobni gracze','3 wspólnych rywali','Wspólni przeciwnicy','porównanie ataków','Profil celu (14 dni)','Pewność opisuje jakość danych, nie szansę wygranej.'])assert.ok(html.includes(text),text);
   assert.ok(html.includes('&lt;img onerror=bad&gt;'));assert.ok(!html.includes('<img onerror=bad>'));
   assert.ok(html.includes('<details><summary>Analiza profilu i pewność</summary>'));
+  assert.ok(html.includes('Szacowana wygrana: +237 XP'));
+  assert.ok(html.includes('Prestiż:'));
+  assert.ok(html.includes('tylko pomocniczo'));
+  assert.ok(html.includes('szacunek z listy rywali z 2026-10-25'));
+  assert.ok(html.includes('Porażka: stawka RoQ z jego listy rywali z 2026-10-25'));
   console.log('Analysis UI: separate confidence, collapsed explanations, common opponents, similar players, role-separated results, contextual profile, escaped names — OK');
 })().catch(error=>{console.error(error);process.exitCode=1;});
