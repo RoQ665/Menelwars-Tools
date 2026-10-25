@@ -16,7 +16,7 @@ const analysis={confidenceLabel:'Średnia pewność',favorability:'favorable',co
   assert.ok(html.includes('Łańcuchy wyników — do 4 walk'));assert.ok(html.includes('Za wyborem celu'));
   assert.ok(html.includes('Waga po uwzględnieniu wspólnych dowodów'));
   const scoreScript=fs.readFileSync(require.resolve('../league-parser.js'),'utf8');
-  assert.ok(scoreScript.includes('Siła rekomendacji'));assert.ok(scoreScript.includes('To nie jest szansa wygranej.'));
+  assert.ok(scoreScript.includes('Rekomendacja silnika'));assert.ok(scoreScript.includes('To nie jest szansa wygranej.'));
   assert.ok(html.includes('band-7'));assert.ok(html.includes('79%'));assert.ok(!html.includes('league-target-tag'));
   assert.ok(html.includes('&lt;img onerror=bad&gt;'));assert.ok(!html.includes('<img onerror=bad>'));
   assert.ok(html.includes('<details><summary>Analiza profilu i pewność</summary>'));

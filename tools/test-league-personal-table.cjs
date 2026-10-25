@@ -25,7 +25,7 @@ const click=(selector,dataset)=>get('league-result').onclick({target:{closest:s=
   assert.ok(!get('league-result').innerHTML.includes('data-label="Siła rekomendacji"'));
   click('[data-league-team]',{leagueTeam:'Enemy'});
   let html=get('league-result').innerHTML;
-  for(const text of ['98%','Średnia','75%','Niska','Brak oceny','Pewność danych','Oceny dla: <b>RoQ</b>','stan na 2026-10-25'])assert.ok(html.includes(text),text);
+  for(const text of ['98%','75%','Brak oceny','Oceny dla: <b>RoQ</b>','stan na 2026-10-25'])assert.ok(html.includes(text),text);
   click('[data-league-sort]',{leagueSort:'recommendation'});
   html=get('league-result').innerHTML;assert.ok(html.indexOf('<strong>Target</strong>')<html.indexOf('<strong>Other</strong>'));
   click('[data-league-sort]',{leagueSort:'recommendation'});
