@@ -136,9 +136,9 @@
             <span class="league-versus">VS</span>
             <div><strong>${escape(gangs[1])}</strong><b class="${tone(-leftXP)}">${signed(-leftXP)} <small>XP</small></b></div>
           </div>
+          ${podium}
           <div class="league-score-foot"><span>${data.fights.length} walk  ·  ${data.fights.length-pending} rozstrzygniętych</span><span class="league-live">${pending} w toku</span></div>
         </div>
-        ${podium}
         ${data.warnings.map(w=>`<p class="league-warning" role="alert">${escape(w)}</p>`).join('')}
         <div class="league-team-tabs" role="group" aria-label="Wybierz gang">${gangs.map(g=>`<button type="button" data-league-team="${escape(g)}" aria-pressed="${g===selectedGang}" class="${g===selectedGang?'active':''}">${escape(g)}</button>`).join('')}</div>
         <div class="league-metrics">

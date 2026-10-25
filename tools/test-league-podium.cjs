@@ -9,6 +9,10 @@ const api=async path=>path.includes('/targets')?{player:'RoQ',ownGang:'Dupkapupk
 const podium=()=>get('league-result').innerHTML.match(/<section class="league-podium"[\s\S]*?<\/section>/)?.[0]||'';
 (async()=>{
   await context.window.LeagueView.open(api);let html=podium();
+  const full=get('league-result').innerHTML;
+  assert.ok(full.indexOf('class="league-scoreline"')<full.indexOf('class="league-podium"'));
+  assert.ok(full.indexOf('class="league-podium"')<full.indexOf('class="league-score-foot"'));
+  assert.equal((full.match(/<section class="league-podium"/g)||[]).length,1);
   for(const name of ['Gold','Silver','Bronze'])assert.ok(html.includes(name));
   assert.ok(!html.includes('Enemy'));assert.ok(!html.includes('Negative'));assert.ok(!html.includes('Fourth'));
   assert.ok(html.includes('kolejność może się zmienić'));assert.ok(html.includes('ataki')||html.includes('ataków'));
