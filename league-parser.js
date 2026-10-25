@@ -123,6 +123,11 @@
       const total = key => rows.reduce((sum,p)=>sum+p[key],0);
       const win = total('attackWins')+total('defenseWins'), loss = total('attackLosses')+total('defenseLosses');
       const teamXP = selectedGang===data.gangA ? data.xp : -data.xp;
+      const ourGang=gangs.find(g=>normalize(g)===normalize(viewerData?.ownGang||'Dupkapupka'));
+      const contributors=ourGang?sortPlayers(data.players.filter(p=>p.gang===ourGang&&Number.isFinite(p.xp)&&p.xp>0),'xp','desc'):[];
+      const leaders=contributors.slice(0,3).map((p,i)=>({...p,place:contributors.findIndex(q=>q.xp===p.xp)+1,slot:i+1}));
+      const tiedOutside=leaders.length===3?contributors.slice(3).filter(p=>p.xp===leaders[2].xp).length:0;
+      const podium=leaders.length?`<section class="league-podium" aria-label="Największy dodatni wkład XP gangu ${escape(ourGang)}"><header><div><span class="league-podium-kicker">WYRÓŻNIENIA EKIPY</span><h3>Największy wkład w mecz</h3></div><span>${escape(ourGang)}</span></header><div class="league-podium-places">${leaders.map(p=>`<div class="league-podium-place slot-${p.slot}"><span class="league-podium-medal" aria-label="Miejsce ${p.place}">${p.place===1?'♛':p.place===2?'◆':'✦'} <small>${p.place}</small></span><strong>${escape(p.name)}</strong><b>+${Number(p.xp).toLocaleString('pl-PL')} <small>XP</small></b><span class="league-podium-step">${p.place===1?'ZŁOTO':p.place===2?'SREBRO':'BRĄZ'}</span></div>`).join('')}</div><p>Bilans XP z rozstrzygniętych ataków i obron · według ostatniego importu.${pending?' Mecz ma trwające walki — kolejność może się zmienić.':''}${tiedOutside?` Jeszcze ${tiedOutside} graczy ma bilans równy ostatniemu pokazanemu miejscu.`:''}${leaders.some((p,i)=>i&&p.place===leaders[i-1].place)?' Równy bilans oznacza miejsce ex aequo.':''}</p></section>`:'';
       result.innerHTML = `
         <div class="league-scoreboard">
           <div class="league-eyebrow">LIGA MENELI <span>${escape(data.date.split('-').reverse().join('.'))}</span></div>
@@ -133,6 +138,7 @@
           </div>
           <div class="league-score-foot"><span>${data.fights.length} walk  ·  ${data.fights.length-pending} rozstrzygniętych</span><span class="league-live">${pending} w toku</span></div>
         </div>
+        ${podium}
         ${data.warnings.map(w=>`<p class="league-warning" role="alert">${escape(w)}</p>`).join('')}
         <div class="league-team-tabs" role="group" aria-label="Wybierz gang">${gangs.map(g=>`<button type="button" data-league-team="${escape(g)}" aria-pressed="${g===selectedGang}" class="${g===selectedGang?'active':''}">${escape(g)}</button>`).join('')}</div>
         <div class="league-metrics">

@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v24.34";
+const CACHE = "menelwars-tools-v24.35";
 // Jednorazowy most z wersji 22.45. Przy następnym wydaniu wraca na false,
 // a o automacie decyduje już strona: samoczynnie tylko na ekranie głównym.
 const FORCE_THIS_RELEASE = false;
@@ -11,8 +11,8 @@ const CORE_ASSETS = [
   "./data.js?v=21.05",
   "./app.js?v=24.26",
   "./navigation.js?v=24.26",
-  "./league-parser.js?v=24.34",
-  "./league.css?v=24.34",
+  "./league-parser.js?v=24.35",
+  "./league.css?v=24.35",
   "./item-catalog.js?v=22.79",
   "./manifest.webmanifest",
   "./icon-192.png",

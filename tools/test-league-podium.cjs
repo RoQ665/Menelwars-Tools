@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const nodes=new Map(),get=id=>{if(!nodes.has(id))nodes.set(id,{value:'',innerHTML:'',textContent:''});return nodes.get(id);};
+const context={document:{readyState:'complete',getElementById:get},window:{},Date};
+vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../league-parser.js'),'utf8'),context);
+const p=(name,xp,gang='Dupkapupka')=>({name,xp,gang,attacks:0,defenses:0,attackXP:xp,defenseXP:0,attackWins:0,attackLosses:0,defenseWins:0,defenseLosses:0,pendingAttack:0,pendingDefense:0});
+let players=[p('Gold',500),p('Silver',400),p('Bronze',300),p('Fourth',200),p('Enemy',9000,'Jpg'),p('Negative',-100)];
+let gangA='Dupkapupka',gangB='Jpg';
+const api=async path=>path.includes('/targets')?{player:'RoQ',ownGang:'Dupkapupka',asOf:'2026-10-25',opponents:[],targets:[]}:path.includes('?match=')?{data:{date:'2026-10-25',gangA,gangB,xp:-1000,players,fights:[{pending:true}],warnings:[]},updatedAt:0,updatedBy:'Tester'}:{permissions:{admin:false},matches:[{id:'one',date:'2026-10-25',gangA,gangB,fightCount:1}]};
+const podium=()=>get('league-result').innerHTML.match(/<section class="league-podium"[\s\S]*?<\/section>/)?.[0]||'';
+(async()=>{
+  await context.window.LeagueView.open(api);let html=podium();
+  for(const name of ['Gold','Silver','Bronze'])assert.ok(html.includes(name));
+  assert.ok(!html.includes('Enemy'));assert.ok(!html.includes('Negative'));assert.ok(!html.includes('Fourth'));
+  assert.ok(html.includes('kolejność może się zmienić'));assert.ok(html.includes('ataki')||html.includes('ataków'));
+  get('league-result').onclick({target:{closest:s=>s==='[data-league-team]'?{dataset:{leagueTeam:'Jpg'}}:null}});
+  assert.equal(podium(),html);
+  players=[p('<img onerror=bad>',100),p('Equal',100),p('Zero',0)];await context.window.LeagueView.open(api);html=podium();
+  assert.ok(html.includes('&lt;img onerror=bad&gt;'));assert.ok(!html.includes('<img onerror=bad>'));assert.ok(html.includes('ex aequo'));assert.ok(!html.includes('Zero'));
+  players=[p('Negative',-1),p('Zero',0)];await context.window.LeagueView.open(api);assert.equal(podium(),'');
+  gangA='Other';gangB='Jpg';players=[p('Enemy',100,'Other')];await context.window.LeagueView.open(api);assert.equal(podium(),'');
+  console.log('Podium: own gang only, positive net XP, top 3, unaffected by tabs/sorts, pending state, ties, escaped names, no podium for unrelated matches or nonpositive contributions — OK');
+})().catch(e=>{console.error(e);process.exitCode=1;});
