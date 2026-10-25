@@ -34,6 +34,10 @@ const click=(selector,dataset)=>get('league-result').onclick({target:{closest:s=
   click('[data-league-target]',{leagueTarget:'0'});
   assert.equal(get('league-target-dialog').open,true);assert.ok(get('league-target-dialog').innerHTML.includes('Target — dla RoQ'));
   assert.ok(get('league-target-dialog').innerHTML.includes('Średnia pewność'));
+  const modal=get('league-target-dialog');modal.getBoundingClientRect=()=>({left:10,top:10,right:200,bottom:200});
+  const inside={target:modal,clientX:50,clientY:50};modal.onpointerdown(inside);modal.onclick(inside);assert.equal(modal.open,true);
+  const outside={target:modal,clientX:250,clientY:250};modal.onpointerdown(inside);modal.onclick(outside);assert.equal(modal.open,true); // dragging out does not close
+  modal.onpointerdown(outside);modal.onclick(outside);assert.equal(modal.open,false); // mouse/touch use identical pointer path
   admin=true;await context.window.LeagueView.open(api);assert.equal(get('league-target-drawer').hidden,false);
   get('league-targets').onchange({target:{matches:()=>true,value:'Someone'}});
   await new Promise(resolve=>setImmediate(resolve));
