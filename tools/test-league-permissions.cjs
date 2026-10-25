@@ -31,11 +31,8 @@ vm.runInContext(fs.readFileSync(require.resolve('../league-parser.js'),'utf8'),c
       name:'<img onerror=bad>',gang:'Other',category:'tested',label:'Sprawdzony',reason:'Dwie wygrane',lastXP:{value:230,date:'2026-10-24'},sampleDate:'2026-10-24',wins:2,losses:0,weightedWins:1.8,weightedLosses:0,evidenceTotal:1.8,evidenceKind:'direct',evidence:[{date:'2026-10-23',time:'12:00',attacker:'Tester',defender:'Enemy',winner:'Tester',weight:.8}],totalEvidence:2
     }]
   }:{permissions:{admin:false},matches:[]});
-  assert.ok(get('league-targets').innerHTML.includes('&lt;img onerror=bad&gt;'));
-  assert.ok(get('league-targets').innerHTML.includes('+230 XP'));
-  assert.ok(get('league-targets').innerHTML.includes('waga dowodu 80%'));
-  assert.ok(get('league-targets').innerHTML.includes('Suma wag własnych walk: 1,8 W / 0 P'));
-  assert.ok(get('league-targets').innerHTML.includes('To nie jest szansa wygranej'));
+  assert.equal(get('league-target-drawer').hidden,true);
+  assert.equal(get('league-targets').innerHTML,'');
   assert.ok(!get('league-targets').innerHTML.includes('data-target-player'));
   console.log('League UI: member read-only, admin import, failed auth hides import — OK');
 })().catch(e=>{console.error(e);process.exitCode=1;});
