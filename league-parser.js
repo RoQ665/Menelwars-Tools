@@ -337,7 +337,7 @@
       try{const result=await syncRequest('/admin/sync/state');if(identity!==syncIdentity||!syncAllowed)return;box.replaceChildren();
         if(!result.sources.length)box.textContent='Brak raportów nowej synchronizacji.';
         for(const source of result.sources){const p=document.createElement('div');p.className='sync-notice';
-          const labels={roster:'Skład gangu',company:'Spółka',payments:'Wpłaty',ai_dump:'Wysypisko AI',market:'Giełda'};
+          const labels={roster:'Skład gangu',opponents:'Skład rywala',company:'Spółka',payments:'Wpłaty',ai_dump:'Wysypisko AI',market:'Giełda'};
           p.textContent=(labels[source.source]||source.source)+' · '+new Date(source.capturedAt).toLocaleString('pl-PL');
           const data=source.data||{},issues=data.issues||data.salaries?.issues||[];
           for(const issue of issues){const line=document.createElement('div');line.textContent=issue.nick+': '+issue.action+(issue.expected!=null?' · oczekiwane '+issue.expected+' zł, w grze '+(issue.actual??'brak'):'');p.append(line);}

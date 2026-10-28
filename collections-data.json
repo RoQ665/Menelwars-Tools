@@ -1,0 +1,338 @@
+{
+  "verifiedOn": "2026-10-28",
+  "source": "User pasted all repeatable collection pages, T1–T6",
+  "coverage": "24 repeatable collections; 14 award gold coins",
+  "recipes": [
+    {
+      "name": "AC/CD",
+      "reward": {
+        "bronze": 43,
+        "silver": 7
+      },
+      "items": {
+        "Kolekcja płyt Disco Polo": 1,
+        "Bezprzewodowy przedłużacz": 1,
+        "Markowe słuchawki": 1
+      },
+      "tier": 2
+    },
+    {
+      "name": "Kolekcja podróżnika",
+      "reward": {
+        "bronze": 53,
+        "silver": 8
+      },
+      "items": {
+        "Globus Polski": 1,
+        "Stara mapa w ramie": 1,
+        "Mosiężny kompas": 1,
+        "Dywan": 1
+      },
+      "tier": 2
+    },
+    {
+      "name": "Trofea starego weterana",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Medal wojenny": 1,
+        "Złota papierośnica": 1,
+        "Naszyjnik z pazurów niedźwiedzia": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Skarby Zachodu",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Zegarek kieszonkowy z grawerem": 1,
+        "Pierścień z rubinem": 1,
+        "Samorodek złota": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Łowca nagród",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Srebrne ostrogi szeryfa": 1,
+        "Karabin Winchester": 1,
+        "List gończy": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Wieczór w saloonie",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Srebrny kielich": 1,
+        "Pozłacana talia kart": 1,
+        "Srebrna tabakiera": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Rewolwerowiec na pokaz",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Kabura z tłoczonej skóry": 1,
+        "Pudełko z cygarami": 1,
+        "Pas rewolwerowca": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Kangal",
+      "reward": {
+        "silver": 23
+      },
+      "items": {
+        "Pies rasy \"Kangal\"": 1,
+        "Kaganiec": 1
+      },
+      "tier": 3
+    },
+    {
+      "name": "Narzędzia T3",
+      "reward": {
+        "gold": 8
+      },
+      "items": {
+        "Wihajster": 5,
+        "Przyczłap": 5,
+        "Pipsztak": 5,
+        "Bulgulator": 5
+      },
+      "tier": 3
+    },
+    {
+      "name": "Broń pogranicza",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Rewolwer Colt": 1,
+        "Strzelba Coach gun": 1,
+        "Tomahawk": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Tajemnica na horyzoncie",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Luneta oficera": 1,
+        "Brosza z szafirem": 1,
+        "Tajemnicza mapa": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Łupy z Media Market",
+      "reward": {
+        "gold": 12
+      },
+      "items": {
+        "Płyta \"Messy Brain\"": 1,
+        "Mikrofon Jimiego Hendrixa": 1,
+        "Tytanowa smycz": 1,
+        "Złota konsola do gier": 1
+      },
+      "tier": 5
+    },
+    {
+      "name": "Diagnostyka klasy premium",
+      "reward": {
+        "gold": 15
+      },
+      "items": {
+        "Kamera termowizyjna": 1,
+        "Wyścigowy komputer pokładowy": 1,
+        "Złote pióro kontraktowe": 1
+      },
+      "tier": 6
+    },
+    {
+      "name": "Podpis, pieczątka i gaz",
+      "reward": {
+        "gold": 15
+      },
+      "items": {
+        "Złote pióro do aktów notarialnych": 1,
+        "Tytanowy wydech": 1,
+        "Złota pieczątka wszechobecności": 1
+      },
+      "tier": 6
+    },
+    {
+      "name": "Pomiar przed ostrym startem",
+      "reward": {
+        "gold": 15
+      },
+      "items": {
+        "Laserowy miernik apartamentów": 1,
+        "Złoty łańcuch mistrza prostej": 1,
+        "Cyfrowy stetoskop premium": 1
+      },
+      "tier": 6
+    },
+    {
+      "name": "Remont na pełnych obrotach",
+      "reward": {
+        "gold": 15
+      },
+      "items": {
+        "Pozłacana bateria łazienkowa": 1,
+        "Kuta felga 22 cale": 1,
+        "Przenośny aparat USG": 1
+      },
+      "tier": 6
+    },
+    {
+      "name": "Zegarek na nocnym dyżurze",
+      "reward": {
+        "gold": 15
+      },
+      "items": {
+        "Szwajcarski zegarek inwestora": 1,
+        "Karbonowa kierownica": 1,
+        "Tablet do potrójnego grafiku": 1
+      },
+      "tier": 6
+    },
+    {
+      "name": "Kolekcja winiarska",
+      "reward": {
+        "bronze": 23
+      },
+      "items": {
+        "Drożdże winiarskie": 15,
+        "Obierki po jabłkach": 15,
+        "Tani Kwiaśniak": 3
+      },
+      "tier": 1
+    },
+    {
+      "name": "Narzędzia T1",
+      "reward": {
+        "bronze": 8
+      },
+      "items": {
+        "Wihajster": 5,
+        "Przyczłap": 5
+      },
+      "tier": 1
+    },
+    {
+      "name": "Narzędzia T2",
+      "reward": {
+        "silver": 8
+      },
+      "items": {
+        "Wihajster": 5,
+        "Przyczłap": 5,
+        "Pipsztak": 5
+      },
+      "tier": 2
+    },
+    {
+      "name": "Zwierzak",
+      "reward": {
+        "items": [
+          {
+            "name": "Kaszanka GMO",
+            "quantity": 1
+          }
+        ]
+      },
+      "items": {
+        "Pies rasy \"Kangal\"": 1,
+        "Kaszanka": 1
+      },
+      "tier": 3
+    },
+    {
+      "name": "Komunalka",
+      "reward": {
+        "items": [
+          {
+            "name": "Kamizelka odblaskowa",
+            "quantity": 1
+          },
+          {
+            "name": "Rękawice odblaskowe",
+            "quantity": 1
+          },
+          {
+            "name": "Spodnie odblaskowe",
+            "quantity": 1
+          },
+          {
+            "name": "Buty robocze",
+            "quantity": 1
+          },
+          {
+            "name": "Czapka robotnika",
+            "quantity": 1
+          }
+        ]
+      },
+      "items": {
+        "Stara lampa naftowa": 1,
+        "Stary walkman": 1,
+        "Stara walizka": 1,
+        "Stara maszyna do pisania": 1,
+        "Mosiężna popielniczka": 1,
+        "Kolekcja monet": 1,
+        "Podkowa": 1,
+        "Antyczna szkatułka na biżuterię": 1
+      },
+      "tier": 3
+    },
+    {
+      "name": "Zwierzak ++",
+      "reward": {
+        "items": [
+          {
+            "name": "Kaszanka GMO Deluxe",
+            "quantity": 1
+          }
+        ]
+      },
+      "items": {
+        "Pies rasy \"Kangal\"": 2,
+        "Kaszanka": 1
+      },
+      "tier": 4
+    },
+    {
+      "name": "Puma",
+      "reward": {
+        "items": [
+          {
+            "name": "Puma - zwierzak",
+            "quantity": 1
+          }
+        ]
+      },
+      "items": {
+        "Tytanowa smycz": 1,
+        "Rewolwer Colt": 1,
+        "Pozytywka": 1,
+        "Tajemnicza mapa": 1
+      },
+      "tier": 5
+    }
+  ]
+}

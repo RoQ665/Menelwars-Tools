@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
   <link rel="stylesheet" href="league.css?v=24.36">
-  <link rel="stylesheet" href="market.css?v=24.40">
+  <link rel="stylesheet" href="market.css?v=24.41">
   <title>MenelWars Tools</title>
 
   <style>
@@ -757,10 +757,19 @@
  <div class="market-hero"><div><span class="market-eyebrow">MENELWARS · RYNEK GRACZY</span><h2>Giełda przedmiotów</h2><p>Ceny ofertowe, dostępność i historia rynku</p></div><span class="market-feed"><i></i> Migawki rynku</span></div>
  <div id="market-summary" class="market-summary" aria-label="Podsumowanie rynku"></div>
  <p id="market-status" role="status"></p>
+ <nav class="market-subtabs" aria-label="Widok giełdy"><button type="button" data-market-pane="quotes" class="active" aria-pressed="true">Notowania</button><button type="button" data-market-pane="collections" aria-pressed="false">Kolekcje · cena za monetę</button></nav>
+ <div id="market-quotes-pane">
  <form id="market-search-form" class="market-toolbar" role="search" autocomplete="off"><div class="market-search-wrap"><span aria-hidden="true">⌕</span><input id="market-search" name="market-item-filter" type="search" placeholder="Nazwa przedmiotu…" aria-label="Szukaj przedmiotu" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other"></div><select id="market-filter" name="market-availability-filter" aria-label="Filtr rynku"><option value="">Wszystkie przedmioty</option><option value="listed">Tylko dostępne</option><option value="fall">Spadki cen</option><option value="rise">Wzrosty cen</option><option value="missing">Brak ofert</option></select><button id="market-refresh" type="button">↻ Odśwież</button></form>
  <div id="market-active-filter" class="market-active-filter" hidden><span id="market-active-filter-label"></span><button type="button" id="market-clear-search">Wyczyść filtry ✕</button></div>
- <p id="market-count" class="market-help"></p><div class="market-table-wrap"><table><thead><tr><th><button data-market-sort="name" data-label="Przedmiot">Przedmiot</button></th><th><button data-market-sort="price" data-label="Cena minimalna">Cena minimalna</button></th><th><button data-market-sort="change" data-label="Zmiana">Zmiana</button></th><th><button data-market-sort="quantity" data-label="Sztuk">Sztuk</button></th></tr></thead><tbody id="market-rows"></tbody></table></div>
- <p class="market-help">Zmiana względem poprzedniej zapisanej migawki. Ceny ofertowe, nie potwierdzone transakcje. Brak oferty nie oznacza ceny 0 zł. Rynek w grze pobiera się przy wejściu; tutaj widzisz czas ostatniego odczytu. Historia do 30 dni.</p>
+ <p id="market-count" class="market-help"></p><div class="market-table-wrap"><table><thead><tr><th><button data-market-sort="name" data-label="Przedmiot">Przedmiot</button></th><th><button data-market-sort="price" data-label="Cena minimalna">Cena minimalna</button></th><th><button data-market-sort="change" data-label="Zmiana 24h">Zmiana 24h</button></th><th><button data-market-sort="quantity" data-label="Sztuk">Sztuk</button></th></tr></thead><tbody id="market-rows"></tbody></table></div>
+ <p class="market-help">Cena: zmiana 24h względem dostępnego wcześniejszego odczytu (do 6h odstępu od punktu odniesienia). Sztuki: zmiana między ostatnimi migawkami. To dane ofertowe, nie potwierdzone transakcje. Historia do 30 dni.</p>
+ </div>
+ <div id="market-collections-pane" hidden>
+ <form id="collection-controls" class="collection-controls" autocomplete="off"><label>Nagroda<select id="collection-currency"><option value="gold">Złote monety</option><option value="silver">Srebrne monety</option><option value="bronze">Brązowe monety</option><option value="items">Przedmioty i zwierzaki</option></select></label><label>Twój budżet (opcjonalnie)<input id="collection-budget" name="collection-budget" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Kwota w zł" autocomplete="off" data-lpignore="true" data-1p-ignore="true"></label><button type="button" id="collection-refresh">↻ Odśwież ceny</button></form>
+ <p id="collection-status" class="market-help" role="status"></p>
+ <p class="market-help">Ranking od najniższej ceny za monetę, potem całkowitego kosztu. Liczymy zakup całego kompletu, bez odejmowania Twoich przedmiotów. Każdy rodzaj monet porównujemy osobno.</p>
+ <div id="collection-list"></div>
+ </div>
  <dialog id="market-dialog"><button id="market-close" type="button">Zamknij ✕</button><h3 id="market-history-title"></h3><label>Okres <select id="market-days"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select></label><div id="market-chart"></div><p class="market-help">Wykres przedstawia zaobserwowane minimum ofertowe. Pomiędzy odczytami cena mogła się zmieniać.</p></dialog>
  </section>
  <section id="module-loading-view" class="view" hidden>
@@ -2320,9 +2329,11 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.39"></script>
+  <script src="league-parser.js?v=24.41"></script>
   <script src="navigation.js?v=24.39"></script>
-  <script src="market.js?v=24.40"></script>
+  <script src="market-chart.js?v=24.41"></script>
+  <script src="collections.js?v=24.41"></script>
+  <script src="market.js?v=24.41"></script>
   <script src="app.js?v=24.40"></script>
 </body>
 </html>
