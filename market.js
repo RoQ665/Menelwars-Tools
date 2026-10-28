@@ -4,6 +4,13 @@
  const price=v=>v==null?'—':new Intl.NumberFormat('pl-PL',{maximumFractionDigits:2}).format(v)+' zł';
  const date=v=>v?new Date(v).toLocaleString('pl-PL'):'brak odczytu';
  let request,items=[],query='',filter='',snapshot=null,lastLoadedAt=0,inFlight=null,order='name',direction=1,epoch=0,historyEpoch=0;
+ const AUTO_REFRESH_MS=5*60*1000;
+ let autoTimer=null,lastAttemptAt=0;
+ const active=()=>request&&!el('market-view').hidden&&document.visibilityState==='visible';
+ function scheduleRefresh(){
+  clearTimeout(autoTimer);autoTimer=null;
+  if(active())autoTimer=setTimeout(()=>{autoTimer=null;if(active())void refresh();},Math.max(1,AUTO_REFRESH_MS-(Date.now()-lastAttemptAt)));
+ }
  function render(){
   // Keep intentional search state separate from browser/password-manager autofill.
   el('market-search').value=query;el('market-filter').value=filter;
@@ -22,13 +29,14 @@
  }
  function refresh(){
   if(inFlight)return inFlight;
+  lastAttemptAt=Date.now();clearTimeout(autoTimer);autoTimer=null;
   const current=++epoch;el('market-status').textContent='Pobieram rynek…';
   el('market-refresh').disabled=true;
   const work=(async()=>{
    await Promise.resolve();
    try{const data=await request('/market/state');if(current!==epoch)return;if(!Array.isArray(data.items))throw Error('Niekompletny odczyt rynku.');snapshot=data;items=data.items.map(x=>({...x,change:x.change24h??null,previousPrice:x.price24h??null}));lastLoadedAt=Date.now();el('market-status').textContent=`Odczyt rynku: ${date(data.lastSeenAt)} · ostatnia zmiana: ${date(data.capturedAt)}`;render();}
    catch(error){if(current!==epoch)return;if(error.status===401||error.status===403){items=[];snapshot=null;lastLoadedAt=0;}render();el('market-status').textContent=error.message+(snapshot?' · wyświetlam ostatni poprawny odczyt z '+date(snapshot.lastSeenAt):'');}
-   finally{if(current===epoch){inFlight=null;el('market-refresh').disabled=false;if(!snapshot)render();}}
+   finally{if(current===epoch){inFlight=null;el('market-refresh').disabled=false;if(!snapshot)render();scheduleRefresh();}}
   })();inFlight=work;return work;
  }
  async function openHistory(key){
@@ -56,6 +64,6 @@
   document.querySelectorAll('[data-market-pane]').forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});
   if(collections)await window.MarketCollections.open();
  });
- window.MarketView={refresh,history:openHistory,open:async api=>{request=api;render();if(!snapshot||Date.now()-lastLoadedAt>=60000)await refresh();},clear:()=>{const visible=!el('market-view').hidden;epoch++;historyEpoch++;inFlight=null;items=[];snapshot=null;lastLoadedAt=0;window.MarketCollections?.reset();el('market-dialog').close();el('market-refresh').disabled=false;render();el('market-status').textContent='';if(visible&&request)queueMicrotask(()=>refresh());}};
- setInterval(()=>{if(request&&!el('market-view').hidden)void refresh();},300000);
+ window.MarketView={refresh,history:openHistory,open:async api=>{request=api;render();if(!lastAttemptAt||Date.now()-lastAttemptAt>=AUTO_REFRESH_MS)await refresh();else scheduleRefresh();},clear:()=>{const visible=!el('market-view').hidden;clearTimeout(autoTimer);autoTimer=null;epoch++;historyEpoch++;inFlight=null;items=[];snapshot=null;lastLoadedAt=0;lastAttemptAt=0;window.MarketCollections?.reset();el('market-dialog').close();el('market-refresh').disabled=false;render();el('market-status').textContent='';if(visible&&request)queueMicrotask(()=>refresh());}};
+ document.addEventListener('visibilitychange',()=>{if(active()&&Date.now()-lastAttemptAt>=AUTO_REFRESH_MS)void refresh();else scheduleRefresh();});
 })();
