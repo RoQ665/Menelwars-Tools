@@ -12,7 +12,7 @@
   if(active())autoTimer=setTimeout(()=>{autoTimer=null;if(active())void refresh();},Math.max(1,AUTO_REFRESH_MS-(Date.now()-lastAttemptAt)));
  }
  function render(){
-  window.MarketDesk?.update(items,snapshot);window.MarketInventoryView?.update(items,snapshot);
+  window.MarketDesk?.update(items,snapshot);window.MarketFinance?.update(items,snapshot);window.MarketInventoryView?.update(items,snapshot);
   // Keep intentional search state separate from browser/password-manager autofill.
   el('market-search').value=query;el('market-filter').value=filter;
   const search=query.trim().toLocaleLowerCase('pl');
@@ -67,10 +67,10 @@
   document.querySelectorAll('[data-market-pane]').forEach(b=>{const chosen=b.dataset.marketPane===pane;b.classList.toggle('active',chosen);b.setAttribute('aria-pressed',String(chosen));});
   if(pane==='collections')void window.MarketCollections.open();
   if(pane==='loot')void window.MarketDesk.openLoot();
-  if(pane==='trade')window.MarketDesk.openTrade();
+  if(pane==='trade'){window.MarketDesk.openTrade();window.MarketFinance.tradeOpened();}
   if(pane==='inventory')void window.MarketInventoryView.open();
  }
  document.querySelectorAll('[data-market-pane]').forEach(button=>button.onclick=()=>showPane(button.dataset.marketPane));
- window.MarketView={refresh,render,pane:showPane,history:openHistory,open:async api=>{request=api;window.MarketDesk?.configure(api);render();if(!lastAttemptAt||Date.now()-lastAttemptAt>=AUTO_REFRESH_MS)await refresh();else scheduleRefresh();},clear:()=>{const visible=!el('market-view').hidden;clearTimeout(autoTimer);autoTimer=null;epoch++;historyEpoch++;inFlight=null;items=[];snapshot=null;lastLoadedAt=0;lastAttemptAt=0;window.MarketCollections?.reset();el('market-dialog').close();el('market-refresh').disabled=false;render();el('market-status').textContent='';if(visible&&request)queueMicrotask(()=>refresh());}};
+ window.MarketView={refresh,render,pane:showPane,history:openHistory,open:async api=>{request=api;window.MarketDesk?.configure(api);window.MarketFinance?.configure(api);render();if(!lastAttemptAt||Date.now()-lastAttemptAt>=AUTO_REFRESH_MS)await refresh();else scheduleRefresh();},clear:()=>{const visible=!el('market-view').hidden;clearTimeout(autoTimer);autoTimer=null;epoch++;historyEpoch++;inFlight=null;items=[];snapshot=null;lastLoadedAt=0;lastAttemptAt=0;window.MarketCollections?.reset();el('market-dialog').close();el('market-refresh').disabled=false;render();el('market-status').textContent='';if(visible&&request)queueMicrotask(()=>refresh());}};
  document.addEventListener('visibilitychange',()=>{if(active()&&Date.now()-lastAttemptAt>=AUTO_REFRESH_MS)void refresh();else scheduleRefresh();});
 })();
