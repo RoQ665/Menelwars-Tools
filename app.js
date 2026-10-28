@@ -15826,6 +15826,8 @@ function setupAdmin() {
     const missing = [];
     if (!source || typeof source !== "object") return {ok:false,missing:["build"]};
 
+    if (source.simulationUnavailable) return {ok:false,missing:[source.simulationUnavailable]};
+
     // Przeciwnik odtworzony z pełnego logu walki nie potrzebuje sztucznego
     // drzewka perków. Log zawiera jego końcowe ATK/DEF/HP oraz wszystkie
     // efektywne statystyki PvP używane przez symulator.
@@ -16560,6 +16562,21 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1660 ATK · 1819 DEF · 8732 HP. Uwzględnia próg minimum 175 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
     });
+    // Katalog z ekranu bossów przesłanego przez gracza. Sama lista nagród
+    // ani zdarzenia walki nie ujawniają pełnego profilu bojowego NPC.
+    const bossCatalogue=["Menel Igor","Mietek magister","Żul Artur","Zdzichu złota rączka","Pijus Dawid","Młody lump Sławek","Cyber Piotrek","Marek „Amant”","Andrzej","Krzysztof Jarzyna","Geralt z Rumii","Damian Wąsik","Kamil Zdun","Nagła Śmierć","Pan Paweł","Mateusz Rowerzysta","Adrian Puchacki","Janusz Tracz","Silnoręki","Sułtan Meneli","Rzezimieszek Heniek","Baron Blokowiska","Portier Stefan","Ochroniarz Mirek „Byk”","Cwaniak Zenek","Cinkciarz Wiesiek","Bimbrownik Kazik","Doktor Spirytus","Gwardzista Cesarza","Cesarz Meneli","Komornik Wiesław","Prezes Wysypiska","Ojciec Chrzestny Melin","Burmistrz Ryszard „Układ”","Deweloper Bogdan „Beton”"];
+    const bossNameKey=name=>String(name).split(' · ')[0].replace(/[„”"]/g,'').toLocaleLowerCase('pl');
+    const knownBosses=new Map(out.filter(x=>x.boss).map(x=>[bossNameKey(x.name),x]));
+    const orderedBosses=bossCatalogue.map((name,index)=>{
+      const known=knownBosses.get(bossNameKey(name));if(known)return known;
+      const mayor=index===33,developer=index===34;
+      return {id:'boss-catalog-'+(index+1),name:name+' · Boss · niepełne dane',authorNick:'MenelWars · Bossowie',ownerNick:'',public:false,boss:true,
+        attributes:{},perks:{},profile:{},bonuses:[],
+        simulationUnavailable:'pełne ATK, DEF i statystyki PvP bossa',
+        observations:mayor?{level:34,maxHp:9188,reportDate:'2026-10-28',winner:'RoQ',turns:19,remainingHp:470,rewardXp:170000,rewardGold:15}:developer?{rewardXp:175000,rewardGold:15}:{},
+        description:mayor?'Raport z 28.10.2026: poziom 34, 9188 HP. RoQ wygrał w 19. rundzie, pozostając z 470 HP. Nagroda: 170 000 XP i 15 złotych monet. Log nie zawiera pełnego ATK, DEF ani statystyk PvP — symulacja niedostępna.':developer?'Znany z listy bossów: 175 000 XP i 15 złotych monet. Brak raportu i pełnych statystyk do symulacji.':'Boss z przesłanej listy. Brak pełnego profilu bojowego do symulacji.'};
+    });
+    out.splice(0,out.length,...out.filter(x=>!x.boss),...orderedBosses);
     pvpGeneratedPresetsCache = out;
     return out;
   }
@@ -16570,7 +16587,7 @@ function setupAdmin() {
     buildMyItems.forEach(item=>all.push({key:`mine:${item.id}`,label:`🔒 ${item.name}`,source:item,group:"mine"}));
     buildPublicItems.forEach(item=>all.push({key:`public:${item.id}`,label:`🌍 ${item.name} · ${item.authorNick||"Anonim"}`,source:item,group:"public"}));
     buildPrivatePreviewItems.forEach(item=>all.push({key:`private-preview:${item.id}`,label:`🔐 ${item.name} · ${item.authorNick||item.ownerNick||"Anonim"} · prywatny`,source:item,group:"private-preview"}));
-    pvpGeneratedPresets().forEach(item=>all.push({key:`preset:${item.id}`,label:`🤖 ${item.name} · treningowy`,source:item,group:"preset"}));
+    pvpGeneratedPresets().forEach(item=>all.push({key:`preset:${item.id}`,label:`🤖 ${item.name}${item.simulationUnavailable?" · katalog":" · treningowy"}`,source:item,group:"preset"}));
     return all;
   }
 
@@ -16716,7 +16733,7 @@ function setupAdmin() {
     const parts=[];
     if (!leftReady.ok) parts.push(`${leftItem.label}: ${leftReady.missing.join(", ")}`);
     if (!rightReady.ok) parts.push(`${rightItem.label}: ${rightReady.missing.join(", ")}`);
-    host.textContent="⚠️ Brakuje: "+parts.join(" · ");
+    host.textContent="⚠️ Brakuje: "+parts.join(" · ")+(rightItem.source.simulationUnavailable?". "+rightItem.source.description:"");
   }
 
   function pvpClamp(value,min,max) { return Math.max(min,Math.min(max,value)); }
