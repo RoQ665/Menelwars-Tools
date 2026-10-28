@@ -2,6 +2,25 @@
  'use strict';
  const norm=v=>String(v).normalize('NFKC').trim().toLocaleLowerCase('pl');
  function clean(text){return String(text).replace(/\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/&#x([\da-f]+);/gi,(_,n)=>String.fromCodePoint(parseInt(n,16))).replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/&quot;/g,'"').replace(/&amp;/g,'&').replace(/[\u00a0\u202f]/g,' ').replace(/[*_#]/g,'').trim();}
+ function parseCollections(text){
+  const lines=String(text).split(/\r?\n/).map(clean).filter(Boolean),result=[];
+  if(!lines.some(x=>/^Kolekcjoner$/i.test(x)))return result;
+  for(let i=0;i<lines.length;i++)if(/^Wymagane przedmioty:$/i.test(lines[i])){
+   let heading=i-1;while(heading>=0&&(/^(x\d+|Uko[nń]czona|[%♡♥]+|[+\d\s.,%/()–-]+)$/i.test(lines[heading])||/^(Bonusy|Kaszanka GMO|Bezpieczny poziom)/i.test(lines[heading])))heading--;
+   const name=lines[heading];if(!name||name.length>150)throw Error('Nie rozpoznano nazwy kolekcji.');
+   const completed=lines.slice(heading+1,i).some(x=>/^Uko[nń]czona$/i.test(x)),items={},deposited={};let pending=null,j=i+1;
+   for(;j<lines.length&&!/^Nagroda:$/i.test(lines[j]);j++){
+    const line=lines[j];if(/^\+\d+$/.test(line))continue;
+    const m=line.match(/^(.*?)(\d+)\s*\/\s*(\d+)(?:\s*\+\d+)?$/);
+    if(m){const item=(m[1].trim()||pending),have=Number(m[2]),need=Number(m[3]);if(!item||!Number.isSafeInteger(need)||need<1||need>1e6||have>need||Object.hasOwn(items,item))throw Error('Nieprawidłowy postęp kolekcji '+name+'.');items[item]=need;deposited[norm(item)]=have;pending=null;}
+    else{if(pending)throw Error('Brakuje liczby sztuk w kolekcji '+name+'. Skopiuj całą stronę.');pending=line;}
+   }
+   if(j===lines.length||pending||!Object.keys(items).length)throw Error('Niepełna kolekcja '+name+'. Skopiuj całą stronę.');
+   const rewardLines=[];for(let k=j+1;k<Math.min(lines.length,j+14)&&! /^(Zbieraj|Odbierz|Wycofaj|[%♡♥]+|Wymagane|Zadania|Tier)/i.test(lines[k]);k++)rewardLines.push(lines[k]);const rewardText=rewardLines.join(' '),reward={};for(const [kind,label] of [['gold','Złota'],['silver','Srebrna'],['bronze','Brązowa']]){const m=rewardText.match(new RegExp(label+' moneta\\s*(\\d+)\\s*x','i'))||rewardText.match(new RegExp('(\\d+)\\s*x\\s*'+label+' moneta','i'));if(m)reward[kind]=Number(m[1]);}
+   if(Object.keys(reward).length)result.push({name,items,deposited,reward,completed});i=j;
+  }
+  return result;
+ }
  function parse(text,catalog){
   if(typeof text!=='string'||text.length>500000)throw Error('Wklej tekst jednej lub kilku stron ekwipunku (do 500 tys. znaków).');
   const lines=text.split(/\r?\n/).map(clean).filter(Boolean),known=new Map(catalog.map(x=>[norm(x.name),x]));
@@ -24,10 +43,10 @@
    const meta=known.get(norm(name));current.stacks++;const row={name,id:meta?.id??null,level,quantity};
    const previous=current.items.find(x=>norm(x.name)===norm(name)&&x.level===level);if(previous)previous.quantity+=quantity;else current.items.push(row);
   }
-  const result=[...sections.values()].filter(s=>s.stacks);
-  if(!result.length)throw Error('Nie rozpoznano plecaka, rupieciarni ani sejfu. Skopiuj całą stronę z widoczną listą przedmiotów.');
+  const result=[...sections.values()].filter(s=>s.stacks),collections=parseCollections(text);
+  if(!result.length&&!collections.length)throw Error('Nie rozpoznano ekwipunku ani kolekcji. Skopiuj całą stronę z listą przedmiotów lub Kolekcjonera.');
   for(const s of result)if(s.reportedSlots!==null&&s.reportedSlots!==s.stacks)throw Error('Schowek '+s.source+': odczytano '+s.stacks+' z '+s.reportedSlots+' pozycji. Wybierz Wszystkie i skopiuj pełną listę.');
-  return {sections:result,money};
+  return {sections:result,money,collections};
  }
  function assess(row,market,catalog,recipes,includeSafe=false){
   const meta=catalog.find(x=>x.id===row.id),quote=market.find(x=>x.id===row.id&&x.level===row.level),paser=row.level===0?meta?.paserPrice??null:null;
@@ -44,6 +63,6 @@
   else{reason='Jest cena bazaru, ale brakuje porównywalnej ceny pasera.';}
   return {row,meta,quote,paser,paserTotal,price,fee,marketNet,sets,choice,reason};
  }
- if(typeof module!=='undefined'&&module.exports){module.exports={parse,assess};return;}
- root.MarketInventoryEngine={parse,assess};
+ if(typeof module!=='undefined'&&module.exports){module.exports={parse,parseCollections,assess};return;}
+ root.MarketInventoryEngine={parse,parseCollections,assess};
 })(typeof window!=='undefined'?window:globalThis);

@@ -3,35 +3,37 @@
  const el=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const money=v=>v==null?'—':new Intl.NumberFormat('pl-PL',{maximumFractionDigits:2}).format(v)+' zł';
  const labels={backpack:'Plecak',stash:'Rupieciarnia',safe:'Sejf'},choices={market:'Bazar daje więcej',paser:'Porównaj z paserem',keep:'Do zachowania',collection:'Składnik kolekcji',check:'Sprawdź ręcznie'};
- let viewer=null,book={sources:{},money:null,reserves:{}},items=[],catalog=null,recipes=null,loading=null,catalogDate=null,page=1,sourceFilter='',selectedKey=null;
+ let viewer=null,book={sources:{},money:null,reserves:{},collections:{}},items=[],catalog=null,recipes=null,loading=null,catalogDate=null,page=1,sourceFilter='',selectedKey=null;
  const PAGE_SIZE=24;
  const rowKey=r=>JSON.stringify([r.source,r.id??r.name,r.level]);
  const storageKey=()=>viewer?'mwt-inventory-v1:'+encodeURIComponent(viewer.toLocaleLowerCase('pl')):null;
  function loadBook(){
-  book={sources:{},money:null,reserves:{}};if(!viewer)return;
+  book={sources:{},money:null,reserves:{},collections:{}};if(!viewer)return;
   try{const raw=JSON.parse(localStorage.getItem(storageKey())||'null');if(!raw)return;
    for(const source of Object.keys(labels)){const s=raw.sources?.[source];if(!s)continue;if(!Array.isArray(s.items)||s.items.length>1000)throw Error();
     if(!s.items.every(x=>typeof x.name==='string'&&x.name.length<=150&&Number.isSafeInteger(x.level)&&x.level>=0&&x.level<=100&&Number.isSafeInteger(x.quantity)&&x.quantity>0&&x.quantity<=1e9&&(x.id===null||Number.isSafeInteger(x.id))))throw Error();
     book.sources[source]={items:s.items,at:Number(s.at)||0};
    }
    if(raw.reserves&&typeof raw.reserves==='object')for(const [key,value] of Object.entries(raw.reserves))if(key.length<220&&Number.isSafeInteger(value)&&value>=0&&value<=1e9)book.reserves[key]=value;
+   if(raw.collections&&typeof raw.collections==='object')for(const [key,r] of Object.entries(raw.collections).slice(0,500))if(r&&typeof r.name==='string'&&r.name.length<=150&&r.items&&Object.keys(r.items).length<=50&&Object.entries(r.items).every(([n,q])=>n.length<=150&&Number.isSafeInteger(q)&&q>0&&q<=1e6&&Number.isSafeInteger(r.deposited?.[n.normalize('NFKC').trim().toLocaleLowerCase('pl')])&&r.deposited[n.normalize('NFKC').trim().toLocaleLowerCase('pl')]>=0&&r.deposited[n.normalize('NFKC').trim().toLocaleLowerCase('pl')]<=q)&&r.reward&&Object.entries(r.reward).every(([k,v])=>['gold','silver','bronze'].includes(k)&&Number.isSafeInteger(v)&&v>=0&&v<=1e6)&&typeof r.completed==='boolean')book.collections[key]=r;
    book.money=typeof raw.money==='number'&&Number.isFinite(raw.money)&&raw.money>=0?raw.money:null;
-  }catch{book={sources:{},money:null,reserves:{}};}
+  }catch{book={sources:{},money:null,reserves:{},collections:{}};}
  }
  function saveBook(){try{localStorage.setItem(storageKey(),JSON.stringify(book));return true;}catch{el('inventory-message').textContent='Analiza działa, ale przeglądarka nie pozwala zapisać schowków lokalnie.';return false;}}
  function rows(){return Object.entries(book.sources).flatMap(([source,s])=>s.items.map(x=>({...x,source})));}
  function availableRows(){return MarketEconomy.reserveRows(rows(),book.reserves,el('inventory-include-safe').checked);}
  function availableOwned(){const owned={};for(const r of availableRows())if(r.level===0&&r.sellQuantity){const key=r.name.normalize('NFKC').trim().toLocaleLowerCase('pl');owned[key]=(owned[key]||0)+r.sellQuantity;}return owned;}
- function applyOwned(){window.MarketCollections.setOwned(availableOwned());window.MarketFinance?.inventoryChanged();}
+ function applyOwned(){window.MarketCollections.setProgress(book.collections);window.MarketCollections.setOwned(availableOwned());window.MarketFinance?.inventoryChanged();}
  function assessRow(row){const r=window.MarketInventoryEngine.assess({...row,quantity:row.sellQuantity},items,catalog,recipes,el('inventory-include-safe').checked);r.row=row;if(!row.sellQuantity){r.choice='keep';r.reason=row.source==='safe'&&!el('inventory-include-safe').checked?'Sejf pozostaje chroniony.':'Całość mieści się w ustawionej rezerwie — brak nadwyżki do sprzedaży.';}return r;}
  async function load(){if(catalog&&recipes)return;if(loading)return loading;loading=(async()=>{try{const [response,list]=await Promise.all([fetch('market-item-data.json?v=24.44'),window.MarketCollections.getRecipes()]);if(!response.ok)throw Error('Nie udało się pobrać cen pasera.');const data=await response.json();if(!Array.isArray(data.items))throw Error('Nieprawidłowy katalog przedmiotów.');catalog=data.items;catalogDate=data.checkedAt;recipes=list;}finally{loading=null;}})();return loading;}
  function render(){
   el('inventory-import-controls').hidden=!viewer;el('inventory-login-note').hidden=Boolean(viewer);
   el('inventory-catalog-date').textContent=catalogDate?'Bazowe ceny pasera z wiki: '+new Date(catalogDate).toLocaleDateString('pl-PL')+'. Bez premii umiejętności, kar za alkohol i kosztu transportu.':'';
-  el('inventory-profile').textContent=viewer?'Schowki zapisane lokalnie w tej przeglądarce dla '+viewer+'. Pełny wklejony tekst nie jest zapisywany ani wysyłany.':'';
+  el('inventory-profile').textContent=viewer?'Schowki i kolekcje zapisane lokalnie w tej przeglądarce dla '+viewer+'. Pełny wklejony tekst nie jest zapisywany ani wysyłany.':'';
   el('inventory-money').hidden=book.money===null;el('inventory-money-value').textContent=money(book.money);
   el('inventory-sources').innerHTML=(Object.keys(book.sources).length?'<button type="button" data-inventory-source="" class="'+(!sourceFilter?'active':'')+'">Wszystkie schowki</button>':'')+Object.entries(book.sources).map(([source,s])=>'<button type="button" data-inventory-source="'+source+'" class="'+(sourceFilter===source?'active':'')+'" title="Odczyt '+esc(new Date(s.at).toLocaleString('pl-PL'))+'">'+labels[source]+' · '+s.items.length+'</button>').join('');
   el('inventory-sources').querySelectorAll('[data-inventory-source]').forEach(b=>b.onclick=()=>{sourceFilter=b.dataset.inventorySource;page=1;render();});
+  const progressRows=Object.values(book.collections);el('inventory-collections').innerHTML=progressRows.length?'<details class="finance-box"><summary>Zaimportowane kolekcje · '+progressRows.length+'</summary><p class="market-help">Oddane składniki liczymy tylko w konkretnej kolekcji. Nie trafiają do schowków ani wyceny sprzedaży.</p>'+progressRows.map(r=>'<p><b>'+esc(r.name)+'</b> · '+(r.completed?'ukończona':Object.values(r.deposited).reduce((a,b)=>a+b,0)+' / '+Object.values(r.items).reduce((a,b)=>a+b,0)+' szt. oddanych')+'</p>').join('')+'</details>':'';
   if(!catalog||!recipes)return;
   const mode=el('inventory-filter').value,list=availableRows().map(assessRow).filter(r=>(!mode||r.choice===mode)&&(!sourceFilter||r.row.source===sourceFilter));
   list.sort((a,b)=>(b.marketNet??-1)-(a.marketNet??-1)||a.row.name.localeCompare(b.row.name,'pl'));
@@ -62,12 +64,12 @@
  el('inventory-import').onsubmit=async e=>{
   e.preventDefault();if(!viewer)return;const owner=viewer;
   try{await load();if(viewer!==owner)return;const result=window.MarketInventoryEngine.parse(el('inventory-paste').value,catalog);
-   for(const section of result.sections)book.sources[section.source]={items:section.items,at:Date.now()};if(result.money!==null)book.money=result.money;
-   const saved=saveBook();page=1;applyOwned();render();el('inventory-message').textContent='Zaktualizowano: '+result.sections.map(s=>labels[s.source]).join(', ')+(saved?' · zapisano lokalnie.':' · bez zapisu lokalnego.');el('inventory-paste').value='';el('inventory-import-box').open=false;
+   for(const section of result.sections)book.sources[section.source]={items:section.items,at:Date.now()};for(const r of result.collections)book.collections[r.name.normalize('NFKC').trim().toLocaleLowerCase('pl')]={...r,at:Date.now()};if(result.money!==null)book.money=result.money;
+   const saved=saveBook();page=1;applyOwned();recipes=await window.MarketCollections.getRecipes();if(owner!==viewer)return;render();el('inventory-message').textContent='Zaktualizowano: '+[...result.sections.map(s=>labels[s.source]),...(result.collections.length?['kolekcje: '+result.collections.length]:[])].join(', ')+(saved?' · zapisano lokalnie.':' · bez zapisu lokalnego.');el('inventory-paste').value='';el('inventory-import-box').open=false;
   }catch(error){el('inventory-message').textContent=error.message;}
  };
  el('inventory-filter').onchange=()=>{page=1;render();};el('inventory-include-safe').onchange=()=>{applyOwned();render();};
  el('inventory-use-money').onclick=()=>{window.MarketCollections.setBudget(book.money);window.MarketDesk.budgetChanged(book.money);el('inventory-message').textContent='Ustawiono budżet '+money(book.money)+' ze skopiowanego ekranu.';};
- el('inventory-clear').onclick=()=>{book={sources:{},money:null,reserves:book.reserves};if(viewer)saveBook();applyOwned();render();el('inventory-message').textContent='Usunięto lokalne odczyty schowków.';};
+ el('inventory-clear').onclick=()=>{book={sources:{},money:null,reserves:book.reserves,collections:{}};if(viewer)saveBook();applyOwned();render();el('inventory-message').textContent='Usunięto lokalne odczyty schowków i kolekcji.';};
  window.MarketInventoryView={getAvailableOwned:availableOwned,open:async()=>{try{await load();render();}catch(e){el('inventory-message').textContent=e.message;}},update:(list,data)=>{items=list;const next=data?.viewer?.nick??null;if(next!==viewer){viewer=next;page=1;sourceFilter='';selectedKey=null;el('inventory-detail-dialog').close();loadBook();el('inventory-paste').value='';el('inventory-filter').value='';el('inventory-message').textContent='';el('inventory-include-safe').checked=false;applyOwned();}render();}};
 })();

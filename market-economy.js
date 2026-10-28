@@ -57,18 +57,18 @@
  }
  function plan(recipes,items,owned,budget,maxRuns=50,options={}){
   const limit=integer(maxRuns,1,100),budgetCents=cents(budget),market=new Map(items.filter(x=>x.level===0).map(x=>[norm(x.name),x])),resources=new Map();
-  const candidates=recipes.filter(r=>r.reward.gold>0).map(r=>({name:r.name,gold:r.reward.gold,needs:Object.entries(r.items).map(([name,q])=>{
+  const candidates=recipes.filter(r=>r.reward.gold>0&&!r.progress?.completed).map(r=>({name:r.name,gold:r.reward.gold,repeatable:r.repeatable!==false,needs:Object.entries(r.items).map(([name,q])=>{
    const key=norm(name),m=market.get(key),have=Math.max(0,Math.floor(Number(owned[key])||0)),quantity=m?.price!=null?Math.min(1,Math.max(0,Math.floor(m.quantity))):0;
-   if(!resources.has(key))resources.set(key,{name,owned:have,market:quantity,price:m?.price!=null?cents(m.price):null});return {key,q};
+   if(!resources.has(key))resources.set(key,{name,owned:have,market:quantity,price:m?.price!=null?cents(m.price):null});return {key,q,deposited:Math.min(q,Math.max(0,Math.floor(Number(r.progress?.deposited?.[key])||0)))};
   })}));
   const used=new Map([...resources.keys()].map(k=>[k,0]));
-  function maxCount(r,spent,runs){let cap=limit-runs;for(const n of r.needs){const v=resources.get(n.key);cap=Math.min(cap,Math.floor((v.owned+v.market-used.get(n.key))/n.q));}let low=0,high=Math.max(0,cap);while(low<high){const mid=Math.ceil((low+high)/2);if(delta(r,mid)<=budgetCents-spent)low=mid;else high=mid-1;}return low;}
-  function delta(r,n){let cost=0;for(const a of r.needs){const v=resources.get(a.key),before=used.get(a.key),buy=Math.max(0,before+a.q*n-v.owned)-Math.max(0,before-v.owned);cost+=buy*(v.price??0);}return cost;}
+  function maxCount(r,spent,runs){let cap=Math.min(limit-runs,r.repeatable?limit:1);for(const n of r.needs){const v=resources.get(n.key);cap=Math.min(cap,Math.floor((v.owned+v.market-used.get(n.key)+n.deposited)/n.q));}let low=0,high=Math.max(0,cap);while(low<high){const mid=Math.ceil((low+high)/2);if(delta(r,mid)<=budgetCents-spent)low=mid;else high=mid-1;}return low;}
+  function delta(r,n){let cost=0;for(const a of r.needs){const v=resources.get(a.key),before=used.get(a.key),buy=Math.max(0,before+Math.max(0,a.q*n-a.deposited)-v.owned)-Math.max(0,before-v.owned);cost+=buy*(v.price??0);}return cost;}
   candidates.sort((a,b)=>{const ca=delta(a,1),cb=delta(b,1);return (cb?b.gold/cb:Infinity)-(ca?a.gold/ca:Infinity)||b.gold-a.gold||a.name.localeCompare(b.name,'pl');});
   let visited=0,truncated=false,best={coins:0,cost:0,counts:[]};const counts=Array(candidates.length).fill(0),memo=new Map(),started=Date.now(),maxNodes=options.maxNodes??250000,maxMs=options.maxMs??1500;
   function bound(index,spent,runs){
    const blocks=[];for(let i=index;i<candidates.length;i++){const r=candidates[i],cap=maxCount(r,spent,runs);if(!cap)continue;
-    const changes=new Set([0,cap]);for(const n of r.needs){const v=resources.get(n.key),free=Math.max(0,v.owned-used.get(n.key)),t=Math.floor(free/n.q);for(const cut of [t,t+1])if(cut>0&&cut<cap)changes.add(cut);}
+    const changes=new Set([0,cap]);for(const n of r.needs){const v=resources.get(n.key),free=Math.max(0,v.owned-used.get(n.key))+n.deposited,t=Math.floor(free/n.q);for(const cut of [t,t+1])if(cut>0&&cut<cap)changes.add(cut);}
     const cuts=[...changes].sort((a,b)=>a-b);for(let j=1;j<cuts.length;j++){const a=cuts[j-1],b=cuts[j];blocks.push({n:b-a,gold:r.gold,cost:(delta(r,b)-delta(r,a))/(b-a)});}
    }
    let moneyLeft=budgetCents-spent,byMoney=0;for(const b of [...blocks].sort((a,b)=>(b.cost?b.gold/b.cost:Infinity)-(a.cost?a.gold/a.cost:Infinity))){const take=b.cost?Math.min(b.n,moneyLeft/b.cost):b.n;byMoney+=take*b.gold;moneyLeft-=take*b.cost;}
@@ -83,11 +83,11 @@
    const signature=index+'|'+spent+'|'+runs+'|'+keys.map(k=>used.get(k)).join(',');
    if((memo.get(signature)??-1)>=coins)return;memo.set(signature,coins);
    const r=candidates[index],max=maxCount(r,spent,runs);
-   for(let n=max;n>=0;n--){const cost=delta(r,n);counts[index]=n;for(const a of r.needs)used.set(a.key,used.get(a.key)+a.q*n);search(index+1,spent+cost,runs+n,coins+r.gold*n);for(const a of r.needs)used.set(a.key,used.get(a.key)-a.q*n);counts[index]=0;if(truncated)break;}
+   for(let n=max;n>=0;n--){const cost=delta(r,n);counts[index]=n;for(const a of r.needs)used.set(a.key,used.get(a.key)+Math.max(0,a.q*n-a.deposited));search(index+1,spent+cost,runs+n,coins+r.gold*n);for(const a of r.needs)used.set(a.key,used.get(a.key)-Math.max(0,a.q*n-a.deposited));counts[index]=0;if(truncated)break;}
   }
   search(0,0,0,0);
   const selected=candidates.map((r,i)=>({...r,count:best.counts[i]||0})).filter(r=>r.count);
-  const demands=new Map();for(const r of selected)for(const n of r.needs)demands.set(n.key,(demands.get(n.key)||0)+n.q*r.count);
+  const demands=new Map();for(const r of selected)for(const n of r.needs)demands.set(n.key,(demands.get(n.key)||0)+Math.max(0,n.q*r.count-n.deposited));
   const shopping=[...demands].map(([key,quantity])=>{const r=resources.get(key),held=Math.min(quantity,r.owned),buy=quantity-held;return {name:r.name,quantity,held,buy,available:r.market,unitPrice:r.price===null?null:r.price/100,cost:buy*(r.price??0)/100};});
   return {coins:best.coins,cost:best.cost/100,left:(budgetCents-best.cost)/100,runs:selected.map(r=>({name:r.name,count:r.count,coins:r.gold*r.count})),shopping,optimal:!truncated,visited,maxRuns:limit};
  }
