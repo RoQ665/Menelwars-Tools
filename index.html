@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
   <link rel="stylesheet" href="league.css?v=24.36">
+  <link rel="stylesheet" href="battle-analyzer.css?v=24.54">
   <link rel="stylesheet" href="market.css?v=24.52">
   <title>MenelWars Tools</title>
 
@@ -1392,6 +1393,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
         <div id="build-tabs" class="build-tabs" role="tablist" aria-label="Sekcje Buildów">
           <button type="button" class="build-tab active" data-build-tab="editor">🛠 Kreator</button>
+          <button type="button" class="build-tab" data-build-tab="analysis">🧾 Analizator walk</button>
           <button type="button" class="build-tab" data-build-tab="sim">🥊 Symulator</button>
           <button type="button" class="build-tab" data-build-tab="public">🌍 Publiczne</button>
           <button type="button" class="build-tab" data-build-tab="mine">🔒 Moje buildy</button>
@@ -1666,6 +1668,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
         <div id="build-viewer" class="build-viewer" hidden></div>
 
+        <section id="battle-analyzer-section" hidden><h3>Analizator walk PvP i bossów</h3><p class="muted">Wklej JSON z Network lub całą stronę zakończonej walki. Możesz też wybrać kilka plików TXT / JSON. Dane nie są wysyłane na serwer.</p><form id="battle-import"><label>Raport walki<textarea id="battle-paste" rows="7" maxlength="4000000" spellcheck="false" placeholder="Wklej JSON albo skopiowaną stronę z pełnym logiem walki…"></textarea></label><div class="battle-import-actions"><button type="submit" class="primary-btn">Analizuj / dodaj walkę</button><label class="secondary-btn">Wybierz pliki<input id="battle-files" type="file" accept=".txt,.json,text/plain,application/json" multiple></label></div></form><p id="battle-message" class="submit-status" role="status"></p><div class="battle-controls"><label>Analiza dla<select id="battle-player"></select></label><label><input type="checkbox" id="battle-save"> Zachowaj raporty na tym urządzeniu</label><button type="button" class="secondary-btn" id="battle-clear">Usuń raporty</button></div><p class="muted">Zapis jest lokalny, osobny dla konta. Bez zapisu raporty pozostają do odświeżenia strony. JSON zawiera więcej danych niż log tekstowy. To analiza rozegranych walk, nie szansa wygranej ani symulacja.</p><p id="battle-count" class="muted"></p><div id="battle-results"></div></section>
         <details id="pvp-simulator-section" class="content-accordion pvp-simulator-section" open hidden>
           <summary>
             <span>🥊 Symulator walk — 🧪 Eksperymentalny</span>
@@ -1720,13 +1723,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
             <div id="pvp-sim-readiness" class="submit-status"></div>
             <div id="pvp-sim-results" class="pvp-sim-results"></div>
 
-            <details class="build-filter-details pvp-log-analyzer">
-              <summary>🧾 Analizator logu walki</summary>
-              <p class="muted">Wklej tekstowy log. Analizator policzy rozpoznane eventy bez udawania, że zna nieobecne w logu wartości.</p>
-              <textarea id="pvp-log-text" rows="7" spellcheck="false" placeholder="Wklej log walki..."></textarea>
-              <button id="pvp-log-analyze" type="button" class="secondary-btn">🔎 Analizuj log</button>
-              <div id="pvp-log-results"></div>
-            </details>
+
           </div>
         </details>
       </div>
@@ -2350,6 +2347,8 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
   <script src="market-inventory-view.js?v=24.52"></script>
   <script src="market-desk.js?v=24.52"></script>
   <script src="market.js?v=24.52"></script>
-  <script src="app.js?v=24.50"></script>
+  <script src="battle-analyzer.js?v=24.54"></script>
+  <script src="battle-analyzer-view.js?v=24.54"></script>
+  <script src="app.js?v=24.54"></script>
 </body>
 </html>

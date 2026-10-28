@@ -1,0 +1,57 @@
+(function(root){
+ 'use strict';
+ const norm=v=>String(v).normalize('NFKC').trim().toLocaleLowerCase('pl'),num=v=>Number.isFinite(Number(v))&&Number(v)>=0&&Number(v)<=1e9?Number(v):null;
+ const hash=s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return(h>>>0).toString(36);};
+ function fighter(p){if(!p||typeof p.nickname!=='string'||!p.nickname.trim()||p.nickname.length>100||num(p.maxHp)===null||!Number(p.maxHp)||num(p.finalHp)===null||Number(p.finalHp)>Number(p.maxHp))throw Error('Brakuje nicków lub końcowych stanów HP obu graczy.');return {nickname:p.nickname.trim(),level:num(p.level),maxHp:Number(p.maxHp),finalHp:Number(p.finalHp),id:p.characterId??p.id??null};}
+ const metrics=()=>({hits:0,crits:0,damage:0,counters:0,counterCrits:0,counterDamage:0,bleedDamage:0,bleedTaken:0,regen:0,lifesteal:0,evades:0,doubles:0,stuns:0,skips:0,bleedAttempts:0,bleedResisted:0,momentum:0,normal:[],breakthroughs:[]});
+ const supported=new Set('battle_start breakthrough_ready turn_start attack_phase attack crit first_strike lifesteal hp_update regen double_strike bleed_apply breakthrough bleed_tick evade miss counter_attack_trigger counter_attack_damage counter_damage_reduction momentum low_hp_bonus stun_resisted stun_apply stun_skip execute death victory battle_timeout'.split(' '));
+ function analyze(raw,format='json',extraWarnings=[]){
+  const d=raw.report?.events?raw.report:raw;if(!Array.isArray(d.events)||d.events.length>30000)throw Error('Brak pełnego raportu walki lub zbyt wiele zdarzeń.');
+  const attacker=fighter(d.attacker),defender=fighter(d.defender),turns=num(d.totalTurns);if(!turns||turns>1000||!['attacker','defender','tie','draw'].includes(d.winner))throw Error('Brak jednoznacznego wyniku i liczby tur.');
+  const m={attacker:metrics(),defender:metrics()},unknown=new Map(),trace=new Map();let timeout=false,execution=null,invalid=0;
+  for(const e of d.events){if(!e||typeof e.type!=='string')throw Error('Nieprawidłowe zdarzenie walki.');if(!supported.has(e.type))unknown.set(e.type,(unknown.get(e.type)||0)+1);if(e.type==='battle_timeout')timeout=true;if(e.type==='execute'&&['attacker','defender'].includes(e.actor))execution=e.actor;if(e.type==='hp_update'&&num(e.attackerHp)!==null&&num(e.defenderHp)!==null&&num(e.turn)!==null)trace.set(Number(e.turn),{turn:Number(e.turn),a:Number(e.attackerHp),b:Number(e.defenderHp)});
+   if(!['attacker','defender'].includes(e.actor))continue;if((['attack','counter_attack_damage','bleed_tick'].includes(e.type)&&num(e.damage)===null)||(['regen','lifesteal'].includes(e.type)&&num(e.amount)===null)){invalid++;continue;}const a=m[e.actor];const b=m[e.actor==='attacker'?'defender':'attacker'],damage=num(e.damage),amount=num(e.amount);
+   if(e.type==='attack'&&damage!==null){a.hits++;a.damage+=damage;if(e.isCrit)a.crits++;else a.normal.push({turn:num(e.turn),damage});}
+   if(e.type==='counter_attack_damage'&&damage!==null){a.counters++;a.counterDamage+=damage;if(e.isCrit)a.counterCrits++;}
+   if(e.type==='bleed_tick'&&damage!==null){a.bleedTaken+=damage;b.bleedDamage+=damage;}
+   if(e.type==='regen'&&amount!==null)a.regen+=amount;if(e.type==='lifesteal'&&amount!==null)a.lifesteal+=amount;
+   if(e.type==='evade')a.evades++;if(e.type==='double_strike')a.doubles++;if(e.type==='stun_apply')a.stuns++;if(e.type==='stun_skip')a.skips++;
+   if(e.type==='bleed_apply'){a.bleedAttempts++;if(e.resisted)a.bleedResisted++;}if(e.type==='momentum'&&num(e.bonus)!==null)a.momentum=Math.max(a.momentum,Number(e.bonus));
+   if(e.type==='breakthrough')a.breakthroughs.push({name:String(e.name||e.id||'Przełamanie').slice(0,100),rank:num(e.rank),turn:num(e.turn),amount,kind:['damage','healing','mitigation'].includes(e.kind)?e.kind:'unknown',effect:String(e.effect||'').slice(0,80)});
+  }
+  const signature=JSON.stringify([attacker.nickname,defender.nickname,attacker.maxHp,defender.maxHp,attacker.finalHp,defender.finalHp,turns,d.winner,...['attacker','defender'].map(k=>{const a=m[k];return [a.hits,a.crits,a.damage,a.counters,a.counterCrits,a.counterDamage,a.bleedTaken,a.regen,a.lifesteal,a.evades,a.doubles,a.breakthroughs.map(x=>[x.name,x.amount])];})]);
+  const warnings=[...extraWarnings];if(invalid)warnings.push('Niepełne kwoty w '+invalid+' zdarzeniach — pominięto je w sumach.');if(unknown.size)warnings.push('Nierozpoznane zdarzenia: '+[...unknown].map(([k,v])=>k+' ('+v+')').join(', ')+'. Podsumowanie może być niepełne.');
+  return {uid:typeof d.battleId==='string'?d.battleId.slice(0,150):'text-'+hash(signature),battleId:typeof d.battleId==='string'?d.battleId.slice(0,150):null,signature,formats:[format],attacker,defender,turns,winner:d.winner,timeout,execution,metrics:m,trace:[...trace.values()].sort((a,b)=>a.turn-b.turn),warnings,createdAt:raw.createdAt||null};
+ }
+ function textBattle(input){
+  const text=input.replace(/\[([^\]]*)\]\([^)]*\)/g,'$1').replace(/\*\*|^#+\s*/gm,'').replace(/[\u00a0\u202f]/g,' '),lines=text.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  const fighters=[...text.matchAll(/([^\r\n]+)\r?\nPoz\.\s*(\d+)\r?\n(\d+)\s*\/\s*(\d+)/g)].map(m=>({nickname:m[1].trim(),level:Number(m[2]),finalHp:Number(m[3]),maxHp:Number(m[4])}));if(fighters.length!==2)throw Error('Skopiuj całą stronę walki wraz z nickami, poziomami, końcowym HP i logiem.');
+  const sides=new Map(fighters.map((p,i)=>[norm(p.nickname),i?'defender':'attacker'])),winner=[...sides].find(([n])=>lines.some(l=>norm(l).startsWith(n+' wygrywa')));if(!winner)throw Error('Nie rozpoznano zwycięzcy w logu.');
+  let turn=0,started=false,unknown=0;const events=[];const add=(type,name,more={})=>{const actor=sides.get(norm(name));if(actor)events.push({type,actor,turn,...more});else unknown++;};
+  for(const line of lines){if(/Walka rozpoczęta!/i.test(line)){started=true;continue;}if(!started)continue;let m;
+   if((m=line.match(/---\s*Tura\s+(\d+)\s*---/i))){turn=Number(m[1]);continue;}
+   if(/wyczerpania|limit.*tur/i.test(line)){events.push({type:'battle_timeout',turn});continue;}
+   if(/wygrywa po \d+ turach/i.test(line))break;if(/^◆|^Powtórz|^Reset|^Zamknij/.test(line))continue;
+   if((m=line.match(/^Kontratak (.+?) zadaje (\d+) obra[żz]e[nń]/i))){add('counter_attack_damage',m[1],{damage:Number(m[2]),isCrit:/KRYTYK/i.test(line)});continue;}
+   if((m=line.match(/^(.+?) zadaje (\d+) obra[żz]e[nń]/i))){add('attack',m[1],{damage:Number(m[2]),isCrit:/KRYTYK/i.test(line)});continue;}
+   if((m=line.match(/^(.+?) kradnie (\d+) HP/i))){add('lifesteal',m[1],{amount:Number(m[2])});continue;}
+   if((m=line.match(/^(.+?) regeneruje (\d+) HP/i))){add('regen',m[1],{amount:Number(m[2])});continue;}
+   if((m=line.match(/^(.+?) unika ataku/i))){add('evade',m[1]);continue;}
+   if((m=line.match(/^(.+?) wykonuje podwójne uderzenie/i))){add('double_strike',m[1]);continue;}
+   if((m=line.match(/^(.+?) opiera się krwawieniu/i))){const target=sides.get(norm(m[1]));if(target)events.push({type:'bleed_apply',actor:target==='attacker'?'defender':'attacker',turn,resisted:true});continue;}
+   if((m=line.match(/^(.+?) krwawi.*?(\d+) (?:HP|obra[żz]e[nń])/i))){add('bleed_tick',m[1],{damage:Number(m[2])});continue;}
+   if((m=line.match(/^✦\s*PRZEŁAMANIE (.+?): (.+?) — (.+?)\s*\((\d+)\)/))){add('breakthrough',m[1],{name:m[2],amount:Number(m[4]),kind:/trzecie uderzenie|echo|obra[żz]e[nń]/i.test(m[3])?'damage':/lecze|wyssanie/i.test(m[3])?'healing':/ochrona|redukc/i.test(m[3])?'mitigation':'unknown'});continue;}
+   if(/odpowiada kontratakiem/i.test(line))continue;
+   if((m=line.match(/^(.+?) (?:wykonuje egzekucję|dobija.*egzekucj)/i))){add('execute',m[1]);continue;}
+   if((m=line.match(/^(.+?) .*rozpęd.*?\+?(\d+(?:[.,]\d+)?)%/i))){add('momentum',m[1],{bonus:Number(m[2].replace(',','.'))});continue;}
+   unknown++;
+  }
+  if(!turn||events.filter(e=>e.type==='attack').length<1)throw Error('Nie znaleziono tur i trafień w logu.');
+  return analyze({attacker:fighters[0],defender:fighters[1],winner:winner[1],totalTurns:turn,events},'text',['Log tekstowy: brak pełnej osi HP i części danych diagnostycznych.' ,...(unknown?['Nie rozpoznano '+unknown+' linii logu. Wartości mogą być niepełne.']:[])]);
+ }
+ function parse(input){if(typeof input!=='string'||input.length>4000000)throw Error('Raport jest zbyt duży (limit 4 MB).');const text=input.trim();if(!text)throw Error('Wklej raport walki.');if(text[0]==='{'||text[0]==='['){let values;try{const d=JSON.parse(text);values=Array.isArray(d)?d:[d];}catch{const parts=[];let depth=0,start=0,quote=false,escape=false;for(let i=0;i<text.length;i++){const c=text[i];if(quote){if(escape)escape=false;else if(c==='\\')escape=true;else if(c==='"')quote=false;continue;}if(c==='"')quote=true;if(c==='{'){if(depth++===0)start=i;}else if(c==='}'&&--depth===0)parts.push(JSON.parse(text.slice(start,i+1)));}if(depth||quote||!parts.length)throw Error('Nieprawidłowy JSON. Wklej pełną odpowiedź z gry.');values=parts;}if(values.length>100)throw Error('Wklej najwyżej 100 walk naraz.');return values.map(d=>analyze(d));}return [textBattle(text)];}
+ function merge(old,incoming){const out=[...old];let duplicates=0;for(const r of incoming){const i=out.findIndex(x=>x.battleId&&r.battleId?x.battleId===r.battleId:x.signature===r.signature);if(i<0)out.push(r);else{duplicates++;const prev=out[i],best=r.formats.includes('json')?r:prev;out[i]={...best,formats:[...new Set([...prev.formats,...r.formats])]};}}return {reports:out,duplicates};}
+ function view(r,name){const side=norm(r.defender.nickname)===norm(name)?'defender':'attacker',other=side==='attacker'?'defender':'attacker';return {side,other,me:r[side],enemy:r[other],mine:r.metrics[side],theirs:r.metrics[other],won:r.winner===side};}
+ function explain(r,name){const v=view(r,name),a=v.mine,b=v.theirs,out=[];out.push('Rywal: '+v.enemy.nickname+'. '+(['tie','draw'].includes(r.winner)?'Remis':v.won?'Wygrana':'Przegrana')+' po '+r.turns+' turach. Pozostałe HP: '+v.me.finalHp+'/'+v.me.maxHp+' u Ciebie i '+v.enemy.finalHp+'/'+v.enemy.maxHp+' u rywala.');if(r.timeout)out.push('Walka zakończyła się limitem tur; obaj gracze mogli pozostać przy życiu.');if(r.execution)out.push('Walkę zakończyła egzekucja '+r[r.execution].nickname+'. Małe końcowe HP zwycięzcy nie oznacza, że zabrakło jednego ciosu.');out.push('Regeneracja i kradzież życia w logu: '+(a.regen+a.lifesteal)+' HP u Ciebie, '+(b.regen+b.lifesteal)+' HP u przeciwnika.');if(!['tie','draw'].includes(r.winner)&&!v.won&&a.regen+a.lifesteal>b.regen+b.lifesteal)out.push('Przegrałeś mimo większej sumy leczenia — samo leczenie przeciwnika nie tłumaczy wyniku.');if(a.momentum||b.momentum)out.push('Zarejestrowany Rozpęd: maksymalnie +'+a.momentum+'% u Ciebie, +'+b.momentum+'% u rywala. Wzrostu obrażeń nie przypisujemy wyłącznie Rozpędowi: działa też eskalacja i efekty niskiego HP.');if(a.normal.length>1)out.push('Twoje zwykłe trafienia: od '+a.normal[0].damage+' do '+a.normal.at(-1).damage+' obrażeń (pierwsze i ostatnie zarejestrowane).');out.push('Krytyki w trafieniach bez kontrataków: '+a.crits+'/'+a.hits+' u Ciebie, '+b.crits+'/'+b.hits+' u rywala. To zaobserwowany wynik, nie rzeczywista szansa na krytyka.');if(a.bleedDamage||b.bleedDamage)out.push('Krwawienie zadało: '+a.bleedDamage+' obrażeń rywalowi i '+b.bleedDamage+' Tobie.');else out.push('Nie zarejestrowano obrażeń od krwawienia.');return out;}
+ const api={parse,analyze,merge,view,explain};if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.BattleAnalysis=api;
+})(typeof window!=='undefined'?window:globalThis);

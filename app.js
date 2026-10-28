@@ -3525,7 +3525,7 @@ function mapRenderRouteResult() {
   function setPlayerAccountSessionToken(token) {
     const previousToken = playerAccountSessionToken();
     const nextToken = String(token || "");
-    if(previousToken!==nextToken)window.MarketView?.clear();
+    if(previousToken!==nextToken){window.MarketView?.clear();window.BattleAnalyzer?.reset();}
 
     if (token) {
       localStorage.setItem(
@@ -17587,26 +17587,6 @@ function setupAdmin() {
     } finally { button.disabled=false; }
   }
 
-  function pvpAnalyzeLog() {
-    const text=String(el("pvp-log-text")?.value||"");
-    const host=el("pvp-log-results");
-    if (!host) return;
-    if (!text.trim()) { host.innerHTML='<div class="empty">Wklej log walki.</div>'; return; }
-    const patterns={
-      krytyk:/\b(kryt|critical|crit)\w*/gi,
-      double:/podw[oó]jn\w*\s+uderz|double\s+strike/gi,
-      counter:/kontratak|counter/gi,
-      bleed:/krwaw|bleed/gi,
-      stun:/og[łl]usz|stun/gi,
-      execute:/egzekuc|execute/gi,
-      evade:/unik|evad/gi
-    };
-    const counts={}; Object.entries(patterns).forEach(([k,re])=>{counts[k]=(text.match(re)||[]).length;});
-    const turns=(text.match(/\b(?:tura|turn)\s*#?\s*\d+/gi)||[]).map(x=>Number((x.match(/\d+/)||[0])[0])).filter(Boolean);
-    const damage=(text.match(/\b\d+(?:[.,]\d+)?\s*(?:obra[żz]e[nń]|damage)/gi)||[]).map(x=>Number((x.match(/\d+(?:[.,]\d+)?/)||[0])[0].replace(",","."))).filter(Number.isFinite);
-    host.innerHTML=`<div class="pvp-log-summary"><b>Rozpoznane wzmianki:</b> ${Object.entries(counts).map(([k,v])=>`${escapeHtml(k)}: ${v}`).join(" · ")}<br>${turns.length?`Najwyższy numer tury: ${Math.max(...turns)}. `:""}${damage.length?`Rozpoznane wartości obrażeń: ${damage.length}, średnia ${Math.round(damage.reduce((a,b)=>a+b,0)/damage.length)}.`:"Brak jednoznacznych wartości obrażeń."}<div class="muted">Analizator liczy tylko to, co faktycznie występuje w tekście; nie uzupełnia brakujących eventów.</div></div>`;
-  }
-
   function setupPvpLab() {
     pvpPopulateSelectors();
     ["pvp-sim-left","pvp-sim-right"].forEach(id=>el(id)?.addEventListener("change",()=>{
@@ -17615,12 +17595,12 @@ function setupAdmin() {
     }));
     pvpUpdateBossConsumables();
     el("pvp-sim-run")?.addEventListener("click",pvpRunSimulation);
-    el("pvp-log-analyze")?.addEventListener("click",pvpAnalyzeLog);
+
   }
 
 
   function setBuildTab(tab,options={}) {
-    const wanted=["editor","sim","public","mine"].includes(tab)||(tab==="admin"&&cachedAccountStatus?.admin)?tab:"editor";
+    const wanted=["editor","sim","analysis","public","mine"].includes(tab)||(tab==="admin"&&cachedAccountStatus?.admin)?tab:"editor";
     buildActiveTab=wanted;
 
     const intro=el("build-editor-intro");
@@ -17628,6 +17608,7 @@ function setupAdmin() {
     const publicSection=el("build-public-section");
     const mineSection=el("build-my-section");
     const simSection=el("pvp-simulator-section");
+    const analysisSection=el("battle-analyzer-section");
     const adminSection=el("builds-admin-tools");
 
     if (intro) intro.hidden=wanted!=="editor";
@@ -17635,6 +17616,8 @@ function setupAdmin() {
     if (publicSection) publicSection.hidden=wanted!=="public";
     if (mineSection) mineSection.hidden=wanted!=="mine";
     if (simSection) simSection.hidden=wanted!=="sim";
+    if (analysisSection) analysisSection.hidden=wanted!=="analysis";
+    if (wanted==="analysis") window.BattleAnalyzer?.open(cachedAccountStatus?.nick||"");
     if (adminSection) adminSection.hidden=wanted!=="admin";
 
     document.querySelectorAll("[data-build-tab]").forEach(button=>{
