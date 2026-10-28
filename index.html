@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
   <link rel="stylesheet" href="league.css?v=24.36">
-  <link rel="stylesheet" href="market.css?v=24.39">
+  <link rel="stylesheet" href="market.css?v=24.40">
   <title>MenelWars Tools</title>
 
   <style>
@@ -754,10 +754,12 @@
   </section>
 
   <section id="market-view" class="view" hidden>
- <div class="market-hero"><h2>📈 Giełda</h2><p>Ceny i dostępność na rynku graczy</p></div>
+ <div class="market-hero"><div><span class="market-eyebrow">MENELWARS · RYNEK GRACZY</span><h2>Giełda przedmiotów</h2><p>Ceny ofertowe, dostępność i historia rynku</p></div><span class="market-feed"><i></i> Migawki rynku</span></div>
+ <div id="market-summary" class="market-summary" aria-label="Podsumowanie rynku"></div>
  <p id="market-status" role="status"></p>
- <div class="market-toolbar"><input id="market-search" type="search" placeholder="Szukaj przedmiotu…" aria-label="Szukaj przedmiotu"><select id="market-filter" aria-label="Filtr rynku"><option value="">Wszystkie</option><option value="fall">Spadki cen</option><option value="rise">Wzrosty cen</option><option value="missing">Brak ofert</option></select><button id="market-refresh">Odśwież dane</button></div>
- <p id="market-count" class="market-help"></p><div class="market-table-wrap"><table><thead><tr><th><button data-market-sort="name" data-label="Przedmiot">Przedmiot</button></th><th><button data-market-sort="price" data-label="Cena minimalna">Cena minimalna</button></th><th><button data-market-sort="change" data-label="Zmiana">Zmiana</button></th><th><button data-market-sort="quantity" data-label="Sztuk">Sztuk</button></th><th><button data-market-sort="offers" data-label="Ofert">Ofert</button></th></tr></thead><tbody id="market-rows"></tbody></table></div>
+ <form id="market-search-form" class="market-toolbar" role="search" autocomplete="off"><div class="market-search-wrap"><span aria-hidden="true">⌕</span><input id="market-search" name="market-item-filter" type="search" placeholder="Nazwa przedmiotu…" aria-label="Szukaj przedmiotu" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other"></div><select id="market-filter" name="market-availability-filter" aria-label="Filtr rynku"><option value="">Wszystkie przedmioty</option><option value="listed">Tylko dostępne</option><option value="fall">Spadki cen</option><option value="rise">Wzrosty cen</option><option value="missing">Brak ofert</option></select><button id="market-refresh" type="button">↻ Odśwież</button></form>
+ <div id="market-active-filter" class="market-active-filter" hidden><span id="market-active-filter-label"></span><button type="button" id="market-clear-search">Wyczyść filtry ✕</button></div>
+ <p id="market-count" class="market-help"></p><div class="market-table-wrap"><table><thead><tr><th><button data-market-sort="name" data-label="Przedmiot">Przedmiot</button></th><th><button data-market-sort="price" data-label="Cena minimalna">Cena minimalna</button></th><th><button data-market-sort="change" data-label="Zmiana">Zmiana</button></th><th><button data-market-sort="quantity" data-label="Sztuk">Sztuk</button></th></tr></thead><tbody id="market-rows"></tbody></table></div>
  <p class="market-help">Zmiana względem poprzedniej zapisanej migawki. Ceny ofertowe, nie potwierdzone transakcje. Brak oferty nie oznacza ceny 0 zł. Rynek w grze pobiera się przy wejściu; tutaj widzisz czas ostatniego odczytu. Historia do 30 dni.</p>
  <dialog id="market-dialog"><button id="market-close" type="button">Zamknij ✕</button><h3 id="market-history-title"></h3><label>Okres <select id="market-days"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select></label><div id="market-chart"></div><p class="market-help">Wykres przedstawia zaobserwowane minimum ofertowe. Pomiędzy odczytami cena mogła się zmieniać.</p></dialog>
  </section>
@@ -2320,7 +2322,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
   <script src="item-catalog.js?v=22.79"></script>
   <script src="league-parser.js?v=24.39"></script>
   <script src="navigation.js?v=24.39"></script>
-  <script src="market.js?v=24.39"></script>
-  <script src="app.js?v=24.39"></script>
+  <script src="market.js?v=24.40"></script>
+  <script src="app.js?v=24.40"></script>
 </body>
 </html>

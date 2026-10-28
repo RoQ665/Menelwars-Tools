@@ -18384,7 +18384,10 @@ function setupAdmin() {
   async function openMarketModule(){
     if(!await ensureModuleAccess('market'))return;
     showToolView('market-view','market');
-    await window.MarketView.open((path,options={})=>cloudflareApi(path,{...options,token:cloudflareSessionToken()}));
+    await window.MarketView.open(async(path,options={})=>{
+      const token=playerAccountSessionToken()?await cloudflareEnsureSession():'';
+      return cloudflareApi(path,{...options,token});
+    });
   }
   document.querySelectorAll("[data-module]").forEach(button=>{
     button.addEventListener("click",async ()=>{
