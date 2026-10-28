@@ -13,5 +13,11 @@ const now=Date.now(),points=[{at:now-300000,seenAt:now-300000,item:{price:100,qu
 const chart=series(points,7,now);assert.deepEqual(chart.quantities,[5,2,0,8]);assert.deepEqual(chart.deltas,[null,-3,-2,8]);assert.equal(chart.minimum,100);assert.equal(chart.maximum,120);
 assert.ok(chart.svg.includes('Cena · zł'));assert.ok(chart.svg.includes('Dostępność · szt.'));assert.ok(chart.svg.includes('#217157'));assert.ok(chart.svg.includes('#477caa'));assert.ok(!/NaN|Infinity/.test(chart.svg));
 assert.ok(!/NaN|Infinity/.test(series([points[0]],7,now).svg));assert.equal(series([],7,now).svg,'');
+const egg=series([5999,5999,5999,5793].map((price,i)=>({at:now-(3-i)*600000,seenAt:now-(3-i)*600000,item:{price,quantity:i===3?2:1}})),7,now);
+assert.deepEqual(egg.priceScale.ticks,[5700,5800,5900,6000,6100]);
+assert.ok(egg.quantityScale.ticks.every(Number.isInteger));
+assert.ok(egg.svg.includes('stroke-dasharray="7 5"'));
+assert.ok(!/d="[^"]*V/.test(egg.svg));
+assert.ok([...egg.svg.matchAll(/circle cx="([\d.]+)"/g)].every(m=>Number(m[1])>96&&Number(m[1])<784));
 console.log('Collections: 24 recipes, tiers, separate currencies, integer costs, quantities, missing stock, base variants, ordering — OK');
 console.log('Chart: two units/scales, missing offers, stock deltas, single sample, empty history — OK');
