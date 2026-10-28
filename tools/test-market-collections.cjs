@@ -21,3 +21,5 @@ assert.ok(!/d="[^"]*V/.test(egg.svg));
 assert.ok([...egg.svg.matchAll(/circle cx="([\d.]+)"/g)].every(m=>Number(m[1])>96&&Number(m[1])<784));
 console.log('Collections: 24 recipes, tiers, separate currencies, integer costs, quantities, missing stock, base variants, ordering — OK');
 console.log('Chart: two units/scales, missing offers, stock deltas, single sample, empty history — OK');
+
+{const {calculate,purchaseLimit}=require('../collections.js');const r=calculate({name:'Limit',items:{A:1,B:1},reward:{gold:12}},[{name:'A',level:0,price:8000,quantity:1},{name:'B',level:0,price:3000,quantity:1}]);assert.equal(purchaseLimit(r,r.ingredients[0],1000),9000);assert.equal(purchaseLimit(r,r.ingredients[0],1000,8000),5000);assert.equal(purchaseLimit(r,r.ingredients[0],100),-1800);assert.equal(purchaseLimit(r,r.ingredients[0],null,null),null);const held=calculate(r.recipe,[{name:'A',level:0,price:8000,quantity:1}], 'gold',{b:1});assert.equal(purchaseLimit(held,held.ingredients[0],1000),12000);console.log('Purchase ceiling: other ingredients, budget, target, owned ingredients and unaffordable cap — OK');}

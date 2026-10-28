@@ -72,7 +72,7 @@
   try{const recipes=await MarketCollections.getRecipes();if(token!==job||owner!==viewer)return;
    const budget=number('plan-budget'),maxRuns=number('plan-limit'),owned=el('plan-owned').checked?(window.MarketInventoryView?.getAvailableOwned()||{}):{};
    MarketCollections.setBudget(budget);MarketDesk.budgetChanged(budget);
-   worker=new Worker('market-plan-worker.js?v=24.47');
+   worker=new Worker('market-plan-worker.js?v=24.48');
    worker.onmessage=event=>{if(token!==job||owner!==viewer)return;worker.terminate();worker=null;el('plan-start').disabled=false;el('plan-cancel').hidden=true;
     if(stamp!==snapshot?.capturedAt){el('plan-message').textContent='Ceny zmieniły się podczas obliczeń. Policz ponownie.';return;}
     if(!event.data.ok){el('plan-message').textContent=event.data.error;return;}
