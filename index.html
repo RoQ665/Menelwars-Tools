@@ -10,7 +10,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
   <link rel="stylesheet" href="league.css?v=24.36">
-  <link rel="stylesheet" href="market.css?v=24.44">
+  <link rel="stylesheet" href="market.css?v=24.45">
   <title>MenelWars Tools</title>
 
   <style>
@@ -775,6 +775,7 @@
  <div id="market-trade-pane" hidden><h3>Kandydaci do kupna i odsprzedaży</h3><p class="market-help">Symulacja dla jednej sztuki: kupno po aktualnym minimum, odsprzedaż po medianie ofert z 7 dni. Opłata 5% pobierana przy wystawieniu, zaokrąglana w dół do pełnych złotych, bezzwrotna. Nie znamy rzeczywistych transakcji ani czasu potrzebnego na sprzedaż.</p><div class="collection-controls"><label>Budżet na zakup i wystawienie<input type="number" id="market-trade-budget" min="0" step="0.01" placeholder="Opcjonalnie · zł" inputmode="decimal" autocomplete="off"></label><label>Sortowanie<select id="market-trade-sort"><option value="profit">Możliwy zysk w zł</option><option value="roi">Marża względem zakupu</option><option value="flow">Zaobserwowane ubytki sztuk</option></select></label></div><p id="market-trade-count" class="market-help"></p><div id="market-trade-results"></div></div>
  <div id="market-watch-pane" hidden><h3>Twoje obserwowane</h3><p class="market-help">Lista i ceny docelowe zapisują się na koncie. Wyróżnienia pojawiają się po odczycie giełdy, gdy minimalna oferta mieści się w limicie.</p><div id="market-watch-list"></div></div>
  <div id="market-loot-pane" hidden><h3>Którą nagrodę zatrzymać?</h3><p class="market-help">Porównaj proponowane przedmioty pod kątem dokończenia powtarzalnych kolekcji za złote monety.</p><form id="market-loot-add" class="market-toolbar" autocomplete="off"><input id="market-loot-name" name="loot-item-name" type="search" list="market-loot-options" placeholder="Wybierz przedmiot z podpowiedzi…" aria-label="Przedmiot z nagrody" autocomplete="off" data-lpignore="true" data-1p-ignore="true"><datalist id="market-loot-options"></datalist><button type="submit">Dodaj nagrodę</button></form><label class="market-loot-budget-label">Budżet na dokupienie · zł<input type="number" id="market-loot-budget" min="0" step="0.01" inputmode="decimal" placeholder="Opcjonalnie" autocomplete="off"></label><p id="market-loot-status" class="market-help" role="status"></p><div id="market-loot-selected"></div><div id="market-loot-results"></div><p class="market-help">Każdy wariant liczymy osobno: zatrzymujesz wskazany przedmiot, resztę składników kupujesz. Własne stany ze schowków możesz uwzględnić w rankingu kolekcji. Koszt kilku sztuk według minimum jest dolnym oszacowaniem. Obecna cena i dostępność nie przewidują przyszłych ofert.</p></div>
+ <dialog id="inventory-detail-dialog" aria-labelledby="inventory-detail-title"><button type="button" id="inventory-detail-close">Zamknij ✕</button><h3 id="inventory-detail-title"></h3><div id="inventory-detail-content"></div></dialog>
  <dialog id="market-dialog"><button id="market-close" type="button">Zamknij ✕</button><h3 id="market-history-title"></h3><label>Okres <select id="market-days"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select></label><div id="market-chart"></div><p class="market-help">Punkty to rzeczywiste odczyty. Linie łączą próbki; przebieg zmian pomiędzy nimi nie jest znany.</p></dialog>
  </section>
  <section id="module-loading-view" class="view" hidden>
@@ -2339,7 +2340,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
   <script src="market-chart.js?v=24.44"></script>
   <script src="collections.js?v=24.44"></script>
   <script src="market-inventory.js?v=24.44"></script>
-  <script src="market-inventory-view.js?v=24.44"></script>
+  <script src="market-inventory-view.js?v=24.45"></script>
   <script src="market-desk.js?v=24.44"></script>
   <script src="market.js?v=24.44"></script>
   <script src="app.js?v=24.40"></script>
