@@ -1,0 +1,17 @@
+const assert=require('node:assert/strict');
+const {signal,context,lootOptions,tradeCandidate}=require('../market-desk.js');
+const {calculate}=require('../collections.js');
+assert.equal(signal({stepChange:-10,quantityChange:0}).label,'Cena ↓ · tyle samo sztuk');
+assert.equal(signal({stepChange:-10,quantityChange:3}).tone,'good');assert.equal(signal({stepChange:null,quantityChange:-2}).label,'Ubyło sztuk');
+const stats={min:90,median:100,max:110,samples:6,days:1,mature:false,dropIntervals:4};
+assert.equal(context({price:90,stats7d:stats}).tone,'neutral');assert.equal(context({price:90,stats7d:{...stats,mature:true}}).tone,'good');
+let r=tradeCandidate({price:90,quantity:2,stats7d:stats},95);assert.equal(r.fee,5);assert.equal(r.profit,5);assert.equal(r.capital,95);assert.equal(r.affordable,true);assert.equal(r.confirmed,false);
+assert.equal(tradeCandidate({price:96,quantity:1,stats7d:stats}).profit,-1,'a small price discount is erased by the fee');
+r=tradeCandidate({price:90,quantity:1,stats7d:stats,maxListingPrice:98});assert.equal(r.resale,98);assert.equal(r.fee,4);assert.equal(r.profit,4);assert.equal(r.breakEven,94);
+const recipes=[{name:'Set A',items:{Loot:1,Other:1},reward:{gold:10}},{name:'Set B',items:{Other:1,Third:1},reward:{gold:15}}];
+const items=[{key:'1:0',level:0,name:'Loot',price:null,quantity:0},{key:'2:0',level:0,name:'Other',price:100,quantity:1},{key:'3:0',level:0,name:'Third',price:200,quantity:1}];
+const list=lootOptions(recipes,items,[{name:'Loot',quantity:1},{name:'Other',quantity:1}],110,calculate);
+assert.equal(list[0].name,'Loot');assert.equal(list[0].best.totalCost,100);assert.equal(list[0].best.costPerCoin,10);assert.equal(list[0].best.ingredients[0].held,1);
+assert.equal(calculate(recipes[0],items,'gold',{}).complete,false);assert.equal(list[1].best.totalCost,200);
+assert.equal(lootOptions(recipes,items,[{name:'Unknown',quantity:1}],null,calculate)[0].best,null);
+console.log('Stock/price signals, short history, real 5% floor fee, capital, profit, price limits, break-even, owned loot, budget ranking, unavailable ingredients — OK');
