@@ -58,7 +58,7 @@
  function plan(recipes,items,owned,budget,maxRuns=50,options={}){
   const limit=integer(maxRuns,1,100),budgetCents=cents(budget),market=new Map(items.filter(x=>x.level===0).map(x=>[norm(x.name),x])),resources=new Map();
   const candidates=recipes.filter(r=>r.reward.gold>0).map(r=>({name:r.name,gold:r.reward.gold,needs:Object.entries(r.items).map(([name,q])=>{
-   const key=norm(name),m=market.get(key),have=Math.max(0,Math.floor(Number(owned[key])||0)),quantity=m?.price!=null?Math.max(0,Math.floor(m.quantity)):0;
+   const key=norm(name),m=market.get(key),have=Math.max(0,Math.floor(Number(owned[key])||0)),quantity=m?.price!=null?Math.min(1,Math.max(0,Math.floor(m.quantity))):0;
    if(!resources.has(key))resources.set(key,{name,owned:have,market:quantity,price:m?.price!=null?cents(m.price):null});return {key,q};
   })}));
   const used=new Map([...resources.keys()].map(k=>[k,0]));
