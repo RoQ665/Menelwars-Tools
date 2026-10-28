@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="icon-192.png">
   <link rel="stylesheet" href="styles.css?v=24.0">
   <link rel="stylesheet" href="league.css?v=24.36">
+  <link rel="stylesheet" href="market.css?v=24.39">
   <title>MenelWars Tools</title>
 
   <style>
@@ -694,6 +695,7 @@
     <nav class="tabs main-tabs main-tabs-public" aria-label="Moduły publiczne">
       <button data-module="distillery">⚗ Destylarnia</button>
       <button data-module="garden">🌱 Ogród</button>
+      <button data-module="market">📈 Giełda</button>
       <button data-module="builds">⚔️ PVP</button>
       <button data-module="map">🗺 Mapa</button>
     </nav>
@@ -751,7 +753,15 @@
     </div>
   </section>
 
-  <section id="module-loading-view" class="view" hidden>
+  <section id="market-view" class="view" hidden>
+ <div class="market-hero"><h2>📈 Giełda</h2><p>Ceny i dostępność na rynku graczy</p></div>
+ <p id="market-status" role="status"></p>
+ <div class="market-toolbar"><input id="market-search" type="search" placeholder="Szukaj przedmiotu…" aria-label="Szukaj przedmiotu"><select id="market-filter" aria-label="Filtr rynku"><option value="">Wszystkie</option><option value="fall">Spadki cen</option><option value="rise">Wzrosty cen</option><option value="missing">Brak ofert</option></select><button id="market-refresh">Odśwież dane</button></div>
+ <p id="market-count" class="market-help"></p><div class="market-table-wrap"><table><thead><tr><th><button data-market-sort="name" data-label="Przedmiot">Przedmiot</button></th><th><button data-market-sort="price" data-label="Cena minimalna">Cena minimalna</button></th><th><button data-market-sort="change" data-label="Zmiana">Zmiana</button></th><th><button data-market-sort="quantity" data-label="Sztuk">Sztuk</button></th><th><button data-market-sort="offers" data-label="Ofert">Ofert</button></th></tr></thead><tbody id="market-rows"></tbody></table></div>
+ <p class="market-help">Zmiana względem poprzedniej zapisanej migawki. Ceny ofertowe, nie potwierdzone transakcje. Brak oferty nie oznacza ceny 0 zł. Rynek w grze pobiera się przy wejściu; tutaj widzisz czas ostatniego odczytu. Historia do 30 dni.</p>
+ <dialog id="market-dialog"><button id="market-close" type="button">Zamknij ✕</button><h3 id="market-history-title"></h3><label>Okres <select id="market-days"><option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option></select></label><div id="market-chart"></div><p class="market-help">Wykres przedstawia zaobserwowane minimum ofertowe. Pomiędzy odczytami cena mogła się zmieniać.</p></dialog>
+ </section>
+ <section id="module-loading-view" class="view" hidden>
     <div class="module-page-loading">
       <div class="module-page-spinner" aria-hidden="true"></div>
       <strong id="module-loading-title">Ładowanie modułu...</strong>
@@ -1764,12 +1774,11 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
       <details id="league-sync-panel" class="league-help" hidden><summary>Prywatna synchronizacja danych (T2)</summary>
         <p>1. Zainstaluj <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a>. Prywatny skrypt z lokalnego pliku wklej w jego edytorze: „Utwórz nowy skrypt”. Skrypt nie jest udostępniany na stronie toola.</p>
-        <p>2. Wygeneruj klucz poniżej. W grze rozwiń panel „Liga / Wysypisko AI → Tools”, wklej klucz i zapisz ustawienia.</p>
-        <p>3. Otwórz Szczegóły meczu, wybierz 5, 10, 30 lub 60 minut i uruchom automat ręcznie. Skrypt przechwytuje tylko odpowiedzi Network, które gra sama pobiera. Brak nowych raportów przez 5 minut zatrzymuje automat. Po odświeżeniu strony, przerwie lub weryfikacji gry uruchom go ponownie ręcznie. Brak ataków, dodatkowego odpytywania gry i obchodzenia zabezpieczeń. Nie ma gwarancji niewykrywalności. Komputer musi działać.</p>
-        <p>Wysypisko AI: otwórz w grze „Historycznie”, uruchom automat i włącz osobnym przyciskiem odczyt Wysypiska AI. Skrypt odczytuje widoczną listę zamiast Network; niczego nie klika. Wysyła tylko zmieniony ranking. Po 5 minutach bez nowego raportu automat zatrzymuje się zgodnie z ustawionym zabezpieczeniem.</p>
-        <p>Klucz jest ważny 30 dni i pozwala importować raporty ligi oraz zaznaczone dodatkowe źródła. Nie jest hasłem ani pełną sesją konta i nie daje prawa do operacji w grze. Generowanie nowego unieważnia Twój poprzedni klucz.</p>
-        <label><input id="sync-payments-allow" type="checkbox"> Zezwól również na aktualizację Wpłat (cała historia, wszyscy członkowie)</label>
-        <label><input id="sync-ai-dump-allow" type="checkbox"> Zezwól na import historycznego wkładu Wysypiska AI</label>
+        <p>2. Wygeneruj klucz T2 obejmujący Ligę, Giełdę, Wpłaty, Wysypisko AI, Spółkę i kontrolę składu. Wklej go w ustawieniach jednego lokalnego skryptu „MenelWars → Tools”. Wyłącz poprzedni synchronizator ligi i rejestrator diagnostyczny.</p>
+        <p>Skrypt startuje automatycznie. Przechwytuje dane pobierane przez grę i wysyła zmiany najwyżej raz na 5 minut. Nie odpytuje gry i nie wykonuje w niej działań. Pełny rynek pobiera się przy wejściu. Wpłaty: wybierz całą historię i wszystkich członków; kolejne strony dziennego archiwum są zapisywane po ich otwarciu.</p>
+        <p>Skład jest tylko porównywany. Różnice wymagają ręcznej decyzji. Dochód spółki aktualizuje się z raportu; pensje są potwierdzane wyłącznie przy zgodności całego planu. Klucz jest ważny 30 dni; nowy unieważnia poprzedni.</p>
+        <div id="sync-source-status" role="status"></div>
+        <button type="button" id="sync-source-refresh">Sprawdź stan i wymagane działania</button>
         <button type="button" id="league-sync-create">Wygeneruj klucz synchronizacji</button>
         <button type="button" id="league-sync-revoke">Unieważnij mój klucz</button>
         <input id="league-sync-token" type="password" readonly autocomplete="off" hidden aria-label="Nowy klucz synchronizacji">
@@ -2309,8 +2318,9 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
 
 <script src="data.js?v=21.05"></script>
   <script src="item-catalog.js?v=22.79"></script>
-  <script src="league-parser.js?v=24.38"></script>
-  <script src="navigation.js?v=24.26"></script>
-  <script src="app.js?v=24.37"></script>
+  <script src="league-parser.js?v=24.39"></script>
+  <script src="navigation.js?v=24.39"></script>
+  <script src="market.js?v=24.39"></script>
+  <script src="app.js?v=24.39"></script>
 </body>
 </html>

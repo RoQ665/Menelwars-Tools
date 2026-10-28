@@ -2795,7 +2795,7 @@ function mapRenderRouteResult() {
     distillery:false,
     garden:false,
     builds:false,
-    map:false
+    map:false,market:false
   };
 
   let moduleAccessPolicyAt = 0;
@@ -2829,7 +2829,7 @@ function mapRenderRouteResult() {
                 distillery:Boolean(payload.policy.distillery),
                 garden:Boolean(payload.policy.garden),
                 builds:Boolean(payload.policy.builds),
-                map:Boolean(payload.policy.map)
+                map:Boolean(payload.policy.map),market:Boolean(payload.policy.market)
               };
               moduleAccessPolicyAt = Date.now();
             }
@@ -2857,7 +2857,7 @@ function mapRenderRouteResult() {
             distillery:Boolean(payload.policy.distillery),
             garden:Boolean(payload.policy.garden),
             builds:Boolean(payload.policy.builds),
-            map:Boolean(payload.policy.map)
+            map:Boolean(payload.policy.map),market:Boolean(payload.policy.market)
           };
           moduleAccessPolicyAt = Date.now();
         }
@@ -2876,7 +2876,7 @@ function mapRenderRouteResult() {
     distillery:"Destylarnia",
     garden:"Ogród",
     builds:"PVP",
-    map:"Mapa"
+    map:"Mapa",market:"Giełda"
   };
 
   async function showModuleAccountGate(
@@ -3525,6 +3525,7 @@ function mapRenderRouteResult() {
   function setPlayerAccountSessionToken(token) {
     const previousToken = playerAccountSessionToken();
     const nextToken = String(token || "");
+    if(previousToken!==nextToken)window.MarketView?.clear();
 
     if (token) {
       localStorage.setItem(
@@ -6506,7 +6507,8 @@ async function loadAdminModuleAccess() {
         "map",
         "🗺 Mapa",
         "Ściąga mapy gry."
-      ]
+      ],
+      ["market","📈 Giełda","Ceny rynku i historia dostępności."]
     ];
 
     box.innerHTML =
@@ -18379,9 +18381,15 @@ function setupAdmin() {
     validateGangSessionInBackground();
   }
 
+  async function openMarketModule(){
+    if(!await ensureModuleAccess('market'))return;
+    showToolView('market-view','market');
+    await window.MarketView.open((path,options={})=>cloudflareApi(path,{...options,token:cloudflareSessionToken()}));
+  }
   document.querySelectorAll("[data-module]").forEach(button=>{
     button.addEventListener("click",async ()=>{
       const moduleName=button.dataset.module;
+      if(moduleName==='market'){await openMarketModule();return;}
 
       if (moduleName === "distillery") {
         await openDistilleryModule(
@@ -18992,6 +19000,7 @@ fetchModuleAccessPolicy().catch(()=>{});
       if(route.module==='gang'){if(route.view==='gang-menu-view')await openGangLanding();else await openGangModule(route.view);return;}
       if(route.module==='distillery'){await openDistilleryModule(route.view);return;}
       if(route.module==='garden'){await openGardenModule();return;}
+      if(route.module==='market'){await openMarketModule();return;}
       if(route.module==='builds'){await openBuildModule();return;}
       if(route.module==='map'){await openMapModule();return;}
       await renderAccountView();showToolView('account-view','account');

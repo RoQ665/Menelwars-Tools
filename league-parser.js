@@ -311,7 +311,7 @@
       syncRequest=syncAllowed?api:null;
       document.getElementById('league-sync-panel').hidden=!syncAllowed;
       const identity=syncAllowed?String(account.nick||'')+':'+account.adminTier:'';
-      if(identity!==syncIdentity||!syncAllowed){syncToken.value='';syncToken.type='password';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='';}
+      if(identity!==syncIdentity||!syncAllowed){syncToken.value='';syncToken.type='password';syncToken.hidden=true;syncCopy.hidden=true;syncStatus.textContent='';document.getElementById('sync-source-status').textContent='';}
       syncIdentity=identity;
     }};
     window.LeagueSyncPanel.configure(null,null);
@@ -320,9 +320,9 @@
       if(!window.confirm('Wygenerować klucz? Poprzedni klucz synchronizacji Twojego konta przestanie działać.'))return;
       const control=document.getElementById('league-sync-create');control.disabled=true;
       try{
-        const payload=await syncRequest('/admin/gang/league/sync-key',{method:'POST',body:{payments:Boolean(document.getElementById('sync-payments-allow').checked),aiDump:Boolean(document.getElementById('sync-ai-dump-allow').checked)}});
+        const payload=await syncRequest('/admin/gang/league/sync-key',{method:'POST',body:{unified:true}});
         syncToken.value=payload.token;syncToken.hidden=false;syncCopy.hidden=false;
-        syncStatus.textContent='Zakres: '+String(payload.scope||'league').split(',').map(s=>({league:'Liga',payments:'Wpłaty',ai_dump:'Wysypisko AI',company:'Spółka'}[s]||s)).join(' + ')+'. Klucz ważny do '+new Date(payload.expiresAt).toLocaleString('pl-PL')+'. Skopiuj go teraz do skryptu; nie zapisujemy jego jawnej postaci w historii.';
+        syncStatus.textContent='Zakres: '+String(payload.scope||'league').split(',').map(s=>({league:'Liga',payments:'Wpłaty',ai_dump:'Wysypisko AI',company:'Spółka',market:'Giełda',roster:'Kontrola składu'}[s]||s)).join(' + ')+'. Klucz ważny do '+new Date(payload.expiresAt).toLocaleString('pl-PL')+'. Skopiuj go teraz do skryptu; nie zapisujemy jego jawnej postaci w historii.';
       }catch(e){syncStatus.textContent=e.message;}
       finally{control.disabled=false;}
     };
@@ -330,6 +330,23 @@
       if(!syncAllowed)return;
       try{await navigator.clipboard.writeText(syncToken.value);syncStatus.textContent='Skopiowano klucz. Wklej go w panelu skryptu w grze.';}
       catch(_){syncToken.type='text';syncToken.select();syncStatus.textContent='Skopiuj zaznaczony klucz ręcznie (Ctrl+C).';}
+    };
+    document.getElementById('sync-source-refresh').onclick=async()=>{
+      const box=document.getElementById('sync-source-status');if(!syncAllowed||!syncRequest)return;const identity=syncIdentity;
+      box.textContent='Sprawdzam…';
+      try{const result=await syncRequest('/admin/sync/state');if(identity!==syncIdentity||!syncAllowed)return;box.replaceChildren();
+        if(!result.sources.length)box.textContent='Brak raportów nowej synchronizacji.';
+        for(const source of result.sources){const p=document.createElement('div');p.className='sync-notice';
+          const labels={roster:'Skład gangu',company:'Spółka',payments:'Wpłaty',ai_dump:'Wysypisko AI',market:'Giełda'};
+          p.textContent=(labels[source.source]||source.source)+' · '+new Date(source.capturedAt).toLocaleString('pl-PL');
+          const data=source.data||{},issues=data.issues||data.salaries?.issues||[];
+          for(const issue of issues){const line=document.createElement('div');line.textContent=issue.nick+': '+issue.action+(issue.expected!=null?' · oczekiwane '+issue.expected+' zł, w grze '+(issue.actual??'brak'):'');p.append(line);}
+          if(source.source==='roster'&&!issues.length)p.append(document.createTextNode(' · skład zgodny'));
+          if(data.salaries?.confirmedAt)p.append(document.createTextNode(' · pensje potwierdzone'));
+          if(data.historyPages)p.append(document.createTextNode(' · strony historii: '+data.historyPages.received+'/'+data.historyPages.total));
+          box.append(p);
+        }
+      }catch(e){if(identity===syncIdentity&&syncAllowed)box.textContent=e.message;}
     };
     document.getElementById('league-sync-revoke').onclick=async()=>{
       if(!syncAllowed||!syncRequest)return;

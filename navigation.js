@@ -11,6 +11,7 @@
     potrzeby:{view:'demand-view',module:'gang'},
     gang:{view:'gang-menu-view',module:'gang'},
     ogrod:{view:'garden-view',module:'garden'},
+    gielda:{view:'market-view',module:'market'},
     destylarnia:{view:'optimizer-view',module:'distillery'},
     nieodkryte:{view:'unknown-view',module:'distillery'},
     'dodaj-recepte':{view:'submit-view',module:'distillery'},
