@@ -124,7 +124,7 @@
       const leftXP = gangs[0]===data.gangA ? data.xp : -data.xp;
       const budgetHtml=gang=>{
         const budget=attackBudget(data,gang);
-        return `<span class="league-attacks-left"><strong>${budget.remaining}</strong> ataków pozostało <small>łącznie z próbami w toku · zakończono ${budget.used} / ${budget.capacity}</small></span>`;
+        return `<span class="league-attacks-left"><strong>${budget.remaining}</strong> ataków pozostało <small>zakończono ${budget.used} / ${budget.capacity}</small></span>`;
       };
       const pending = data.fights.filter(f=>f.pending).length;
       const showRatings=Boolean(viewerData?.ownGang&&selectedGang!==viewerData.ownGang);
@@ -151,7 +151,6 @@
             <span class="league-versus">VS</span>
             <div><strong>${escape(gangs[1])}</strong><b class="${tone(-leftXP)}">${signed(-leftXP)} <small>XP</small></b>${budgetHtml(gangs[1])}</div>
           </div>
-          <p class="league-attacks-note">Szacunek według składu i ostatniego raportu: 10 ataków na gracza minus zakończone walki. Suma obejmuje próby w toku, które jeszcze nie dały wyniku; nie jest liczbą nowych prób możliwych do rozpoczęcia. Brakujące osoby, zmiany składu lub anulowane próby niewidoczne w raporcie mogą zmienić wynik.</p>
           ${podium}
           <div class="league-score-foot"><span>${data.fights.length} walk  ·  ${data.fights.length-pending} rozstrzygniętych</span><span class="league-live">${pending} w toku</span></div>
         </div>
