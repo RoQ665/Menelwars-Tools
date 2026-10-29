@@ -53,6 +53,17 @@
     return {date, gangA, gangB, expected, expectedXP, xp, fights, players:rows, warnings};
   }
   const storageKey = 'menelwars_league_matches_v1';
+  function attackBudget(data,gang) {
+    const players=new Map();
+    for(const p of data.players||[])if(p.gang===gang){
+      const key=String(p.name).normalize('NFKC').trim().toLocaleLowerCase('pl');
+      const used=Math.max(0,Math.floor(Number(p.attacks)||0));
+      players.set(key,Math.max(players.get(key)||0,used));
+    }
+    const used=[...players.values()].reduce((sum,n)=>sum+n,0);
+    const remaining=[...players.values()].reduce((sum,n)=>sum+Math.max(0,10-n),0);
+    return {players:players.size,used,remaining,capacity:players.size*10};
+  }
   const matchKey = data => JSON.stringify([data.date, ...[data.gangA,data.gangB].sort()]);
   function saveMatch(storage, text, now = new Date().toISOString()) {
     const data = parse(text);
@@ -88,7 +99,7 @@
       return sign*(column==='name'?a.name.localeCompare(b.name,'pl'):a[column]-b[column])||a.name.localeCompare(b.name,'pl');
     });
   }
-  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory, sortPlayers};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory, sortPlayers, attackBudget};
   if (typeof document === 'undefined') return;
   const init = () => {
     const button = document.getElementById('league-parse');
@@ -111,6 +122,10 @@
       currentReport = data;
       if (newMatch || !gangs.includes(selectedGang)) selectedGang = gangs[0];
       const leftXP = gangs[0]===data.gangA ? data.xp : -data.xp;
+      const budgetHtml=gang=>{
+        const budget=attackBudget(data,gang);
+        return `<span class="league-attacks-left"><strong>${budget.remaining}</strong> ataków pozostało <small>szacunek · wykorzystano ${budget.used} / ${budget.capacity}</small></span>`;
+      };
       const pending = data.fights.filter(f=>f.pending).length;
       const showRatings=Boolean(viewerData?.ownGang&&selectedGang!==viewerData.ownGang);
       if(!showRatings&&['recommendation','certainty'].includes(sortField)){sortField='xp';sortDirection='desc';}
@@ -132,10 +147,11 @@
         <div class="league-scoreboard">
           <div class="league-eyebrow">LIGA MENELI <span>${escape(data.date.split('-').reverse().join('.'))}</span></div>
           <div class="league-scoreline">
-            <div><strong>${escape(gangs[0])}</strong><b class="${tone(leftXP)}">${signed(leftXP)} <small>XP</small></b></div>
+            <div><strong>${escape(gangs[0])}</strong><b class="${tone(leftXP)}">${signed(leftXP)} <small>XP</small></b>${budgetHtml(gangs[0])}</div>
             <span class="league-versus">VS</span>
-            <div><strong>${escape(gangs[1])}</strong><b class="${tone(-leftXP)}">${signed(-leftXP)} <small>XP</small></b></div>
+            <div><strong>${escape(gangs[1])}</strong><b class="${tone(-leftXP)}">${signed(-leftXP)} <small>XP</small></b>${budgetHtml(gangs[1])}</div>
           </div>
+          <p class="league-attacks-note">Pozostałe ataki: 10 na gracza, według składu i ostatniego raportu. Próby w toku już zużywają limit. Brakujące osoby, zmiany składu lub anulowane próby niewidoczne w raporcie mogą zmienić wynik.</p>
           ${podium}
           <div class="league-score-foot"><span>${data.fights.length} walk  ·  ${data.fights.length-pending} rozstrzygniętych</span><span class="league-live">${pending} w toku</span></div>
         </div>
