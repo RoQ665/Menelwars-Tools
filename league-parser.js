@@ -53,6 +53,11 @@
     return {date, gangA, gangB, expected, expectedXP, xp, fights, players:rows, warnings};
   }
   const storageKey = 'menelwars_league_matches_v1';
+  function remainingAttackLabel(count) {
+    if(count===1)return {verb:'Pozostał',noun:'atak'};
+    const few=count%10>=2&&count%10<=4&&!(count%100>=12&&count%100<=14);
+    return {verb:few?'Pozostały':'Pozostało',noun:few?'ataki':'ataków'};
+  }
   function attackBudget(data,gang) {
     const players=new Map();
     for(const p of data.players||[])if(p.gang===gang){
@@ -99,7 +104,7 @@
       return sign*(column==='name'?a.name.localeCompare(b.name,'pl'):a[column]-b[column])||a.name.localeCompare(b.name,'pl');
     });
   }
-  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory, sortPlayers, attackBudget};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory, sortPlayers, attackBudget, remainingAttackLabel};
   if (typeof document === 'undefined') return;
   const init = () => {
     const button = document.getElementById('league-parse');
@@ -124,7 +129,8 @@
       const leftXP = gangs[0]===data.gangA ? data.xp : -data.xp;
       const budgetHtml=gang=>{
         const budget=attackBudget(data,gang);
-        return `<span class="league-attacks-left"><strong>${budget.remaining}</strong> ataków pozostało <small>zakończono ${budget.used} / ${budget.capacity}</small></span>`;
+        const label=remainingAttackLabel(budget.remaining);
+        return `<span class="league-attacks-left">${label.verb} <strong>${budget.remaining}</strong> ${label.noun} <small>zakończono ${budget.used} / ${budget.capacity}</small></span>`;
       };
       const pending = data.fights.filter(f=>f.pending).length;
       const showRatings=Boolean(viewerData?.ownGang&&selectedGang!==viewerData.ownGang);
