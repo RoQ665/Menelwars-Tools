@@ -3921,6 +3921,7 @@ function mapRenderRouteResult() {
         ${account.admin ? `<div class="account-admin-link"><button id="account-admin-open" class="primary-btn" type="button">🛠 Panel administratora</button></div>` : ""}
       </div>
 
+      ${account.admin&&Number(account.adminTier)>=2&&String(account.nick).toLocaleLowerCase('pl')==='roq'?'<div id="private-raid-cooldowns" class="account-card"></div>':''}
       ${accountAppearanceHtml(account)}
 
       <div class="account-card notification-settings">
@@ -3942,6 +3943,7 @@ function mapRenderRouteResult() {
       ${achievementsHtml(account.achievements || {},expandedAchievementCategories)}
     `;
 
+    if(el('private-raid-cooldowns'))void window.RaidCooldowns?.mount(el('private-raid-cooldowns'),async(path,options={})=>cloudflareApi(path,{...options,token:await cloudflareEnsureSession()}));
     configureAccountAppearance(account);
     void configureNotificationControls();
     void checkImportantAnnouncement();
