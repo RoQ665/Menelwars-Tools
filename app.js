@@ -3928,7 +3928,7 @@ function mapRenderRouteResult() {
         <b>🔔 Powiadomienia</b>
         <label style="margin-top:9px"><input id="account-notifications-enabled" type="checkbox" checked> Chcę otrzymywać powiadomienia</label>
         <button id="account-notifications-device" type="button" style="margin-top:9px">🔔 Aktywuj na tym urządzeniu</button>
-        <div id="account-notifications-note" class="account-note">Ogłoszenia, Zapotrzebowanie, Ogród i Destylarnia. Telefon poprosi jednorazowo o zgodę systemową.</div>
+        <div id="account-notifications-note" class="account-note">Ogłoszenia, Zapotrzebowanie, Ogród, Destylarnia i alerty obserwowanych przedmiotów z Giełdy. Telefon poprosi jednorazowo o zgodę systemową.</div>
       </div>
 
       <div id="account-change-panel" class="account-card" style="margin-top:10px" hidden>
@@ -18390,6 +18390,8 @@ function setupAdmin() {
       const token=playerAccountSessionToken()?await cloudflareEnsureSession():'';
       return cloudflareApi(path,{...options,token});
     });
+    const link=new URL(location.href);
+    if(link.searchParams.has('marketWatch')){window.MarketView.pane('watch');link.searchParams.delete('marketWatch');history.replaceState(null,'',link.pathname+link.search+link.hash);}
   }
   document.querySelectorAll("[data-module]").forEach(button=>{
     button.addEventListener("click",async ()=>{
