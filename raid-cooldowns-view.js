@@ -4,11 +4,15 @@
  let clock;
  function remaining(at){const minutes=Math.ceil((at-Date.now())/60000);if(minutes<=0)return 'Powinien być dostępny';const d=Math.floor(minutes/1440),h=Math.floor(minutes%1440/60),m=minutes%60;return [d?d+' dni':'',h?h+' godz.':'',m?m+' min':''].filter(Boolean).join(' ');}
  async function mount(box,api){
-  clearInterval(clock);let rows=[];
+  clearInterval(clock);let rows=[],expanded=true;
+  const stateKey='roq_private_raids_expanded_v1';
+  try{expanded=localStorage.getItem(stateKey)!=='0';}catch{}
   function render(){
    if(!box.isConnected){clearInterval(clock);return;}
-   box.innerHTML='<b>🎯 Napady grupowe · prywatne RoQ T2</b><p class="account-note">Terminy z gry na PC i telefonie. Kontener jest pomijany. Zaznacz napady do powiadomień; sprawdzanie co 10 min. Dostępność potwierdź w grze — ktoś mógł już rozpocząć nowy napad.</p><button type="button" data-raids-refresh>Odśwież zapis</button><div role="status" data-raids-status></div>'+
-    (rows.length?'<div style="display:grid;gap:10px;margin-top:12px">'+[...rows].sort((a,b)=>a.availableAt-b.availableAt).map(r=>'<label style="display:flex;gap:10px;align-items:start;border-bottom:1px solid #ddcfb7;padding-bottom:9px"><input type="checkbox" data-raid-id="'+r.id+'" '+(r.enabled?'checked':'')+' aria-label="Powiadom o '+esc(r.name)+'"><span><b>'+esc(r.name)+'</b><br>'+remaining(r.availableAt)+'<br><small>'+new Date(r.availableAt).toLocaleString('pl-PL')+' · odczyt '+new Date(r.capturedAt).toLocaleString('pl-PL')+(r.notifiedAt?' · powiadomienie obsłużone':'')+'</small></span></label>').join('')+'</div>':'<p>Brak zapisanych terminów. Zaktualizuj skrypt do 2.4.0, otwórz Gang, a potem listę napadów w grze. Import nie uruchamia napadów.</p>');
+   box.innerHTML='<details data-raids-details '+(expanded?'open':'')+'><summary style="cursor:pointer;font-weight:bold;padding:4px 0">🎯 Napady grupowe · prywatne RoQ T2</summary><p class="account-note">Terminy z gry na PC i telefonie. Kontener jest pomijany. Zaznacz napady do powiadomień; sprawdzanie co 10 min. Dostępność potwierdź w grze — ktoś mógł już rozpocząć nowy napad.</p><button type="button" data-raids-refresh>Odśwież zapis</button><div role="status" data-raids-status></div>'+
+    (rows.length?'<div style="display:grid;gap:10px;margin-top:12px">'+[...rows].sort((a,b)=>a.availableAt-b.availableAt).map(r=>'<label style="display:flex;gap:10px;align-items:start;border-bottom:1px solid #ddcfb7;padding-bottom:9px"><input type="checkbox" data-raid-id="'+r.id+'" '+(r.enabled?'checked':'')+' aria-label="Powiadom o '+esc(r.name)+'"><span><b>'+esc(r.name)+'</b><br>'+remaining(r.availableAt)+'<br><small>'+new Date(r.availableAt).toLocaleString('pl-PL')+' · odczyt '+new Date(r.capturedAt).toLocaleString('pl-PL')+(r.notifiedAt?' · powiadomienie obsłużone':'')+'</small></span></label>').join('')+'</div>':'<p>Brak zapisanych terminów. Zaktualizuj skrypt do 2.4.0, otwórz Gang, a potem listę napadów w grze. Import nie uruchamia napadów.</p>')+'</details>';
+   const details=box.querySelector('[data-raids-details]');
+   details.addEventListener('toggle',()=>{if(!details.isConnected)return;expanded=details.open;try{localStorage.setItem(stateKey,expanded?'1':'0');}catch{}});
    box.querySelector('[data-raids-refresh]').onclick=()=>void load();
    box.querySelectorAll('[data-raid-id]').forEach(input=>input.onchange=async()=>{input.disabled=true;try{const data=await api('/admin/raid-cooldowns',{method:'POST',body:{id:Number(input.dataset.raidId),enabled:input.checked}});if(!box.isConnected)return;rows=data.raids;render();}catch(e){input.checked=!input.checked;box.querySelector('[data-raids-status]').textContent=e.message;}finally{input.disabled=false;}});
   }
