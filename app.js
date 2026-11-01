@@ -3921,7 +3921,7 @@ function mapRenderRouteResult() {
         ${account.admin ? `<div class="account-admin-link"><button id="account-admin-open" class="primary-btn" type="button">🛠 Panel administratora</button></div>` : ""}
       </div>
 
-      ${account.admin&&Number(account.adminTier)>=2&&String(account.nick).toLocaleLowerCase('pl')==='roq'?'<div id="private-investment-reminder" class="account-card"></div><div id="private-raid-cooldowns" class="account-card"></div>':''}
+      ${account.admin&&Number(account.adminTier)>=2&&String(account.nick).toLocaleLowerCase('pl')==='roq'?'<div id="private-garden-reminder" class="account-card"></div><div id="private-investment-reminder" class="account-card"></div><div id="private-raid-cooldowns" class="account-card"></div>':''}
       ${accountAppearanceHtml(account)}
 
       <div class="account-card notification-settings">
@@ -3943,6 +3943,7 @@ function mapRenderRouteResult() {
       ${achievementsHtml(account.achievements || {},expandedAchievementCategories)}
     `;
 
+    if(el('private-garden-reminder'))void window.GardenReminder?.mount(el('private-garden-reminder'),async(path,options={})=>cloudflareApi(path,{...options,token:await cloudflareEnsureSession()}));
     if(el('private-investment-reminder'))void window.InvestmentReminder?.mount(el('private-investment-reminder'),async(path,options={})=>cloudflareApi(path,{...options,token:await cloudflareEnsureSession()}));
     if(el('private-raid-cooldowns'))void window.RaidCooldowns?.mount(el('private-raid-cooldowns'),async(path,options={})=>cloudflareApi(path,{...options,token:await cloudflareEnsureSession()}));
     configureAccountAppearance(account);
@@ -14730,72 +14731,8 @@ function setupAdmin() {
   }
 
   function gardenKernelPrediction(candidate) {
-    const rows=(gardenData.results||[])
-      .filter(item=>item&&item.plant===candidate.plant)
-      .map(item=>({item,obs:gardenObservationForModel(item)}))
-      .filter(row=>row.obs);
-    if (rows.length<3) return null;
-
-    const bandwidth=0.9;
-    const weighted=[];
-    rows.forEach(row=>{
-      const distance=gardenResearchDistance(candidate,row.item);
-      const kernel=Math.exp(-0.5*(distance/bandwidth)*(distance/bandwidth));
-      const weight=kernel*row.obs.weight;
-      if (weight>0.015) weighted.push({
-        duration:row.obs.duration,
-        weight,
-        distance,
-        source:row.obs.source
-      });
-    });
-    if (weighted.length<3) return null;
-
-    const sw=weighted.reduce((sum,row)=>sum+row.weight,0);
-    const sw2=weighted.reduce((sum,row)=>sum+row.weight*row.weight,0);
-    const effectiveN=sw2>0 ? (sw*sw)/sw2 : 0;
-    if (sw<=0 || effectiveN<2.2) return null;
-
-    const basePredictedMs=weighted.reduce((sum,row)=>sum+row.weight*row.duration,0)/sw;
-    const lowerBounds=[...(gardenData.results||[]),...(gardenData.active||[])]
-      .filter(item=>item&&item.plant===candidate.plant&&Number(item.lastNotReadyAt)>Number(item.startedAt))
-      .map(item=>{
-        const distance=gardenResearchDistance(candidate,item);
-        const kernel=Math.exp(-0.5*Math.pow(distance/bandwidth,2));
-        return {duration:Number(item.lastNotReadyAt)-Number(item.startedAt),weight:kernel,distance};
-      })
-      .filter(row=>row.weight>0.015&&row.duration>basePredictedMs);
-    const lowerBoundWeight=lowerBounds.reduce((sum,row)=>sum+row.weight,0);
-    const lowerBoundTarget=lowerBoundWeight>0
-      ? lowerBounds.reduce((sum,row)=>sum+row.weight*row.duration,0)/lowerBoundWeight
-      : basePredictedMs;
-    // „Jeszcze nie wyrosła” jest obserwacją jednostronną: znamy minimum,
-    // ale nie dokładny moment dojrzenia. Przesuwamy model w stronę tej granicy,
-    // bez traktowania kliknięcia jak czasu zbioru.
-    const lowerBoundStrength=Math.min(0.75,lowerBoundWeight/(1+lowerBoundWeight));
-    const predictedMs=basePredictedMs+Math.max(0,lowerBoundTarget-basePredictedMs)*lowerBoundStrength;
-    const variance=weighted.reduce((sum,row)=>sum+row.weight*Math.pow(row.duration-basePredictedMs,2),0)/sw;
-    const nearest=Math.min(...weighted.map(row=>row.distance));
-    const unresolvedLowerBoundGap=lowerBounds.length?Math.max(...lowerBounds.map(row=>Math.max(0,row.duration-predictedMs)*row.weight)):0;
-    const uncertaintyMs=Math.sqrt(Math.max(0,variance)) + predictedMs*(0.06/Math.sqrt(Math.max(1,effectiveN))) + predictedMs*Math.min(0.25,nearest*0.08) + unresolvedLowerBoundGap*0.5;
-    const readySupport=weighted.filter(row=>row.source==="READY").length;
-
-    let confidence="niska";
-    if (effectiveN>=6 && nearest<=0.55 && uncertaintyMs/predictedMs<=0.18) confidence="wysoka";
-    else if (effectiveN>=3.5 && nearest<=0.9 && uncertaintyMs/predictedMs<=0.30) confidence="średnia";
-
-    return {
-      predictedMs,
-      uncertaintyMs,
-      confidence,
-      effectiveN,
-      support:weighted.length,
-      readySupport,
-      lowerBoundSupport:lowerBounds.length,
-      nearest
-    };
+    return window.GardenGrowth.predict(gardenData,candidate);
   }
-
   function gardenCandidatePool(mode,center,plant,n) {
     const pool=[];
     const push=(sun,water,ph)=>{

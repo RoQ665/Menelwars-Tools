@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const {predict,estimate}=require('../garden-growth.js');
+const hour=3600000,plant='Młode ziemniaki',candidate={plant,sun:95,water:75,ph:8};
+assert.equal(estimate({results:[],active:[],phases:[]},candidate).durationMs,52*hour);
+const results=[40,50,60].map((h,i)=>({...candidate,id:'r'+i,durationMs:h*hour,startedAt:hour,finishedAt:(h+1)*hour}));
+const data={results,active:[],phases:[]};assert.equal(predict(data,candidate).predictedMs,50*hour);
+assert.equal(estimate(data,candidate).source,'model');
+assert.equal(predict(data,{...candidate,plant:'Cebula'}),null);
+assert.equal(predict(data,{...candidate,ph:0}),null);
+const lower=predict({...data,active:[{...candidate,startedAt:hour,lastNotReadyAt:71*hour}]},candidate);
+assert.ok(lower.predictedMs>50*hour);
+const auto={...candidate,id:'auto',modelVersion:'AUTO52',startedAt:hour,finishedAt:81*hour,durationMs:80*hour};
+assert.equal(predict({results:[auto,auto,auto]},candidate),null,'late harvest alone cannot extend model');
+console.log('Shared garden model: fallback, kernel estimate, plant separation, distant data, not-ready bounds and late harvest exclusion — OK');
