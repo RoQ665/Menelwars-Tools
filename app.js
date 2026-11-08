@@ -7904,7 +7904,8 @@ function specialOpsCandidateInfoGlobal(payload,item){
   const active=[],excluded=[];
   for(const player of payload.contributions||[]){
     let reason="";
-    if(!(Number(player.weight)>0))reason="Brak wkładu — 0% szans";
+    if(item.drawEnabled===false)reason="Losowanie wyłączone — przedmiot pozostaje w schowku";
+    else if(!(Number(player.weight)>0))reason="Brak wkładu — 0% szans";
     else if(!specialOpsPreferenceEnabledGlobal(payload,player.nickKey,item.itemKey))reason="Nie potrzebuje tego przedmiotu";
     else if(item.requiresPreviousAK47&&!(item.eligibleNickKeys||[]).includes(player.nickKey))reason="Nie otrzymał wcześniej AK47 z operacji";
     else if(item.kind==="single"&&received.has(player.nickKey))reason=`Otrzymał już ten przedmiot w cyklu ${cycleNo}`;
@@ -7937,7 +7938,7 @@ function specialOpsRenderPreferencesGlobal(payload){
   box.innerHTML=visible.map(item=>{
     const enabled=specialOpsPreferenceEnabledGlobal(payload,me,item.itemKey),cycle=specialOpsCurrentCycleGlobal(payload,item.itemKey);
     const received=item.kind==="single"&&(payload.receipts||[]).some(row=>row.itemKey===item.itemKey&&row.nickKey===me&&Number(row.cycleNo)===cycle);
-    return `<article class="special-ops-pref-card${enabled?"":" disabled"}"><div class="special-ops-item-icon">${specialOpsItemIconGlobal(item.itemName)}</div><div class="special-ops-pref-copy"><strong>${escapeHtml(item.itemName)}</strong><small>${item.kind==="single"?`Pojedynczy · cykl ${cycle}`:item.finalReserve?"Zabezpieczenie końcowe · po 1 szt.":`Wielosztukowy · pakiet do ${Number(item.bundleSize)||1} szt.`}${received?" · ✅ już otrzymany w tym cyklu":""}${item.requiresPreviousAK47?" · Tylko dla wcześniejszych odbiorców AK47 z operacji":""}</small></div><button type="button" class="special-ops-switch${enabled?" active":""}" role="switch" aria-checked="${enabled?"true":"false"}" data-special-pref="${escapeHtml(item.itemKey)}" data-special-enabled="${enabled?"1":"0"}"><span aria-hidden="true"></span><b>${enabled?"Chcę":"Nie chcę"}</b></button></article>`;
+    return `<article class="special-ops-pref-card${enabled?"":" disabled"}"><div class="special-ops-item-icon">${specialOpsItemIconGlobal(item.itemName)}</div><div class="special-ops-pref-copy"><strong>${escapeHtml(item.itemName)}</strong><small>${item.kind==="single"?`Pojedynczy · cykl ${cycle}`:item.finalReserve?"Zabezpieczenie końcowe · po 1 szt.":`Wielosztukowy · pakiet do ${Number(item.bundleSize)||1} szt.`}${received?" · ✅ już otrzymany w tym cyklu":""}${item.drawEnabled===false?" · Losowanie wyłączone — zostaje w schowku":""}${item.requiresPreviousAK47?" · Tylko dla wcześniejszych odbiorców AK47 z operacji":""}</small></div><button type="button" class="special-ops-switch${enabled?" active":""}" role="switch" aria-checked="${enabled?"true":"false"}" ${item.drawEnabled===false?'disabled title="Losowanie tego przedmiotu jest wyłączone"':""} data-special-pref="${escapeHtml(item.itemKey)}" data-special-enabled="${enabled?"1":"0"}"><span aria-hidden="true"></span><b>${enabled?"Chcę":"Nie chcę"}</b></button></article>`;
   }).join("")||'<div class="empty">Nie znaleziono przedmiotów dla wybranego filtra.</div>';
   box.querySelectorAll("[data-special-pref]").forEach(button=>button.addEventListener("click",()=>specialOpsSavePreferenceGlobal(button.dataset.specialPref,button.dataset.specialEnabled!=="1",me,button)));
 }
