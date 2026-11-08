@@ -4529,3 +4529,5 @@ body.experimental-ui .garden-plot-attention{background:#b77726;box-shadow:0 2px 
 
 @media(max-width:520px){body.experimental-ui #main-tabs .tabs button{min-height:44px;font-size:11px}body.experimental-ui #main-tabs button.active{transform:translateY(1px)}body.experimental-ui .tabs button[data-attention="action"]::after,body.experimental-ui .tabs button[data-attention="critical"]::after{right:-2px;top:-5px;width:19px;height:19px}.experimental-ui-test-grid{grid-template-columns:1fr}.payments-snapshot-grid{grid-template-columns:1fr}.payments-summary-head>div:last-child{width:100%}.payments-summary-head #payments-refresh{width:100%}}
 @media(prefers-reduced-motion:reduce){body.experimental-ui *,body.experimental-ui *::before,body.experimental-ui *::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+.special-ops-transfer-card>p.special-ops-transfer-transition{padding:12px;border:2px solid #b77b22;border-radius:8px;background:#fff1ce;color:#573800}.special-ops-transfer-transition b{display:block;margin-bottom:4px}.special-ops-transfer-nav button{overflow-wrap:anywhere}

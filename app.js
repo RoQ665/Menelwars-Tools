@@ -7815,6 +7815,8 @@ let specialOpsLoadInFlightGlobal=null;
 let specialOpsFilterGlobal="all";
 let specialOpsPreferenceStatusTimerGlobal=null;
 let specialOpsTransferIndexGlobal=0;
+let specialOpsTransferSelectionGlobal=null;
+let specialOpsTransferLastActionGlobal=0;
 
 function specialOpsTransferStorageKeyGlobal(batchId){return `menelwars-special-transfer:${String(batchId||"")}`;}
 function specialOpsTransferStateGlobal(payload){
@@ -7846,8 +7848,17 @@ function specialOpsRenderTransferGlobal(payload){
   if(!active){box.hidden=true;box.innerHTML="";return;}
   const groups=specialOpsTransferGroupsGlobal(payload);if(!groups.length){box.hidden=true;box.innerHTML="";return;}
   const state=specialOpsTransferStateGlobal(payload),checked=new Set(state.checked);
+  if(specialOpsTransferSelectionGlobal?.batchId!==batch.id){
+    specialOpsTransferIndexGlobal=Math.max(0,groups.findIndex(row=>!checked.has(row.key)));
+  }else{
+    const selected=groups.findIndex(row=>row.key===specialOpsTransferSelectionGlobal.key);
+    if(selected>=0)specialOpsTransferIndexGlobal=selected;
+  }
   if(specialOpsTransferIndexGlobal>=groups.length)specialOpsTransferIndexGlobal=Math.max(0,groups.length-1);
   const current=groups[specialOpsTransferIndexGlobal],isChecked=checked.has(current.key),done=groups.filter(row=>checked.has(row.key)).length;
+  specialOpsTransferSelectionGlobal={batchId:batch.id,key:current.key};
+  const next=groups[specialOpsTransferIndexGlobal+1],changesItem=next&&next.itemKey!==current.itemKey;
+  const transition=changesItem?`<p class="special-ops-transfer-transition"><b>Następny przedmiot: ${escapeHtml(next.itemName)}.</b> Zmień przedmiot w grze przed kolejnym przekazaniem.</p>`:"";
   const stashQuantity=Number((payload.stash||[]).find(row=>row.itemKey===current.itemKey)?.quantity)||0;
   const markedSameItem=groups.filter(row=>row.itemKey===current.itemKey&&row.key!==current.key&&checked.has(row.key)).reduce((sum,row)=>sum+row.quantity,0);
   const estimatedRemaining=Math.max(0,stashQuantity-markedSameItem),useAll=current.quantity>1&&current.quantity===estimatedRemaining;
@@ -7855,13 +7866,21 @@ function specialOpsRenderTransferGlobal(payload){
     ?`Wybierz ${current.winner} i kliknij w grze „Przekaż”.`
     :useAll?`Wybierz ${current.winner}, kliknij „Wszystkie” i przekaż cały pozostały stos.`:`Wybierz ${current.winner}, wpisz ${current.quantity} i przekaż wpisaną ilość.`;
   box.hidden=false;
-  box.innerHTML=`<section class="special-ops-transfer-card"><header><b>Przekazywanie nagród</b><span>Przydział ${specialOpsTransferIndexGlobal+1} z ${groups.length}</span></header><div class="special-ops-transfer-recipient"><small>ODBIORCA</small><strong>${escapeHtml(current.winner)}</strong></div><div class="special-ops-transfer-item"><small>PRZEKAŻ</small><strong>${escapeHtml(current.itemName)} <b>×${current.quantity}</b></strong></div><p>${escapeHtml(instruction)}</p><div class="special-ops-transfer-progress"><b>${done} z ${groups.length} oznaczonych</b><span>${groups.length-done} pozostało · maks. ${groups.length} wpisów Historii</span></div><div class="special-ops-transfer-nav"><button type="button" data-special-transfer-prev ${specialOpsTransferIndexGlobal===0?"disabled":""}>← Poprzedni</button><button type="button" data-special-transfer-next ${specialOpsTransferIndexGlobal===groups.length-1?"disabled":""}>Następny →</button></div><button type="button" class="primary-btn special-ops-transfer-confirm" data-special-transfer-confirm>${isChecked?"Cofnij oznaczenie":"Przekazane — pokaż następny"}</button><small class="special-ops-transfer-note">To robocza checklista. Ostatecznie przekazania potwierdza import Historii gry.</small></section>`;
-  box.querySelector("[data-special-transfer-prev]")?.addEventListener("click",()=>{specialOpsTransferIndexGlobal=Math.max(0,specialOpsTransferIndexGlobal-1);specialOpsRenderTransferGlobal(payload);});
-  box.querySelector("[data-special-transfer-next]")?.addEventListener("click",()=>{specialOpsTransferIndexGlobal=Math.min(groups.length-1,specialOpsTransferIndexGlobal+1);specialOpsRenderTransferGlobal(payload);});
+  box.innerHTML=`<section class="special-ops-transfer-card"><header><b>Przekazywanie nagród</b><span>Przydział ${specialOpsTransferIndexGlobal+1} z ${groups.length}</span></header><div class="special-ops-transfer-recipient"><small>ODBIORCA</small><strong>${escapeHtml(current.winner)}</strong></div><div class="special-ops-transfer-item"><small>PRZEKAŻ</small><strong>${escapeHtml(current.itemName)} <b>×${current.quantity}</b></strong></div><p>${escapeHtml(instruction)}</p>${transition}${done===groups.length?'<p role="status">Wszystkie przydziały oznaczone. Zaimportuj Historię gry.</p>':isChecked?'<p role="status">Ten przydział jest oznaczony jako przekazany. Wybierz następną pozycję przyciskiem nawigacji.</p>':""}<div class="special-ops-transfer-progress"><b>${done} z ${groups.length} oznaczonych</b><span>${groups.length-done} pozostało · maks. ${groups.length} wpisów Historii</span></div><div class="special-ops-transfer-nav"><button type="button" data-special-transfer-prev ${specialOpsTransferIndexGlobal===0?"disabled":""}>← Poprzedni</button><button type="button" data-special-transfer-next ${!next?"disabled":""}>${changesItem?`Przejdź do: ${escapeHtml(next.itemName)} →`:"Następny →"}</button></div><button type="button" class="primary-btn special-ops-transfer-confirm" data-special-transfer-confirm>${isChecked?"Cofnij oznaczenie":!next||changesItem?"Przekazane — oznacz ten przydział":"Przekazane — pokaż następnego odbiorcę"}</button><small class="special-ops-transfer-note">To robocza checklista. Ostatecznie przekazania potwierdza import Historii gry.</small></section>`;
+  const select=index=>{specialOpsTransferIndexGlobal=index;specialOpsTransferSelectionGlobal={batchId:batch.id,key:groups[index].key};specialOpsRenderTransferGlobal(payload);};
+  box.querySelector("[data-special-transfer-prev]")?.addEventListener("click",()=>select(Math.max(0,specialOpsTransferIndexGlobal-1)));
+  box.querySelector("[data-special-transfer-next]")?.addEventListener("click",()=>select(Math.min(groups.length-1,specialOpsTransferIndexGlobal+1)));
   box.querySelector("[data-special-transfer-confirm]")?.addEventListener("click",()=>{
+    const now=Date.now();if(now-specialOpsTransferLastActionGlobal<500)return;specialOpsTransferLastActionGlobal=now;
     if(isChecked)checked.delete(current.key);else checked.add(current.key);
     const nextState={checked:[...checked],historyAt:Number((payload.imports||[]).find(row=>row.kind==="history")?.createdAt)||state.historyAt||0};specialOpsSaveTransferStateGlobal(batch.id,nextState);
-    if(!isChecked){const next=groups.findIndex((row,index)=>index>specialOpsTransferIndexGlobal&&!checked.has(row.key));const wrapped=groups.findIndex(row=>!checked.has(row.key));specialOpsTransferIndexGlobal=next>=0?next:(wrapped>=0?wrapped:specialOpsTransferIndexGlobal);}
+    if(!isChecked){
+      const nextIndex=groups.findIndex((row,index)=>index>specialOpsTransferIndexGlobal&&!checked.has(row.key));
+      if(nextIndex>=0&&groups[nextIndex].itemKey===current.itemKey){
+        specialOpsTransferIndexGlobal=nextIndex;
+        specialOpsTransferSelectionGlobal={batchId:batch.id,key:groups[nextIndex].key};
+      }
+    }
     specialOpsRenderTransferGlobal(payload);
   });
 }
