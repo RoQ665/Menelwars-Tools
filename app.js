@@ -16539,12 +16539,16 @@ function setupAdmin() {
       simulationUnavailable:"pełne ATK, DEF i statystyki PvP Hrabiego Działek",
       observations:{
         bossId:37,level:36,maxHp:10116,reportDate:"2026-11-13",playerMaxHp:4751,
+        // Public catalogue values are base values, not a final combat profile:
+        // the catalogue lists 6510 HP, while both actual fights use 10116 HP.
+        catalogue:{checkedAt:"2026-11-13",attack:1470,defense:1570,hp:6510,
+          attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52}},
         attempts:[
           {turns:17,bossRemainingHp:473,playerHpBeforeExecution:652,firstBleedRound:5,bleedDamage:3335},
           {turns:17,bossRemainingHp:160,playerHpBeforeExecution:633,firstBleedRound:2,bleedDamage:4021}
         ]
       },
-      description:"Dwie próby z 13.11.2026: poziom 36, 10 116 HP. Obie zakończone egzekucją RoQ w 17. rundzie. Bossowi zostało kolejno 473 i 160 HP; krwawienie zadało 3335 i 4021 obrażeń. Brakuje pełnego ATK, DEF i statystyk PvP bossa — symulacja niedostępna."
+      description:"Dwie próby z 13.11.2026: poziom 36, 10 116 HP. Obie zakończone egzekucją RoQ w 17. rundzie. Bossowi zostało kolejno 473 i 160 HP; krwawienie zadało 3335 i 4021 obrażeń. Publiczny katalog gry podaje bazowe 1470 ATK, 1570 DEF i 6510 HP — to inne wartości niż końcowy profil walki. Brakuje pełnego ATK, DEF i statystyk PvP bossa — symulacja niedostępna."
     });
     // Katalog z ekranu bossów przesłanego przez gracza. Sama lista nagród
     // ani zdarzenia walki nie ujawniają pełnego profilu bojowego NPC.
