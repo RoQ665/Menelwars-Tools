@@ -1,0 +1,15 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const s=fs.readFileSync(require.resolve('../app.js'),'utf8'),html=fs.readFileSync(require.resolve('../index.html'),'utf8');
+const inputs={'pvp-boss-postrach':{checked:true}},c={el:id=>inputs[id],buildCalculateStats:()=>({stats:{attackPct:41.9,defensePct:106.63,maxHpPct:150.75}}),buildStatNumber:Number,escapeHtml:s=>String(s)};vm.createContext(c);
+const a=s.indexOf('  const PVP_COMBAT_CONSUMABLES = ['),b=s.indexOf('  const BUILD_BREAKTHROUGHS',a);vm.runInContext(s.slice(a,b),c);
+const f=s.indexOf('  function pvpIsBossSource('),end=s.indexOf('  function pvpBreakthroughSummaryHtml(',f);vm.runInContext(s.slice(f,end),c);
+const boss={group:'preset',source:{boss:true}},player={group:'public',source:{boss:false}};
+const selected=c.pvpSelectedCombatConsumables(boss);assert.equal(selected.length,1);assert.equal(selected[0].name,'Postrach rewirów');
+assert.equal(c.pvpSelectedCombatConsumables(player).length,0,'Boss bonus must not leak into PvP');
+const original={profile:{combatAttack:726,combatDefense:1429,combatHp:4099}},updated=c.pvpApplyCombatConsumables(original,selected);
+assert.deepEqual(JSON.parse(JSON.stringify(updated.profile)),{combatAttack:769,combatDefense:1553,combatHp:4601});
+assert.deepEqual(original.profile,{combatAttack:726,combatDefense:1429,combatHp:4099},'Applying bonus must not modify saved build');
+assert.match(c.pvpCombatConsumablesResultHtml(boss,selected),/Bonus gangu:.*Postrach rewirów/);
+assert.doesNotMatch(c.pvpCombatConsumablesResultHtml(player,[]),/Postrach rewirów/);
+assert.match(html,/id="pvp-boss-postrach" type="checkbox"/);
+console.log('PASS: gang bonus scales all three stats, is listed in results, stays out of PvP, and preserves saved builds.');

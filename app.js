@@ -16569,7 +16569,8 @@ function setupAdmin() {
     {id:"pvp-food-grochowka",name:"Grochówka „Czarnobylska Mgła”",bonuses:{defense:10},label:"+10 DEF"},
     {id:"pvp-boss-krokodyl",name:"Krokodyl",bonuses:{hp:60},label:"+60 maks. HP",bossOnly:true},
     {id:"pvp-boss-mocarz",name:"Mocarz",bonuses:{defense:80},label:"+80 DEF",bossOnly:true},
-    {id:"pvp-boss-tajfun",name:"Tajfun",bonuses:{attack:20},label:"+20 ATK",bossOnly:true}
+    {id:"pvp-boss-tajfun",name:"Tajfun",bonuses:{attack:20},label:"+20 ATK",bossOnly:true},
+    {id:"pvp-boss-postrach",name:"Postrach rewirów",bonuses:{attack:30,defense:60,hp:200},label:"+30 ATK · +60 DEF · +200 maks. HP",bossOnly:true,gang:true}
   ];
 
   const BUILD_BREAKTHROUGHS = {
@@ -16649,10 +16650,12 @@ function setupAdmin() {
 
   function pvpCombatConsumablesResultHtml(rightItem,consumables) {
     const regular=consumables.filter(item=>!item.bossOnly);
-    const boss=consumables.filter(item=>item.bossOnly);
+    const boss=consumables.filter(item=>item.bossOnly && !item.gang);
+    const gang=consumables.filter(item=>item.gang);
     const rows=[];
     if (regular.length) rows.push(`🍖 Aktywne efekty: ${regular.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · ")}`);
     if (pvpIsBossSource(rightItem)) rows.push(`🧪 Dopalacze bossowe: ${boss.length?boss.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · "):"brak"}`);
+    if (pvpIsBossSource(rightItem)) rows.push(`🏴 Bonus gangu: ${gang.length?gang.map(item=>`<b>${escapeHtml(item.name)}</b> ${escapeHtml(item.label)}`).join(" · "):"brak"}`);
     return rows.length?`<div class="pvp-boss-consumables-result">${rows.join("<br>")}</div>`:"";
   }
 
