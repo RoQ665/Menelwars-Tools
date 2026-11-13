@@ -15797,8 +15797,8 @@ function setupAdmin() {
     // Przeciwnik odtworzony z pełnego logu walki nie potrzebuje sztucznego
     // drzewka perków. Log zawiera jego końcowe ATK/DEF/HP oraz wszystkie
     // efektywne statystyki PvP używane przez symulator.
-    if (source.exactCombat && typeof source.exactCombat === "object") {
-      const exact=source.exactCombat;
+    if (source.exactCombat || source.estimatedCombat) {
+      const exact=source.exactCombat || source.estimatedCombat;
       const primary=exact.primary || {};
       const stats=exact.stats || {};
       if (!Number.isInteger(Number(exact.level)) || Number(exact.level)<1) missing.push("poziom bojowy NPC");
@@ -15997,8 +15997,7 @@ function setupAdmin() {
       });
     });
 
-    // Nagła Śmierć została odtworzona bez zgadywania perków. Wszystkie
-    // wartości poniżej pochodzą z pełnego logu prawdziwej walki z 3.09.2026.
+    // Nagła Śmierć została zachowana jako profil treningowy.
     out.push({
       id:"rewir-17-nagla-smierc",
       name:"Nagła Śmierć · Lvl 14 · Rewiry",
@@ -16032,9 +16031,6 @@ function setupAdmin() {
       description:"Dokładny przeciwnik z Rewirów odtworzony z logu walki: 847 ATK · 661 DEF · 2060 HP. Statystyki efektów i odporności pochodzą bezpośrednio z gry."
     });
 
-    // Pan Paweł został odtworzony z dwóch pełnych logów walk z 6.09.2026.
-    // Oba logi zwróciły identyczny profil końcowy bossa; różnił je wyłącznie
-    // losowy przebieg zdarzeń i wynik po limicie 15 tur.
     out.push({
       id:"boss-18-pan-pawel",
       name:"Pan Paweł · Lvl 15 · Boss",
@@ -16053,8 +16049,6 @@ function setupAdmin() {
       bonuses:[],
       exactCombat:{
         level:15,
-        // Kalibracja z niekrytycznych ciosów RoQ w obu logach: przy 523 ATK,
-        // 18,4% przebicia i 867 DEF odtwarza 118 obrażeń w T1 oraz 122 w T2.
         defenseK:264,
         primary:{attack:751,defense:867,hp:2388},
         stats:{
@@ -16071,9 +16065,6 @@ function setupAdmin() {
       description:"Dokładny boss odtworzony z dwóch logów walki: 751 ATK · 867 DEF · 2388 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
 
-    // Mateusz Rowerzysta został odtworzony z pełnego logu walki z 7.09.2026.
-    // Walka doszła do limitu 15 tur, dzięki czemu zawiera obrażenia z całej
-    // tabeli eskalacji oraz końcowe statystyki obu stron.
     out.push({
       id:"boss-19-mateusz-rowerzysta",
       name:"Mateusz Rowerzysta · Lvl 16 · Boss",
@@ -16092,8 +16083,6 @@ function setupAdmin() {
       bonuses:[],
       exactCombat:{
         level:16,
-        // Kalibracja z niekrytycznych ciosów RoQ: 523 ATK, 18,4% przebicia,
-        // 980 DEF i 29,7% redukcji odtwarza 104 obrażenia w pierwszej turze.
         defenseK:299,
         primary:{attack:765,defense:980,hp:2882},
         stats:{
@@ -16110,8 +16099,6 @@ function setupAdmin() {
       description:"Dokładny boss odtworzony z pełnego logu walki: 765 ATK · 980 DEF · 2882 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
 
-    // Adrian Puchacki został potwierdzony w dwóch pełnych walkach z 8.09.2026.
-    // Oba logi zawierają identyczne statystyki bossa i obrażenia aż do 15. tury.
     out.push({
       id:"boss-20-adrian-puchacki",
       name:"Adrian Puchacki · Lvl 17 · Boss",
@@ -16130,8 +16117,6 @@ function setupAdmin() {
       bonuses:[],
       exactCombat:{
         level:17,
-        // Kalibracja z niekrytycznych ciosów RoQ: 504 ATK, 19% przebicia,
-        // 993 DEF i 31,6% redukcji odtwarza całą tabelę 97–140 obrażeń.
         defenseK:299,
         primary:{attack:772,defense:993,hp:2931},
         stats:{
@@ -16148,9 +16133,6 @@ function setupAdmin() {
       description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 772 ATK · 993 DEF · 2931 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
 
-    // Janusz Tracz został potwierdzony w dwóch pełnych walkach z 10.09.2026.
-    // Obie próby miały identyczne statystyki obu stron i aktywny komplet
-    // dopalaczy bossowych; różnicę wyniku zrobiło głównie krwawienie.
     out.push({
       id:"boss-21-janusz-tracz",
       name:"Janusz Tracz · Lvl 18 · Boss",
@@ -16169,9 +16151,6 @@ function setupAdmin() {
       bonuses:[],
       exactCombat:{
         level:18,
-        // Kalibracja z dwóch pełnych tabel ciosów RoQ: 547 ATK, 22,4%
-        // przebicia, 825 DEF i 19,9% redukcji. K=272 minimalizuje błąd
-        // zaokrągleń na całej sekwencji 136–187 obrażeń przed bonusem low HP.
         defenseK:272,
         primary:{attack:776,defense:825,hp:2409},
         stats:{
@@ -16187,9 +16166,6 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 776 ATK · 825 DEF · 2409 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
-    // Ochroniarz Mirek „Byk” pochodzi z pełnej 15-turowej walki z 21.09.2026.
-    // K=400 odtwarza pierwszy zwykły cios RoQ: 702 ATK, 36,6% przebicia,
-    // 1354 DEF i 31,7% redukcji bossa daje 158 obrażeń w T1.
     out.push({
       id:"boss-28-ochroniarz-mirek-byk",
       name:"Ochroniarz Mirek „Byk” · Lvl 24 · Boss",
@@ -16224,9 +16200,6 @@ function setupAdmin() {
       description:"Boss potwierdzony w pięciu pełnych walkach: 998 ATK · 1354 DEF · 4863 HP. Statystyki PvP pochodzą bezpośrednio z logów gry; model obrażeń jest eksperymentalny."
     });
 
-    // Cinkciarz Wiesiek został potwierdzony w dwóch kolejnych pełnych walkach
-    // z 23.09.2026. W obu próbach miał identyczne statystyki; druga walka
-    // dostarczyła pełną sekwencję krwawienia od T2 aż do śmierci RoQ w T12.
     out.push({
       id:"boss-24-cinkciarz-wiesiek",
       name:"Cinkciarz Wiesiek · Lvl 26 · Boss",
@@ -16245,8 +16218,6 @@ function setupAdmin() {
       bonuses:[],
       exactCombat:{
         level:26,
-        // Kalibracja z obu logów: 717 ATK, 37,2% przebicia, 1219 DEF
-        // i 20,5% redukcji bossa odtwarza 186 obrażeń w pierwszej turze.
         defenseK:351,
         primary:{attack:1314,defense:1219,hp:5399},
         stats:{
@@ -16263,10 +16234,6 @@ function setupAdmin() {
       description:"Dokładny boss potwierdzony w dwóch pełnych logach walki: 1314 ATK · 1219 DEF · 5399 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
 
-    // Bimbrownik Kazik został potwierdzony w dwóch pełnych walkach z 2.10.2026.
-    // Obie próby miały identyczny profil bossa. K=422 odtwarza pierwszy zwykły
-    // cios RoQ: 731 ATK, 38,35% przebicia, 1285 DEF i 16% redukcji daje
-    // 206 obrażeń w T1 po uwzględnieniu redukcji wynikającej z uniku bossa.
     out.push({
       id:"boss-22-bimbrownik-kazik",
       name:"Bimbrownik Kazik · Lvl 27 · Boss",
@@ -16301,9 +16268,6 @@ function setupAdmin() {
       description:"Dokładny boss potwierdzony w dwóch pełnych walkach: 1213 ATK · 1285 DEF · 5714 HP. Wszystkie efektywne statystyki PvP pochodzą bezpośrednio z gry."
     });
 
-    // Doktor Spirytus pochodzi z pełnej 19-turowej walki z 4.10.2026.
-    // K=410 odtwarza całą sekwencję zwykłych i krytycznych ciosów RoQ
-    // (błąd zaokrągleń łącznie 7 pkt na 25 trafień).
     out.push({
       id:"boss-26-doktor-spirytus",
       name:"Doktor Spirytus · Lvl 28 · Boss",
@@ -16338,9 +16302,6 @@ function setupAdmin() {
       description:"Dokładny boss odtworzony z pełnej 19-turowej walki: 1319 ATK · 1407 DEF · 6278 HP. Wszystkie efektywne statystyki PvP i eskalacja pochodzą bezpośrednio z gry."
     });
 
-    // Gwardzista Cesarza pochodzi z pełnej 20-turowej walki z 5.10.2026.
-    // RoQ walczył na pełnych buffach (586 ATK · 1207 DEF · 3783 HP).
-    // K=423 najlepiej odtwarza sekwencję zwykłych i krytycznych ciosów z logu.
     out.push({
       id:"boss-27-gwardzista-cesarza",
       name:"Gwardzista Cesarza · Lvl 29 · Boss",
@@ -16372,13 +16333,9 @@ function setupAdmin() {
         }
       },
       boss:true,
-      description:"Dokładny boss odtworzony z pełnej 20-turowej walki przeciwko RoQ na pełnych buffach: 1320 ATK · 1460 DEF · 6787 HP. Wszystkie efektywne statystyki PvP i eskalacja pochodzą bezpośrednio z gry."
+      description:"Potwierdzony profil bojowy bossa. Symulacja korzysta z końcowych statystyk walki."
     });
 
-    // Cesarz Meneli pochodzi z pełnej 18-turowej walki z 6.10.2026.
-    // RoQ walczył na pełnych buffach (589 ATK · 1207 DEF · 3808 HP).
-    // K=451 odtwarza późniejsze ciosy z błędem łącznie 1 pkt. Pierwsze
-    // uderzenia ujawniły dodatkowo właściwy temu bossowi próg 150 obrażeń.
     out.push({
       id:"boss-23-cesarz-meneli",
       name:"Cesarz Meneli · Lvl 30 · Boss",
@@ -16411,12 +16368,9 @@ function setupAdmin() {
         }
       },
       boss:true,
-      description:"Dokładny boss odtworzony z pełnej 18-turowej walki przeciwko RoQ na pełnych buffach: 1388 ATK · 1589 DEF · 7513 HP. Uwzględnia próg minimum 150 obrażeń, pełne statystyki PvP i egzekucję."
+      description:"Potwierdzony profil bojowy bossa. Symulacja korzysta z końcowych statystyk walki."
     });
 
-    // Komornik Wiesław pochodzi z dwóch pełnych walk z 6.10.2026.
-    // RoQ walczył na pełnych buffach (601 ATK · 1276 DEF · 3932 HP).
-    // K=479 odtwarza ciosy RoQ po wyjściu ponad próg minimum 158 obrażeń.
     out.push({
       id:"boss-31-komornik-wieslaw",
       name:"Komornik Wiesław · Lvl 31 · Boss",
@@ -16449,13 +16403,9 @@ function setupAdmin() {
         }
       },
       boss:true,
-      description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1450 ATK · 1653 DEF · 7894 HP. Uwzględnia próg minimum 158 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
+      description:"Potwierdzony profil bojowy bossa. Symulacja korzysta z końcowych statystyk walki."
     });
 
-    // Prezes Wysypiska pochodzi z dwóch pełnych walk z 13.10.2026:
-    // jednej przegranej w 17. turze i wygranej przez krwawienie w 19. turze.
-    // RoQ walczył na pełnych buffach (659 ATK · 1341 DEF · 3970 HP).
-    // K=493 odtwarza zarejestrowane zwykłe ciosy RoQ od 167 do 221 obrażeń.
     out.push({
       id:"boss-32-prezes-wysypiska",
       name:"Prezes Wysypiska · Lvl 32 · Boss",
@@ -16488,12 +16438,9 @@ function setupAdmin() {
         }
       },
       boss:true,
-      description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1532 ATK · 1736 DEF · 8276 HP. Uwzględnia próg minimum 166 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
+      description:"Potwierdzony profil bojowy bossa. Symulacja korzysta z końcowych statystyk walki."
     });
 
-    // Ojciec Chrzestny Melin pochodzi z dwóch pełnych walk z 14.10.2026.
-    // RoQ walczył na pełnych buffach (666 ATK · 1348 DEF · 3982 HP).
-    // K=510 odtwarza zwykłe ciosy RoQ po wyjściu ponad próg 175 obrażeń.
     out.push({
       id:"boss-33-ojciec-chrzestny-melin",
       name:"Ojciec Chrzestny Melin · Lvl 33 · Boss",
@@ -16526,32 +16473,44 @@ function setupAdmin() {
         }
       },
       boss:true,
-      description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1660 ATK · 1819 DEF · 8732 HP. Uwzględnia próg minimum 175 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
+      description:"Potwierdzony profil bojowy bossa. Symulacja korzysta z końcowych statystyk walki."
     });
-    // Hrabia Działek: dwa raporty z 13.11.2026 zawierają HP i zdarzenia,
-    // ale nie ujawniają pełnego profilu bojowego. Nie kopiujemy statystyk
-    // poprzedniego bossa ani nie wyliczamy szans z dwóch przegranych prób.
     out.push({
-      id:"boss-37-hrabia-dzialek",
-      name:"Hrabia Działek · Lvl 36 · Boss · niepełne dane",
-      authorNick:"MenelWars · Bossowie",ownerNick:"",public:false,boss:true,level:36,
-      attributes:{},perks:{},profile:{},bonuses:[],
-      simulationUnavailable:"pełne ATK, DEF i statystyki PvP Hrabiego Działek",
-      observations:{
-        bossId:37,level:36,maxHp:10116,reportDate:"2026-11-13",playerMaxHp:4751,
-        // Public catalogue values are base values, not a final combat profile:
-        // the catalogue lists 6510 HP, while both actual fights use 10116 HP.
-        catalogue:{checkedAt:"2026-11-13",attack:1470,defense:1570,hp:6510,
-          attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52}},
-        attempts:[
-          {turns:17,bossRemainingHp:473,playerHpBeforeExecution:652,firstBleedRound:5,bleedDamage:3335},
-          {turns:17,bossRemainingHp:160,playerHpBeforeExecution:633,firstBleedRound:2,bleedDamage:4021}
-        ]
+      id:"boss-35-deweloper-bogdan",name:"Deweloper Bogdan „Beton” · Lvl 35 · Boss · profil szacowany",
+      authorNick:"MenelWars · Bossowie",ownerNick:"",public:false,boss:true,level:35,
+      attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52},
+      perks:{},profile:{},bonuses:[],
+      estimatedCombat:{
+        level:35,defenseK:555,
+        primary:{attack:1824,defense:1997,hp:9645},
+        stats:{accuracy:129,initiative:18.6,firstStrike:13,
+          critChance:50.8,critDmg:86,execute:15.8,lifesteal:15.8,
+          armorPen:30.8,stun:20.8,bleed:39.2,bleedDamage:0,
+          evasion:18.1,doubleStrike:23,counter:13.8,
+          healingReduction:50,damageReduction:19.9,
+          critResist:30,stunResist:30,bleedResist:34,
+          hpRegen:13.2,critResistBypass:10.4,critBonusReduction:9.6}
       },
-      description:"Dwie próby z 13.11.2026: poziom 36, 10 116 HP. Obie zakończone egzekucją RoQ w 17. rundzie. Bossowi zostało kolejno 473 i 160 HP; krwawienie zadało 3335 i 4021 obrażeń. Publiczny katalog gry podaje bazowe 1470 ATK, 1570 DEF i 6510 HP — to inne wartości niż końcowy profil walki. Brakuje pełnego ATK, DEF i statystyk PvP bossa — symulacja niedostępna."
+      description:"Profil szacowany na podstawie bazowych statystyk i modelu atrybutów NPC. HP potwierdzone; ATK, DEF, szanse, odporności i współczynnik obrony są przybliżeniem. Wynik służy do porównywania buildów, nie gwarantuje wyniku w grze."
     });
-    // Katalog z ekranu bossów przesłanego przez gracza. Sama lista nagród
-    // ani zdarzenia walki nie ujawniają pełnego profilu bojowego NPC.
+    out.push({
+      id:"boss-37-hrabia-dzialek",name:"Hrabia Działek · Lvl 36 · Boss · profil szacowany",
+      authorNick:"MenelWars · Bossowie",ownerNick:"",public:false,boss:true,level:36,
+      attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52},
+      perks:{},profile:{},bonuses:[],
+      estimatedCombat:{
+        level:36,defenseK:580,
+        primary:{attack:1891,defense:2093,hp:10116},
+        stats:{accuracy:129,initiative:18.6,firstStrike:13,
+          critChance:50.8,critDmg:86,execute:15.8,lifesteal:15.8,
+          armorPen:30.8,stun:20.8,bleed:39.2,bleedDamage:0,
+          evasion:18.1,doubleStrike:23,counter:13.8,
+          healingReduction:50,damageReduction:19.9,
+          critResist:30,stunResist:30,bleedResist:34,
+          hpRegen:13.2,critResistBypass:10.4,critBonusReduction:9.6}
+      },
+      description:"Profil szacowany na podstawie bazowych statystyk i modelu atrybutów NPC. HP potwierdzone; ATK, DEF, szanse, odporności i współczynnik obrony są przybliżeniem. Wynik służy do porównywania buildów, nie gwarantuje wyniku w grze."
+    });
     const bossCatalogue=["Menel Igor","Mietek magister","Żul Artur","Zdzichu złota rączka","Pijus Dawid","Młody lump Sławek","Cyber Piotrek","Marek „Amant”","Andrzej","Krzysztof Jarzyna","Geralt z Rumii","Damian Wąsik","Kamil Zdun","Nagła Śmierć","Pan Paweł","Mateusz Rowerzysta","Adrian Puchacki","Janusz Tracz","Silnoręki","Sułtan Meneli","Rzezimieszek Heniek","Baron Blokowiska","Portier Stefan","Ochroniarz Mirek „Byk”","Cwaniak Zenek","Cinkciarz Wiesiek","Bimbrownik Kazik","Doktor Spirytus","Gwardzista Cesarza","Cesarz Meneli","Komornik Wiesław","Prezes Wysypiska","Ojciec Chrzestny Melin","Burmistrz Ryszard „Układ”","Deweloper Bogdan „Beton”"];
     bossCatalogue.push("Hrabia Działek");
     const bossNameKey=name=>String(name).split(' · ')[0].replace(/[„”"]/g,'').toLocaleLowerCase('pl');
@@ -16562,8 +16521,8 @@ function setupAdmin() {
       return {id:'boss-catalog-'+(index+1),name:name+' · Boss · niepełne dane',authorNick:'MenelWars · Bossowie',ownerNick:'',public:false,boss:true,
         attributes:{},perks:{},profile:{},bonuses:[],
         simulationUnavailable:'pełne ATK, DEF i statystyki PvP bossa',
-        observations:mayor?{level:34,maxHp:9188,reportDate:'2026-10-28',winner:'RoQ',turns:19,remainingHp:470,rewardXp:170000,rewardGold:15}:developer?{rewardXp:175000,rewardGold:15}:{},
-        description:mayor?'Raport z 28.10.2026: poziom 34, 9188 HP. RoQ wygrał w 19. rundzie, pozostając z 470 HP. Nagroda: 170 000 XP i 15 złotych monet. Log nie zawiera pełnego ATK, DEF ani statystyk PvP — symulacja niedostępna.':developer?'Znany z listy bossów: 175 000 XP i 15 złotych monet. Brak raportu i pełnych statystyk do symulacji.':'Boss z przesłanej listy. Brak pełnego profilu bojowego do symulacji.'};
+        observations:mayor?{level:34,maxHp:9188,rewardXp:170000,rewardGold:15}:developer?{rewardXp:175000,rewardGold:15}:{},
+        description:mayor?'Poziom 34, 9188 HP. Brak pełnego profilu bojowego do symulacji.':developer?'Znany z listy bossów: 175 000 XP i 15 złotych monet. Brak raportu i pełnych statystyk do symulacji.':'Boss z przesłanej listy. Brak pełnego profilu bojowego do symulacji.'};
     });
     out.splice(0,out.length,...out.filter(x=>!x.boss),...orderedBosses);
     pvpGeneratedPresetsCache = out;
@@ -16707,6 +16666,12 @@ function setupAdmin() {
     return `<div class="pvp-boss-consumables-result">⚡ <b>${escapeHtml(leftItem.label)}</b>: ${side(leftItem)}<br>⚡ <b>${escapeHtml(rightItem.label)}</b>: ${side(rightItem)}</div>`;
   }
 
+  function pvpEstimatedProfileNotice(...sources) {
+    return sources.some(source=>source?.estimatedCombat)
+      ? "⚠️ Profil bossa jest szacowany. HP potwierdzone; pozostałe parametry są przybliżone. Symulacja jest dostępna, ale jej wynik może odbiegać od gry."
+      : "";
+  }
+
   function pvpUpdateReadiness() {
     const host = el("pvp-sim-readiness");
     if (!host) return;
@@ -16716,7 +16681,7 @@ function setupAdmin() {
     const leftReady=buildSimulationReadiness(leftItem.source);
     const rightReady=buildSimulationReadiness(rightItem.source);
     if (leftReady.ok && rightReady.ok) {
-      host.textContent="✅ Oba buildy mają komplet danych wymaganych do symulacji.";
+      host.textContent=pvpEstimatedProfileNotice(leftItem.source,rightItem.source) || "✅ Oba buildy mają komplet danych wymaganych do symulacji.";
       return;
     }
     const parts=[];
@@ -16792,9 +16757,8 @@ function setupAdmin() {
 
   function pvpPrepareFighter(source,label) {
     const baseCalculated=buildCalculateStats(source);
-    const exact=source && source.exactCombat && typeof source.exactCombat === "object"
-      ? source.exactCombat
-      : null;
+    const combatProfile=source?.exactCombat || source?.estimatedCombat;
+    const exact=combatProfile && typeof combatProfile === "object" ? combatProfile : null;
     const exactLevel=exact ? Math.max(1,Number(exact.level)||1) : null;
     const calculated=exact
       ? Object.assign({},baseCalculated,{
@@ -16897,7 +16861,7 @@ function setupAdmin() {
     // a następnie 74 / 76 / 77. Odtwarza to K ~= 256–257, czyli
     // 175 + 1,5 × (poziom - 1). Dokładne bossy mają własny defenseK.
     const defenderLevel=Math.max(1,Number(defender.combatLevel)||Number(defender.calculated?.characterLevel)||1);
-    const loggedDefenseK=Number(defender.source?.exactCombat?.defenseK);
+    const loggedDefenseK=Number((defender.source?.exactCombat || defender.source?.estimatedCombat)?.defenseK);
     const defenseK=Number.isFinite(loggedDefenseK) && loggedDefenseK>0
       ? loggedDefenseK
       : 175+1.5*(defenderLevel-1);
@@ -17549,7 +17513,7 @@ function setupAdmin() {
       // poza skrajnym remisem timeoutu nie mamy potwierdzonej różnicy stron.
       const agg=await pvpMonteCarlo(leftSource,rightItem.source,runs,params,"B");
       const perRoundDamage=pvpNormalDamageByRound(leftSource,rightItem.source,params);
-      host.innerHTML=`${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}${pvpBreakthroughSummaryHtml(leftItem,rightItem)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika v6</summary><div>Walka trwa maksymalnie 20 rund. Od T12 działa nowa późna eskalacja obrażeń. Inicjatywa daje losową przewagę (remis 50%, +5 około 73%), a nie pewny pierwszy ruch. Ogłuszenie jest redukowane proporcjonalnie przez odporność, może wejść raz na zawodnika i nie jest nakładane przez Double ani kontrę. Regeneracja odbywa się na końcu rundy, gdy obaj żyją, z limitem 2 × poziom postaci; lifesteal jest liczony osobno. Żywotność osłabia dodatkową część krytyka, Precyzja przebija odporność na kryt, a unik daje osobną redukcję równą Unik / 3,5. Silnik uwzględnia przełamania: Druga wątroba, Pewniak, Echo uderzenia, Ostatnie słowo, Łom, Trzeci raz, Draśnięcie, Zejście z linii, Gruby kark, Ząb za ząb, Pijawka, Sól w ranę i Krzepnięcie. Klincz, Twardy łeb oraz Beton pozostają zapisane przy buildzie, ale czekają na wystarczające logi do kalibracji.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
+      host.innerHTML=`${pvpEstimatedProfileNotice(leftSource,rightItem.source) ? `<p class="muted">${pvpEstimatedProfileNotice(leftSource,rightItem.source)}</p>` : ""}${pvpCombatConsumablesResultHtml(rightItem,combatConsumables)}${pvpBreakthroughSummaryHtml(leftItem,rightItem)}<details class="pvp-sim-assumptions"><summary>🧪 Założenia eksperymentalnego silnika v6</summary><div>Walka trwa maksymalnie 20 rund. Od T12 działa nowa późna eskalacja obrażeń. Inicjatywa daje losową przewagę (remis 50%, +5 około 73%), a nie pewny pierwszy ruch. Ogłuszenie jest redukowane proporcjonalnie przez odporność, może wejść raz na zawodnika i nie jest nakładane przez Double ani kontrę. Regeneracja odbywa się na końcu rundy, gdy obaj żyją, z limitem 2 × poziom postaci; lifesteal jest liczony osobno. Żywotność osłabia dodatkową część krytyka, Precyzja przebija odporność na kryt, a unik daje osobną redukcję równą Unik / 3,5. Silnik uwzględnia przełamania: Druga wątroba, Pewniak, Echo uderzenia, Ostatnie słowo, Łom, Trzeci raz, Draśnięcie, Zejście z linii, Gruby kark, Ząb za ząb, Pijawka, Sól w ranę i Krzepnięcie. Klincz, Twardy łeb oraz Beton pozostają zapisane przy buildzie, ale czekają na wystarczające logi do kalibracji.</div></details>${pvpRenderAggregate(agg,leftItem.label,rightItem.label,"Wynik symulacji",perRoundDamage)}${pvpRenderNormalDamageByRound(perRoundDamage,leftItem.label,rightItem.label)}`;
       const achievementIds=["pvp_simulation"];
       const ownNick=normalizedPlayerNick(cachedAccountNick());
       const fightsOtherPublic=rightItem.group==="public" && normalizedPlayerNick(rightItem.source.ownerNick || rightItem.source.authorNick)!==ownNick;
@@ -17570,7 +17534,7 @@ function setupAdmin() {
       if (rightItem.group==="preset" && runs===1000 && agg.winsA/runs>=0.8) {
         achievementTrackAiWin(rightItem.source.id,buildRequiredLevel(),runs,agg.winsA);
       }
-      if (readinessHost) readinessHost.textContent="✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
+      if (readinessHost) readinessHost.textContent=pvpEstimatedProfileNotice(leftSource,rightItem.source) || "✅ Symulacja zakończona. Wyniki są eksperymentalne, nie są prognozą 1:1 silnika gry.";
     } catch (err) {
       if (readinessHost) readinessHost.textContent="❌ "+(err&&err.message?err.message:"Błąd symulacji.");
     } finally { button.disabled=false; }
