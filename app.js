@@ -16528,9 +16528,28 @@ function setupAdmin() {
       boss:true,
       description:"Dokładny boss odtworzony z dwóch pełnych walk przeciwko RoQ na pełnych buffach: 1660 ATK · 1819 DEF · 8732 HP. Uwzględnia próg minimum 175 obrażeń, pełne statystyki PvP, ogłuszenie i egzekucję 15,8%."
     });
+    // Hrabia Działek: dwa raporty z 13.11.2026 zawierają HP i zdarzenia,
+    // ale nie ujawniają pełnego profilu bojowego. Nie kopiujemy statystyk
+    // poprzedniego bossa ani nie wyliczamy szans z dwóch przegranych prób.
+    out.push({
+      id:"boss-37-hrabia-dzialek",
+      name:"Hrabia Działek · Lvl 36 · Boss · niepełne dane",
+      authorNick:"MenelWars · Bossowie",ownerNick:"",public:false,boss:true,level:36,
+      attributes:{},perks:{},profile:{},bonuses:[],
+      simulationUnavailable:"pełne ATK, DEF i statystyki PvP Hrabiego Działek",
+      observations:{
+        bossId:37,level:36,maxHp:10116,reportDate:"2026-11-13",playerMaxHp:4751,
+        attempts:[
+          {turns:17,bossRemainingHp:473,playerHpBeforeExecution:652,firstBleedRound:5,bleedDamage:3335},
+          {turns:17,bossRemainingHp:160,playerHpBeforeExecution:633,firstBleedRound:2,bleedDamage:4021}
+        ]
+      },
+      description:"Dwie próby z 13.11.2026: poziom 36, 10 116 HP. Obie zakończone egzekucją RoQ w 17. rundzie. Bossowi zostało kolejno 473 i 160 HP; krwawienie zadało 3335 i 4021 obrażeń. Brakuje pełnego ATK, DEF i statystyk PvP bossa — symulacja niedostępna."
+    });
     // Katalog z ekranu bossów przesłanego przez gracza. Sama lista nagród
     // ani zdarzenia walki nie ujawniają pełnego profilu bojowego NPC.
     const bossCatalogue=["Menel Igor","Mietek magister","Żul Artur","Zdzichu złota rączka","Pijus Dawid","Młody lump Sławek","Cyber Piotrek","Marek „Amant”","Andrzej","Krzysztof Jarzyna","Geralt z Rumii","Damian Wąsik","Kamil Zdun","Nagła Śmierć","Pan Paweł","Mateusz Rowerzysta","Adrian Puchacki","Janusz Tracz","Silnoręki","Sułtan Meneli","Rzezimieszek Heniek","Baron Blokowiska","Portier Stefan","Ochroniarz Mirek „Byk”","Cwaniak Zenek","Cinkciarz Wiesiek","Bimbrownik Kazik","Doktor Spirytus","Gwardzista Cesarza","Cesarz Meneli","Komornik Wiesław","Prezes Wysypiska","Ojciec Chrzestny Melin","Burmistrz Ryszard „Układ”","Deweloper Bogdan „Beton”"];
+    bossCatalogue.push("Hrabia Działek");
     const bossNameKey=name=>String(name).split(' · ')[0].replace(/[„”"]/g,'').toLocaleLowerCase('pl');
     const knownBosses=new Map(out.filter(x=>x.boss).map(x=>[bossNameKey(x.name),x]));
     const orderedBosses=bossCatalogue.map((name,index)=>{

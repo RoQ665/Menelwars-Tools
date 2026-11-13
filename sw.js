@@ -1,18 +1,18 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v24.72";
+const CACHE = "menelwars-tools-v24.73";
 // Jednorazowy most z wersji 22.45. Przy następnym wydaniu wraca na false,
 // a o automacie decyduje już strona: samoczynnie tylko na ekranie głównym.
 const FORCE_THIS_RELEASE = false;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=24.72",
+  "./styles.css?v=24.73",
   "./data.js?v=21.05",
-  "./app.js?v=24.72",
-  "./garden-growth.js?v=24.72",
-  "./garden-reminder-view.js?v=24.72",
-  "./drink-reminder-view.js?v=24.72",
+  "./app.js?v=24.73",
+  "./garden-growth.js?v=24.73",
+  "./garden-reminder-view.js?v=24.73",
+  "./drink-reminder-view.js?v=24.73",
   "./investment-reminder-view.js?v=24.63",
   "./raid-cooldowns-view.js?v=24.61",
   "./battle-analyzer.js?v=24.55",
