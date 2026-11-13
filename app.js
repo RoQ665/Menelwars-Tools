@@ -7986,6 +7986,10 @@ function specialOpsRenderResultsGlobal(payload){
     if(row.action==="preference")return `<article><b>${escapeHtml(row.actor)} zmienił preferencję gracza ${escapeHtml(target)}${row.details?.itemName?` · ${escapeHtml(row.details.itemName)}`:""}</b><small>${specialOpsDateGlobal(row.createdAt)} · ${row.details?.enabled?"bierze udział":"nie potrzebuje"}</small></article>`;
     if(row.action==="import_history"){
       const confirmed=Math.max(0,Number(row.details?.confirmed)||0),mismatches=Math.max(0,Number(row.details?.mismatches)||0),pending=Math.max(0,Number(row.details?.pending)||0),transferred=confirmed+mismatches;
+      if(row.details?.grouped){
+        const total=Math.max(0,Number(row.details.total)||0),manual=Math.max(0,Number(row.details.manual)||0);
+        return `<article><b>Potwierdzanie przydziałów · przekazano ${transferred}/${total} szt.</b><small>${specialOpsDateGlobal(row.createdAt)} · ostatni zapis: ${escapeHtml(row.actor)}${mismatches?` · rozbieżności odbiorców: ${mismatches}`:""}${manual?` · potwierdzono ręcznie: ${manual}`:""}${pending?` · oczekuje: ${pending}`:" · seria rozliczona"}</small></article>`;
+      }
       return `<article><b>${escapeHtml(row.actor)} zaimportował Historię przydziałów</b><small>${specialOpsDateGlobal(row.createdAt)} · usunięto ze schowka ${transferred} przekazanych szt.${mismatches?` · różnice: ${mismatches}`:""}${pending?` · pozostało w schowku: ${pending}`:" · schowek serii rozliczony"}</small></article>`;
     }
     if(row.action==="departed_prizes_cancelled")return `<article><b>${escapeHtml(row.details?.nick||target)} opuścił gang — anulowano nieprzekazane przydziały</b><small>${specialOpsDateGlobal(row.createdAt)} · ${Math.max(0,Number(row.details?.cancelledPrizes)||0)} szt. pozostało w schowku do kolejnego losowania${row.details?.autoClosed?" · serię zamknięto automatycznie":""}</small></article>`;
