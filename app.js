@@ -16511,8 +16511,26 @@ function setupAdmin() {
       },
       description:"Profil szacowany na podstawie bazowych statystyk i modelu atrybutów NPC. HP potwierdzone; ATK, DEF, szanse, odporności i współczynnik obrony są przybliżeniem. Wynik służy do porównywania buildów, nie gwarantuje wyniku w grze."
     });
+    out.push({
+      id:"boss-39-krol-kaucji",name:"Król Kaucji · Lvl 37 · Boss · profil szacowany",
+      authorNick:"MenelWars · Bossowie",ownerNick:"",public:false,boss:true,level:37,
+      attributes:{strength:50,endurance:50,agility:46,vitality:48,precision:52},
+      perks:{},profile:{},bonuses:[],
+      estimatedCombat:{
+        level:37,defenseK:600,
+        primary:{attack:1935,defense:2193,hp:10611},
+        stats:{accuracy:129,initiative:18.6,firstStrike:13,
+          critChance:50.8,critDmg:86,execute:15.8,lifesteal:15.8,
+          armorPen:30.8,stun:20.8,bleed:39.2,bleedDamage:0,
+          evasion:18.1,doubleStrike:23,counter:13.8,
+          healingReduction:50,damageReduction:19.9,
+          critResist:30,stunResist:30,bleedResist:34,
+          hpRegen:13.2,critResistBypass:10.4,critBonusReduction:9.6}
+      },
+      description:"Profil szacowany na podstawie bazowych statystyk i modelu atrybutów NPC. HP potwierdzone; ATK, DEF, szanse, odporności i współczynnik obrony są przybliżeniem. Wynik służy do porównywania buildów, nie gwarantuje wyniku w grze."
+    });
     const bossCatalogue=["Menel Igor","Mietek magister","Żul Artur","Zdzichu złota rączka","Pijus Dawid","Młody lump Sławek","Cyber Piotrek","Marek „Amant”","Andrzej","Krzysztof Jarzyna","Geralt z Rumii","Damian Wąsik","Kamil Zdun","Nagła Śmierć","Pan Paweł","Mateusz Rowerzysta","Adrian Puchacki","Janusz Tracz","Silnoręki","Sułtan Meneli","Rzezimieszek Heniek","Baron Blokowiska","Portier Stefan","Ochroniarz Mirek „Byk”","Cwaniak Zenek","Cinkciarz Wiesiek","Bimbrownik Kazik","Doktor Spirytus","Gwardzista Cesarza","Cesarz Meneli","Komornik Wiesław","Prezes Wysypiska","Ojciec Chrzestny Melin","Burmistrz Ryszard „Układ”","Deweloper Bogdan „Beton”"];
-    bossCatalogue.push("Hrabia Działek");
+    bossCatalogue.push("Hrabia Działek","Król Kaucji");
     const bossNameKey=name=>String(name).split(' · ')[0].replace(/[„”"]/g,'').toLocaleLowerCase('pl');
     const knownBosses=new Map(out.filter(x=>x.boss).map(x=>[bossNameKey(x.name),x]));
     const orderedBosses=bossCatalogue.map((name,index)=>{
