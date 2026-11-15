@@ -1,0 +1,5 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const input={player:'RoQ',asOf:'2026-11-15',context:{ownGang:'Dupkapupka'},reports:[{date:'2026-11-15',players:[{name:'RoQ',gang:'Dupkapupka'},{name:'Rywal',gang:'Enemy'}],fights:[{attacker:'RoQ',attackerGang:'Dupkapupka',defender:'Rywal',defenderGang:'Enemy',winner:'RoQ',time:'12:00',xp:200}]}]};
+let reply;const self={postMessage:message=>reply=message};vm.runInNewContext(fs.readFileSync(require.resolve('../league-target-worker.js'),'utf8'),{self,Date,Intl});self.onmessage({data:input});assert.equal(reply.ok,true);assert.equal(reply.result.player,'RoQ');assert.equal(reply.result.targets.length,1);assert.equal(reply.result.targets[0].name,'Rywal');assert.ok(Number.isFinite(reply.result.targets[0].rating.value));
+self.onmessage({data:null});assert.equal(reply.ok,false);assert.match(reply.error,/Brak danych/);
+console.log('PASS: bundled league worker computes ratings and reports malformed input safely.');

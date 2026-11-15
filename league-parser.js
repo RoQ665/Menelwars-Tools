@@ -247,24 +247,51 @@
           ${p.analysis?`<p class="league-caption">Pewność danych: <b>${escape(p.analysis.confidenceLabel)}</b> · ${escape({favorable:'Korzystne wskazówki',unfavorable:'Niekorzystne wskazówki',mixed:'Niejednoznaczne wskazówki',unknown:'Brak osobistego porównania'}[p.analysis.favorability]||'Brak oceny')}</p><details><summary>Analiza profilu i pewność</summary>${analysisDetails(p.analysis)}${(p.analysis.proofs||[]).map(f=>`<div class="league-target-proof"><span>${escape(f.date)} · ${escape(f.time)}</span><b>${escape(f.attacker)} → ${escape(f.defender)}</b><span>Wygrywa ${escape(f.winner)}</span></div>`).join('')}<p class="league-caption">Pewność opisuje jakość danych, nie szansę wygranej.</p></details>`:''}
           ${p.evidence.length?`<details><summary>${p.evidenceKind==='direct'?'Twoje walki':'Wyniki pośrednie'} (${p.totalEvidence})</summary>${Number.isFinite(p.evidenceTotal)?`<p class="league-caption">${p.evidenceKind==='direct'?`Suma wag własnych walk: ${Number(p.weightedWins).toLocaleString('pl-PL')} W / ${Number(p.weightedLosses).toLocaleString('pl-PL')} P`:`Pomocnicza suma wag powiązań: ${Number(p.evidenceTotal).toLocaleString('pl-PL')}`}. To nie jest szansa wygranej.</p>`:''}${p.evidence.map(f=>`<div class="league-target-proof"><span>${escape(f.date)} · ${escape(f.time)}${Number.isFinite(f.weight)?` · waga dowodu ${Math.round(f.weight*100)}%`:''}</span><b>${escape(f.attacker)} → ${escape(f.defender)}</b><span>Wygrywa ${escape(f.winner)}</span></div>`).join('')}${p.totalEvidence>p.evidence.length?'<small>Pokazano 6 najnowszych walk.</small>':''}</details>`:''}</article>`).join('')}</div>${rows.length>6?`<button type="button" data-target-expand>Pokaż pozostałe cele (${rows.length-6})</button>`:''}`:'<p class="league-caption">Brak kandydatów — potrzebny raport z udziałem tego gracza.</p>'}`;
     }
+    function computeTargetsInBrowser(input) {
+      return new Promise((resolve,reject)=>{
+        const worker=new Worker('./league-target-worker.js?v=24.78');
+        let timer;
+        const finish=(error,result)=>{
+          clearTimeout(timer);worker.terminate();
+          if(error)reject(error);else resolve(result);
+        };
+        timer=setTimeout(()=>finish(Error('Obliczanie ocen trwa zbyt długo. Spróbuj ponownie.')),60000);
+        worker.onmessage=event=>event.data?.ok
+          ? finish(null,event.data.result)
+          : finish(Error(event.data?.error||'Nie udało się obliczyć ocen.'));
+        worker.onerror=()=>finish(Error('Nie udało się uruchomić analizy. Odśwież tool i spróbuj ponownie.'));
+        worker.postMessage(input);
+      });
+    }
+    async function requestTargets(player) {
+      const payload=await request('/gang/league/targets?compute=client'+(player?'&player='+encodeURIComponent(player):''));
+      if(!payload.compute)return payload;
+      const {compute,...metadata}=payload;
+      return {...await computeTargetsInBrowser(compute),...metadata};
+    }
+    let targetLoadError=false;
     async function loadTargets() {
       const requestId=++targetRequestId;
       targetBox.textContent = 'Szukam celów w zapisanych raportach…';
       try {
         const selectedPlayer=targetPlayer;
         const [payload,own]=await Promise.all([
-          request('/gang/league/targets'+(selectedPlayer?'?player='+encodeURIComponent(selectedPlayer):'')),
-          selectedPlayer&&!viewerData?request('/gang/league/targets'):Promise.resolve(null)
+          requestTargets(selectedPlayer),
+          selectedPlayer&&!viewerData?requestTargets(''):Promise.resolve(null)
         ]);
         if(requestId!==targetRequestId)return;
         targetData=payload;
+        if(targetLoadError){status.textContent="Oceny celów wczytane.";targetLoadError=false;}
         if(!selectedPlayer)viewerData=payload;else if(own)viewerData=own;
         renderTargets();
         if(currentReport)render(currentReport);
       } catch(e) {
         if(requestId!==targetRequestId)return;
         if(!targetPlayer){viewerData=null;if(currentReport)render(currentReport);}
-        targetBox.textContent = 'Nie udało się wczytać celów: '+e.message;
+        targetLoadError=true;
+        const message='Nie udało się wczytać celów: '+e.message;
+        status.textContent=message;
+        targetBox.innerHTML='<p>'+escape(message)+'</p><button type="button" data-target-retry>Spróbuj ponownie</button>';
       }
     }
     targetBox.onchange = event => {
@@ -273,6 +300,7 @@
       if (event.target.matches('[data-target-gang]')) { targetGang=event.target.value; renderTargets(); }
     };
     targetBox.onclick = event => {
+      if(event.target.matches('[data-target-retry]')){loadTargets();return;}
       if (event.target.matches('[data-target-expand]')) {
         const expanded=targetBox.classList.toggle('league-targets-expanded');
         event.target.textContent=expanded?'Pokaż tylko 6 celów':'Pokaż pozostałe cele';
@@ -379,7 +407,7 @@
       async open(api) {
         request = api;
         targetPlayer = '';
-        targetData = null;
+        targetData = null;targetLoadError=false;
         viewerData = null;targetRequestId++;
         if(dialog.close)dialog.close();dialog.innerHTML='';
         targetBox.textContent = '';
