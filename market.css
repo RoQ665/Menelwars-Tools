@@ -36,3 +36,6 @@
 .market-watch-card .market-watch-bell{font-size:20px;min-width:44px;min-height:44px;align-self:start;opacity:.55}.market-watch-card .market-watch-bell[aria-pressed=true]{opacity:1;background:#e5efdd;border-color:#88a779}.market-watch-card .market-watch-bell:focus-visible{outline:2px solid #277056;outline-offset:2px}
 
 .market-watch-heading{display:flex;align-items:center;gap:8px;flex-basis:100%;min-width:0}.market-watch-heading .market-name-link{border:0;background:none;box-shadow:none;color:#3b4030;padding:0;cursor:pointer;flex:1;min-width:0;text-align:left;font:600 14px system-ui;overflow-wrap:anywhere}.market-watch-card .market-watch-bell{flex:0 0 44px;width:44px;padding:6px;border:1px solid #cfc3ad;border-radius:6px;background:#fffdf6;cursor:pointer}
+
+.market-chart-legend span.market-paser-legend:before{background:repeating-linear-gradient(90deg,#9b4b77 0 10px,transparent 10px 14px)}
+.market-below-paser{background:#edf5eb}.market-paser-flag{display:block;color:#35653b;font:600 10px/1.5 system-ui;margin-top:5px}

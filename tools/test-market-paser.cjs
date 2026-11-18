@@ -1,0 +1,11 @@
+const assert=require('node:assert/strict'),C=require('../market-chart.js');
+const meta={id:2,paserPrice:100,tradable:true},item={id:2,level:0,price:50,quantity:10};
+assert.equal(C.paserPrice(item,meta),100);assert.equal(C.belowPaser(item,meta),true);
+for(const change of [{price:100},{price:101},{price:null},{price:NaN},{quantity:0},{level:1},{id:3}])assert.equal(C.belowPaser({...item,...change},meta),false,JSON.stringify(change));
+assert.equal(C.belowPaser({...item,price:0},meta),true);
+assert.equal(C.paserPrice(item,null),null);assert.equal(C.paserPrice(item,{...meta,tradable:false}),null);assert.equal(C.paserPrice(item,{...meta,paserPrice:'100'}),null);
+const t=Date.parse('2026-11-18T12:00:00Z'),points=[{at:t-1000,seenAt:t-1000,item:{price:50,quantity:4}},{at:t,seenAt:t,item:{price:60,quantity:3}}];
+const baseline=C.series(points,7,t,55),withPaser=C.series(points,7,t,55,100);
+assert.doesNotMatch(baseline.svg,/data-paser-line/);assert.match(withPaser.svg,/data-paser-line/);assert.match(withPaser.svg,/Paser · cena bazowa: 100 zł/);assert.match(withPaser.svg,/Mediana 7 dni: 55 zł/);assert.ok(withPaser.priceScale.max>=100);assert.equal(withPaser.minimum,50);assert.equal(withPaser.maximum,60);assert.deepEqual(withPaser.deltas,[null,-1]);assert.doesNotMatch(withPaser.svg,/NaN|Infinity/);
+assert.doesNotMatch(C.series(points,7,t,null,NaN).svg,/data-paser-line|NaN/);assert.equal(C.series([],7,t,null,100).svg,'');
+console.log('PASS: Paser price line, scale, median, profit eligibility, missing/invalid prices, upgraded variants and unavailable stock.');

@@ -8,10 +8,10 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon-192.png">
   <link rel="apple-touch-icon" href="icon-192.png">
-  <link rel="stylesheet" href="styles.css?v=24.79">
+  <link rel="stylesheet" href="styles.css?v=24.80">
   <link rel="stylesheet" href="league.css?v=24.56">
   <link rel="stylesheet" href="battle-analyzer.css?v=24.55">
-  <link rel="stylesheet" href="market.css?v=24.62">
+  <link rel="stylesheet" href="market.css?v=24.80">
   <title>MenelWars Tools</title>
 
   <style>
@@ -761,7 +761,9 @@
  <button type="button" id="market-watch-alerts" class="market-watch-alert" hidden></button><p id="market-desk-message" class="market-help" role="status"></p>
  <nav class="market-subtabs" aria-label="Widok giełdy"><button type="button" data-market-pane="quotes" class="active" aria-pressed="true">Notowania</button><button type="button" data-market-pane="collections" aria-pressed="false">Kolekcje · cena za monetę</button><button type="button" data-market-pane="watch" aria-pressed="false">☆ Obserwowane <span id="market-watch-count"></span></button><button type="button" data-market-pane="loot" aria-pressed="false">Wybór lootu</button><button type="button" data-market-pane="trade" aria-pressed="false">Handel · marża</button><button type="button" data-market-pane="inventory" aria-pressed="false">Mój ekwipunek</button></nav>
  <div id="market-quotes-pane">
- <form id="market-search-form" class="market-toolbar" role="search" autocomplete="off"><div class="market-search-wrap"><span aria-hidden="true">⌕</span><input id="market-search" name="market-item-filter" type="search" placeholder="Nazwa przedmiotu…" aria-label="Szukaj przedmiotu" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other"></div><select id="market-filter" name="market-availability-filter" aria-label="Filtr rynku"><option value="">Wszystkie przedmioty</option><option value="listed">Tylko dostępne</option><option value="fall">Spadki cen</option><option value="rise">Wzrosty cen</option><option value="missing">Brak ofert</option><option value="watched">Obserwowane</option><option value="signals">Sygnały ceny i sztuk</option></select><button id="market-refresh" type="button">↻ Odśwież</button></form>
+ <form id="market-search-form" class="market-toolbar" role="search" autocomplete="off"><div class="market-search-wrap"><span aria-hidden="true">⌕</span><input id="market-search" name="market-item-filter" type="search" placeholder="Nazwa przedmiotu…" aria-label="Szukaj przedmiotu" autocomplete="off" autocapitalize="none" spellcheck="false" data-lpignore="true" data-1p-ignore="true" data-form-type="other"></div><select id="market-filter" name="market-availability-filter" aria-label="Filtr rynku"><option value="">Wszystkie przedmioty</option><option value="listed">Tylko dostępne</option><option value="fall">Spadki cen</option><option value="rise">Wzrosty cen</option><option value="missing">Brak ofert</option><option value="watched">Obserwowane</option><option value="signals">Sygnały ceny i sztuk</option><option value="paser">Poniżej ceny Pasera</option></select><button id="market-refresh" type="button">↻ Odśwież</button></form>
+ <label class="collection-budget-filter"><input id="market-paser-first" type="checkbox" checked disabled> Najpierw poniżej ceny Pasera</label>
+ <p id="market-paser-note" class="market-help" role="status"></p>
  <div id="market-active-filter" class="market-active-filter" hidden><span id="market-active-filter-label"></span><button type="button" id="market-clear-search">Wyczyść filtry ✕</button></div>
  <p id="market-count" class="market-help"></p><div class="market-table-wrap"><table><thead><tr><th><button data-market-sort="name" data-label="Przedmiot">Przedmiot</button></th><th><button data-market-sort="price" data-label="Cena minimalna">Cena minimalna</button></th><th><button data-market-sort="change" data-label="Zmiana 24h">Zmiana 24h</button></th><th><button data-market-sort="quantity" data-label="Sztuk">Sztuk</button></th></tr></thead><tbody id="market-rows"></tbody></table></div>
  <p class="market-help">Cena: zmiana 24h względem dostępnego wcześniejszego odczytu (do 6h odstępu od punktu odniesienia). Sztuki: zmiana między ostatnimi migawkami. To dane ofertowe, nie potwierdzone transakcje. Historia do 30 dni.</p>
@@ -2339,7 +2341,7 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
   <script src="item-catalog.js?v=22.79"></script>
   <script src="league-parser.js?v=24.78"></script>
   <script src="navigation.js?v=24.39"></script>
-  <script src="market-chart.js?v=24.44"></script>
+  <script src="market-chart.js?v=24.80"></script>
   <script src="collections.js?v=24.53"></script>
   <script src="collection-history.js?v=24.52"></script>
   <script src="market-inventory.js?v=24.52"></script>
@@ -2347,14 +2349,14 @@ Obierki po ziemniakach&#9;Turbo drożdże&#9;Woda z kranu&#9;3&#9;4,18"
   <script src="market-finance.js?v=24.52"></script>
   <script src="market-inventory-view.js?v=24.52"></script>
   <script src="market-desk.js?v=24.62"></script>
-  <script src="market.js?v=24.52"></script>
+  <script src="market.js?v=24.80"></script>
   <script src="battle-analyzer.js?v=24.55"></script>
   <script src="battle-analyzer-view.js?v=24.55"></script>
   <script src="raid-cooldowns-view.js?v=24.61"></script>
-  <script src="drink-reminder-view.js?v=24.79"></script>
+  <script src="drink-reminder-view.js?v=24.80"></script>
   <script src="investment-reminder-view.js?v=24.63"></script>
-  <script src="garden-growth.js?v=24.79"></script>
-  <script src="garden-reminder-view.js?v=24.79"></script>
-  <script src="app.js?v=24.79"></script>
+  <script src="garden-growth.js?v=24.80"></script>
+  <script src="garden-reminder-view.js?v=24.80"></script>
+  <script src="app.js?v=24.80"></script>
 </body>
 </html>
