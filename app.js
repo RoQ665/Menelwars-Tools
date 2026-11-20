@@ -169,11 +169,11 @@
     const testState=experimentalUiTestState();
     let gardenReady=Boolean(testState.gardenReady);
     try {
-      gardenReady=gardenReady||[1,2,3,4,5,6].some(plot=>gardenReadyReminderDue(gardenOwnExperimentForPlot(plot)));
+      gardenReady=gardenReady||[1,2,3,4,5,6,7,8].some(plot=>gardenReadyReminderDue(gardenOwnExperimentForPlot(plot)));
     } catch (_) {}
     let gardenQuestion=false;
     try {
-      gardenQuestion=[1,2,3,4,5,6].some(plot=>{
+      gardenQuestion=[1,2,3,4,5,6,7,8].some(plot=>{
         const item=gardenOwnExperimentForPlot(plot);
         return item&&gardenNeedsModelCheck(item,gardenPhaseSummary(item));
       });
@@ -13625,7 +13625,7 @@ function setupAdmin() {
   const GARDEN_PLOT_VIEW_KEY = "menelwars_garden_plot_view_v1";
   let gardenData = {active:[],results:[],phases:[],plants:["Cebula"],maxPlots:4};
   let gardenSelectedPlot = 1;
-  let gardenPlotViewCount = localStorage.getItem(GARDEN_PLOT_VIEW_KEY)==="6" ? 6 : 4;
+  let gardenPlotViewCount = [4,6,8].includes(Number(localStorage.getItem(GARDEN_PLOT_VIEW_KEY))) ? Number(localStorage.getItem(GARDEN_PLOT_VIEW_KEY)) : 4;
   let gardenResultsSelectedPlant = "";
   let gardenLiveRefreshInFlight = null;
   let gardenDataFetchedAt = 0;
@@ -14968,16 +14968,14 @@ function setupAdmin() {
         return `${item.id}:${gardenDisplayFrame(item,summary)}:${gardenNeedsModelCheck(item,summary) ? 1 : 0}:${growingMinute}`;
       }).join("|");
 
-    const availablePlots=Number(gardenData.maxPlots)===6?6:4;
-    const highestActivePlot=gardenOwnExperimentForPlot(6)?6:gardenOwnExperimentForPlot(5)?5:0;
+    const availablePlots=[4,6,8].includes(Number(gardenData.maxPlots))?Number(gardenData.maxPlots):4;
+    const highestActivePlot=Math.max(0,...Array.from({length:availablePlots},(_,i)=>i+1).filter(plot=>gardenOwnExperimentForPlot(plot)));
     const visiblePlots=Math.min(availablePlots,Math.max(gardenPlotViewCount,highestActivePlot));
     if(gardenSelectedPlot>visiblePlots)gardenSelectedPlot=1;
     host.classList.toggle("six-plots",visiblePlots===6);
     const plotToggle=document.querySelector("[data-garden-plot-toggle]");
     if (plotToggle) {
-      const six=gardenPlotViewCount===6;
-      plotToggle.setAttribute("aria-checked",six?"true":"false");
-      plotToggle.setAttribute("aria-label",six?"Pokaż 4 grządki":"Pokaż 6 grządek");
+      plotToggle.value=String(gardenPlotViewCount);
     }
     host.innerHTML = Array.from({length:visiblePlots},(_,index)=>index+1).map(plot => {
       const active = gardenOwnExperimentForPlot(plot);
@@ -15648,8 +15646,8 @@ function setupAdmin() {
     });
     el("garden-race-sort")?.addEventListener("change",gardenRenderRace);
     el("garden-ready")?.addEventListener("click",gardenRecordReady);
-    document.querySelector("[data-garden-plot-toggle]")?.addEventListener("click",()=>{
-      gardenPlotViewCount=gardenPlotViewCount===6?4:6;
+    document.querySelector("[data-garden-plot-toggle]")?.addEventListener("change",event=>{
+      gardenPlotViewCount=Number(event.target.value);
       localStorage.setItem(GARDEN_PLOT_VIEW_KEY,String(gardenPlotViewCount));
       gardenRenderPlots();
       gardenRenderEditor();

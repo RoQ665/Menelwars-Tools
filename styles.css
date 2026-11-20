@@ -4531,3 +4531,5 @@ body.experimental-ui .garden-plot-attention{background:#b77726;box-shadow:0 2px 
 @media(prefers-reduced-motion:reduce){body.experimental-ui *,body.experimental-ui *::before,body.experimental-ui *::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 
 .special-ops-transfer-card>p.special-ops-transfer-transition{padding:12px;border:2px solid #b77b22;border-radius:8px;background:#fff1ce;color:#573800}.special-ops-transfer-transition b{display:block;margin-bottom:4px}.special-ops-transfer-nav button{overflow-wrap:anywhere}
+
+.garden-plot-view-control select{padding:9px 12px;border:1px solid #bda887;border-radius:10px;background:#eee3d1;color:#695943;font:inherit;font-weight:700}

@@ -1,18 +1,18 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v24.80";
+const CACHE = "menelwars-tools-v24.81";
 // Jednorazowy most z wersji 22.45. Przy następnym wydaniu wraca na false,
 // a o automacie decyduje już strona: samoczynnie tylko na ekranie głównym.
 const FORCE_THIS_RELEASE = false;
 const CORE_ASSETS = [
   "./",
   "./index.html",
-  "./styles.css?v=24.80",
+  "./styles.css?v=24.81",
   "./data.js?v=21.05",
-  "./app.js?v=24.80",
-  "./garden-growth.js?v=24.80",
-  "./garden-reminder-view.js?v=24.80",
-  "./drink-reminder-view.js?v=24.80",
+  "./app.js?v=24.81",
+  "./garden-growth.js?v=24.81",
+  "./garden-reminder-view.js?v=24.81",
+  "./drink-reminder-view.js?v=24.81",
   "./investment-reminder-view.js?v=24.63",
   "./raid-cooldowns-view.js?v=24.61",
   "./battle-analyzer.js?v=24.55",
@@ -23,7 +23,7 @@ const CORE_ASSETS = [
   "./league-target-worker.js?v=24.78",
   "./league.css?v=24.56",
   "./item-catalog.js?v=22.79",
-  "./market.js?v=24.80",
+  "./market.js?v=24.81",
   "./market-desk.js?v=24.62",
   "./market-inventory.js?v=24.52",
   "./market-inventory-view.js?v=24.52",
@@ -31,8 +31,8 @@ const CORE_ASSETS = [
   "./market-finance.js?v=24.52",
   "./market-plan-worker.js?v=24.52",
   "./market-item-data.json?v=24.44",
-  "./market.css?v=24.80",
-  "./market-chart.js?v=24.80",
+  "./market.css?v=24.81",
+  "./market-chart.js?v=24.81",
   "./collections.js?v=24.53",
   "./collection-history.js?v=24.52",
   "./collections-data.json?v=24.41",
