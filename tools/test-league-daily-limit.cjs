@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict');
+const {dailyAttackLimit,attackBudget}=require('../league-parser.js');
+const {parseRoster}=require('../../Menelwars-Cloudflare-Backend/src/league-roster.cjs');
+const players=[{name:'A',gang:'Gang',attacks:8},{name:'B',gang:'Gang',attacks:3,pendingAttack:1},{name:'Rival',gang:'Other',attacks:4}];
+assert.equal(dailyAttackLimit('2026-11-21'),10);
+assert.equal(dailyAttackLimit('2026-11-22'),8);
+assert.equal(dailyAttackLimit('2027-01-01'),8);
+assert.deepEqual(attackBudget({date:'2026-11-21',players},'Gang'),{players:2,used:10,remaining:10,capacity:20});
+assert.deepEqual(attackBudget({date:'2026-11-22',players},'Gang'),{players:2,used:10,remaining:6,capacity:16});
+assert.deepEqual(attackBudget({date:'2026-11-22',players:[{name:'A',gang:'Gang',attacks:8}]},'Gang'),{players:1,used:8,remaining:0,capacity:8});
+assert.equal(attackBudget({date:'2026-11-22',players:[{name:'A',gang:'Gang',attacks:10}]},'Gang').remaining,0);
+const page=count=>`Rywal dnia: Other\nZnaleziono 1 graczy\nRival\nOther\n1000prestiżu\nWygrana\n+100 XP\nPorażka\n−200 XP\nAtakowany dziś: ${count}\nZadania`;
+for(const count of ['0/8','8 / 8','0/10','10/10'])assert.equal(parseRoster(page(count)).players.length,1);
+for(const count of ['9/8','11/10','0/9','x/8'])assert.throws(()=>parseRoster(page(count)));
+console.log('PASS: 8 attacks from new edition, historical 10 retained, exhausted budgets and old/new opponent imports.');

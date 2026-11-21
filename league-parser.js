@@ -58,7 +58,12 @@
     const few=count%10>=2&&count%10<=4&&!(count%100>=12&&count%100<=14);
     return {verb:few?'Pozostały':'Pozostało',noun:few?'ataki':'ataków'};
   }
+  function dailyAttackLimit(date) {
+    // New edition starts on 22 November; historical matches retain their budget.
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(date)) && date >= '2026-11-22' ? 8 : 10;
+  }
   function attackBudget(data,gang) {
+    const limit=dailyAttackLimit(data.date);
     const players=new Map();
     for(const p of data.players||[])if(p.gang===gang){
       const key=String(p.name).normalize('NFKC').trim().toLocaleLowerCase('pl');
@@ -66,8 +71,8 @@
       players.set(key,Math.max(players.get(key)||0,used));
     }
     const used=[...players.values()].reduce((sum,n)=>sum+n,0);
-    const remaining=[...players.values()].reduce((sum,n)=>sum+Math.max(0,10-n),0);
-    return {players:players.size,used,remaining,capacity:players.size*10};
+    const remaining=[...players.values()].reduce((sum,n)=>sum+Math.max(0,limit-n),0);
+    return {players:players.size,used,remaining,capacity:players.size*limit};
   }
   const matchKey = data => JSON.stringify([data.date, ...[data.gangA,data.gangB].sort()]);
   function saveMatch(storage, text, now = new Date().toISOString()) {
@@ -104,7 +109,7 @@
       return sign*(column==='name'?a.name.localeCompare(b.name,'pl'):a[column]-b[column])||a.name.localeCompare(b.name,'pl');
     });
   }
-  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory, sortPlayers, attackBudget, remainingAttackLabel};
+  if (typeof module !== 'undefined' && module.exports) module.exports = {parse, matchKey, saveMatch, readHistory, sortPlayers, attackBudget, remainingAttackLabel, dailyAttackLimit};
   if (typeof document === 'undefined') return;
   const init = () => {
     const button = document.getElementById('league-parse');
