@@ -59,8 +59,8 @@
     return {verb:few?'Pozostały':'Pozostało',noun:few?'ataki':'ataków'};
   }
   function dailyAttackLimit(date) {
-    // New edition starts on 22 November; historical matches retain their budget.
-    return /^\d{4}-\d{2}-\d{2}$/.test(String(date)) && date >= '2026-11-22' ? 8 : 10;
+    // New edition starts on 21 November; historical matches retain their budget.
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(date)) && date >= '2026-11-21' ? 8 : 10;
   }
   function attackBudget(data,gang) {
     const limit=dailyAttackLimit(data.date);
