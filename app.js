@@ -225,7 +225,6 @@
     experimentalUiMark('[data-gang-menu-target="demand-view"]',demandOffer?"action":"",demandOffer?"Ktoś ma Twój przedmiot":"");
   }
 
-  const COMPANY_MIN_CONTRIBUTION = 30000;
   const COMPANY_BASE_SALARY = 160;
   const COMPANY_SALARY_RATIO = 0.50;
 
@@ -4985,11 +4984,12 @@ async function loadAccountAdminPermissions(
         💾 Wpłaty: snapshot z <strong>${escapeHtml(formatPaymentsDateTime(snapshotLabel))}</strong>
       </div>
 
+      <p class="muted">Każdy otrzymuje 160 zł podstawy. Dodatek z pozostałej puli pensji zależy od dodatniego łącznego wkładu: salda wpłat, Funduszu i Wysypiska AI. Ujemne saldo wpłat pomniejsza tę sumę.</p>
       <div class="company-grid">
         <div class="company-stat"><small>Dzienny dochód</small><b>${money(payload.companyIncome)}</b></div>
         <div class="company-stat"><small>Budżet pensji 50%</small><b>${money(payload.salaryBudget)}</b></div>
         <div class="company-stat"><small>Rozwój 50%</small><b>${money(payload.developmentBudget)}</b></div>
-        <div class="company-stat"><small>Udziałowcy ≥ ${companyMoney(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION)} zł</small><b>${Number(payload.eligibleCount) || 0}</b></div>
+        <div class="company-stat"><small>Osoby w planie pensji</small><b>${Number(payload.eligibleCount) || 0}</b></div>
       </div>
 
       ${
@@ -5076,7 +5076,7 @@ async function loadAccountAdminPermissions(
                   </div>
                 </div>
               `).join("")
-            : `<div class="empty">Nikt nie osiągnął jeszcze progu ${companyMoney(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION)} zł wkładu.</div>`
+            : `<div class="empty">Brak graczy w planie pensji.</div>`
         }
       </div>
 
@@ -8815,7 +8815,7 @@ function buildAdminDailyReport(payload) {
 Każdego dnia naliczany jest wymóg ${companyMoney(payload&&payload.paymentDailyMinimum||2000)} zł.
 Nadpłata przechodzi na kolejne dni i jednocześnie stanowi wkład w firmę.
 
-🏢 Od ${companyMoney(payload?.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION)} zł wkładu gracz kwalifikuje się do udziału w spółce.
+🏢 Spółka bez progu wejścia: każdy otrzymuje minimum 160 zł. Dodatnia suma wkładu z wpłat, Funduszu i Wysypiska AI daje udział w pozostałej puli pensji.
 
 \`\`\`
 ${rows}
@@ -8967,16 +8967,7 @@ function renderAdminCompanyPlan(
       payload,
       income
     );
-  const companyMinimum = Number(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION);
   const canManageSalaryWaivers=Boolean(cachedAccountStatus?.admin&&Number(cachedAccountStatus.adminTier)>=2);
-
-  // Osoby, które były w ostatnim potwierdzonym planie, ale dziś
-  // nie osiągają progu, znikają z listy pensji. Wymagają osobnej akcji w grze.
-  const dismissRows = (Array.isArray(payload.players) ? payload.players : [])
-    .filter(player => Boolean(player.activeEligible) &&
-      Number(player.contribution) < companyMinimum)
-    .sort((a, b) => Number(a.contribution) - Number(b.contribution) ||
-      String(a.nick || "").localeCompare(String(b.nick || ""), "pl", { sensitivity: "base" }));
 
   const totalContribution =
     (Array.isArray(payload.players)
@@ -9098,7 +9089,7 @@ function renderAdminCompanyPlan(
 
   let rowsHtml = "";
   if (!orderedRows.length) {
-    rowsHtml = `<div class="empty">Nikt nie osiągnął jeszcze progu ${companyMoney(companyMinimum)} zł.</div>`;
+    rowsHtml = `<div class="empty">Brak graczy w planie pensji.</div>`;
   } else if (anyNeedsAction) {
     const changed = orderedRows.filter(row => row.needsAction);
     const correct = orderedRows.filter(row => !row.needsAction);
@@ -9207,16 +9198,10 @@ function renderAdminCompanyPlan(
     </div>
 
     <div class="muted" style="margin-bottom:6px">
-      Próg zatrudnienia:
-      <b>
-        ${companyMoney(
-          companyMinimum
-        )} zł
-      </b>.
-      Każdy zakwalifikowany dostaje najpierw
+      Bez progu wejścia. Każdy dostaje najpierw
       <b>${COMPANY_BASE_SALARY} zł</b>,
       a pozostała część 50% dochodu jest
-      dzielona według wagi <b>wkład<sup>0,8</sup></b>.
+      dzielona według wagi <b>dodatni łączny wkład<sup>0,8</sup></b>. Wkład to suma salda wpłat, Funduszu i Wysypiska AI. Przy zerowym lub ujemnym łącznym wkładzie pensja wynosi 160 zł.
       Pensję do gry zawsze ucinamy do pełnych złotych.
     </div>
 
@@ -9234,24 +9219,6 @@ function renderAdminCompanyPlan(
         <span>Możesz ustawić lub wycofać zrzeczenie w imieniu gracza, który Cię o to poprosił. Zmiana trafi do proponowanego planu pensji.</span>
       </div>
       <div id="admin-company-waiver-manager-status" class="submit-status"></div>` : ""}
-
-    ${dismissRows.length ? `
-      <div class="admin-company-salary-section dismiss-section">
-        <div class="admin-company-salary-section-head">
-          <strong>⛔ DO ZWOLNIENIA ZE SPÓŁKI</strong>
-          <span>${dismissRows.length} ${dismissRows.length === 1 ? "osoba" : "osób"}</span>
-        </div>
-        <div class="admin-company-dismiss-note">Według ostatniego potwierdzonego planu te osoby miały etat, ale ich obecny wkład spadł poniżej ${companyMoney(companyMinimum)} zł. Sprawdź i usuń ich etat w grze przed potwierdzeniem nowego planu.</div>
-        ${dismissRows.map(player => `
-          <div class="admin-company-salary-row needs-change">
-            <div class="admin-company-salary-player">
-              <div class="admin-company-player-name"><strong>${escapeHtml(player.nick)}</strong></div>
-              <div class="muted">Wkład: ${companyMoney(player.contribution)} zł · brakuje ${companyMoney(companyMinimum - Number(player.contribution))} zł do progu</div>
-              <div class="admin-company-current-salary">Ostatnio ustawiona pensja: <strong>${companyMoney(player.activePayoutSalary)} zł</strong></div>
-            </div>
-            <div class="admin-company-instruction dismiss"><span>⛔ ZWOLNIJ W GRZE</span></div>
-          </div>`).join("")}
-      </div>` : ""}
 
     ${rowsHtml}
   `;
@@ -9371,10 +9338,7 @@ async function loadAdminPaymentsStatus() {
     if(dailyMinimumInput)dailyMinimumInput.value=String(Number(payload.paymentDailyMinimum)||2000);
     const aiDailyMinimumInput=el("admin-ai-dump-daily-minimum");
     if(aiDailyMinimumInput)aiDailyMinimumInput.value=String(payload.aiDump?.dailyMinimum ?? 20);
-    const companyMinimumInput=el("admin-company-minimum-contribution");
-    if(companyMinimumInput)companyMinimumInput.value=String(payload.companyMinimumContribution ?? COMPANY_MIN_CONTRIBUTION);
-
-    renderAdminCompanyPlan(
+renderAdminCompanyPlan(
       payload
     );
 
@@ -9825,24 +9789,6 @@ function setupAdmin() {
         await runtimeLoaderFinish(`✅ Składka AI ${result.amount} pkt od ${formatAdminDate(result.effectiveFrom)}`);
       } catch(err) {
         const status=el("admin-status");if(status)status.textContent=err?.message||"Nie udało się zapisać składki AI.";
-        await runtimeLoaderFinish("❌ Aktualizacja nieudana");
-      } finally { input.disabled=false; }
-    });
-
-  el("admin-company-minimum-contribution")
-    ?.addEventListener("change",async event=>{
-      const input=event.target,amount=Number(String(input.value||"").replace(/\s+/g,"").replace(",","."));
-      if(!Number.isFinite(amount)||amount<=0){
-        const status=el("admin-status");if(status)status.textContent="Próg zatrudnienia musi być większy od 0 zł.";
-        await loadAdminPaymentsStatus();return;
-      }
-      input.disabled=true;
-      try {
-        await adminPostAction("adminSetCompanyMinimumContribution",{amount});
-        await loadAdminPaymentsStatus();
-        await runtimeLoaderFinish("✅ Próg zatrudnienia zaktualizowany");
-      } catch(err) {
-        const status=el("admin-status");if(status)status.textContent=err?.message||"Nie udało się zapisać progu zatrudnienia.";
         await runtimeLoaderFinish("❌ Aktualizacja nieudana");
       } finally { input.disabled=false; }
     });
