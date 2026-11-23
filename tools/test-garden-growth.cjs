@@ -6,6 +6,7 @@ const results=[40,50,60].map((h,i)=>({...candidate,id:'r'+i,durationMs:h*hour,st
 const data={results,active:[],phases:[]};assert.equal(predict(data,candidate).predictedMs,50*hour);
 assert.equal(estimate(data,candidate).source,'model');
 assert.equal(predict(data,{...candidate,plant:'Cebula'}),null);
+assert.equal(predict(data,{...candidate,plant:'Rzeżucha'}),null,'cress never borrows potato measurements');
 assert.equal(predict(data,{...candidate,ph:0}),null);
 const lower=predict({...data,active:[{...candidate,startedAt:hour,lastNotReadyAt:71*hour}]},candidate);
 assert.ok(lower.predictedMs>50*hour);
