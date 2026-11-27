@@ -15294,7 +15294,7 @@ function setupAdmin() {
       : serverPhases;
     const nextGardenData = {
       plants:Array.isArray(payload.plants) ? payload.plants : ["Cebula"],
-      maxPlots:Number(payload.maxPlots)===6?6:4,
+      maxPlots:[4,6,8].includes(Number(payload.maxPlots))?Number(payload.maxPlots):4,
       active:Array.isArray(payload.active) ? payload.active : [],
       results:Array.isArray(payload.results) ? payload.results : [],
       phases
