@@ -145,6 +145,7 @@
   }
 
   function gardenObservationForModel(item) {
+    if(item?.modelVersion==="GAME_TIME" && Number(item.durationMs)>0) return {duration:Number(item.durationMs),source:"GAME_TIME",weight:1};
     if (gardenUsesAutoModel(item)) {
       const evidence=gardenEvidenceForResult(item);
       if (!evidence.duration) return null;

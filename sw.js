@@ -1,17 +1,17 @@
 "use strict";
 
-const CACHE = "menelwars-tools-v24.88";
+const CACHE = "menelwars-tools-v24.89";
 // Jednorazowy most z wersji 22.45. Przy następnym wydaniu wraca na false,
 // a o automacie decyduje już strona: samoczynnie tylko na ekranie głównym.
 const FORCE_THIS_RELEASE = false;
 const CORE_ASSETS = [
-  "./cress-growth-atlas-20261121.png?v=24.88",
+  "./cress-growth-atlas-20261121.png?v=24.89",
   "./",
   "./index.html",
-  "./styles.css?v=24.88",
+  "./styles.css?v=24.89",
   "./data.js?v=21.05",
-  "./app.js?v=24.88",
-  "./garden-growth.js?v=24.81",
+  "./app.js?v=24.89",
+  "./garden-growth.js?v=24.89",
   "./garden-reminder-view.js?v=24.81",
   "./drink-reminder-view.js?v=24.81",
   "./investment-reminder-view.js?v=24.63",

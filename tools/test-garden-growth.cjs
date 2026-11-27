@@ -13,3 +13,7 @@ assert.ok(lower.predictedMs>50*hour);
 const auto={...candidate,id:'auto',modelVersion:'AUTO52',startedAt:hour,finishedAt:81*hour,durationMs:80*hour};
 assert.equal(predict({results:[auto,auto,auto]},candidate),null,'late harvest alone cannot extend model');
 console.log('Shared garden model: fallback, kernel estimate, plant separation, distant data, not-ready bounds and late harvest exclusion — OK');
+
+const direct={...auto,plant:'Rzeżucha',modelVersion:'GAME_TIME',startSource:'MANUAL',durationMs:74.8*hour};
+const measured=predict({results:[direct,direct,direct],active:[],phases:[]},{...candidate,plant:'Rzeżucha'});
+assert.ok(measured&&Math.abs(measured.predictedMs-74.8*hour)<1,'game duration must train model even after fallback deadline');

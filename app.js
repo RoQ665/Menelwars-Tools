@@ -14063,6 +14063,7 @@ function setupAdmin() {
     const routes={
       gardenStart:"/garden/start",
       gardenFinish:"/garden/finish",
+      gardenResult:"/garden/result",
       gardenCancel:"/garden/cancel",
       gardenPhase:"/garden/phase",
       gardenCheck:"/garden/check",
@@ -14518,6 +14519,7 @@ function setupAdmin() {
   }
 
   function gardenObservationForModel(item) {
+    if(item?.modelVersion==="GAME_TIME" && Number(item.durationMs)>0) return {duration:Number(item.durationMs),source:"GAME_TIME",weight:1};
     if (gardenUsesAutoModel(item)) {
       const evidence=gardenEvidenceForResult(item);
       if (!evidence.duration) return null;
@@ -14869,8 +14871,9 @@ function setupAdmin() {
     (gardenData.results||[]).filter(item=>String(item&&item.plant||"")===gardenResultsSelectedPlant).forEach(item=>{
       if (!item || !Number.isFinite(Number(item.durationMs)) || Number(item.durationMs)<=0) return;
       const key=gardenComboKey(item);
-      const current=groups.get(key) || {item,times:[],latest:0};
+      const current=groups.get(key) || {item,times:[],latest:0,direct:0};
       current.times.push(Number(item.durationMs));
+      if(item.modelVersion==="GAME_TIME")current.direct++;
       current.latest=Math.max(current.latest,Number(item.finishedAt)||0);
       groups.set(key,current);
     });
@@ -14895,7 +14898,7 @@ function setupAdmin() {
         ? "1 zgłoszony zbiór"
         : `${row.times.length} zgłoszone zbiory · najkrótszy zapis ${escapeHtml(gardenFormatDuration(row.fastest))}`;
       const label=index===0&&resultSort==="time" ? "najkrótszy zapis" : `${row.times.length} ${row.times.length===1?"zbiór":"zbiory"}`;
-      return `<div class="garden-race-row ${index===0&&resultSort==="time"?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.plant)} · ☀️${item.sun}% 💧${item.water}% pH ${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>${summary}</span><span class="garden-result-times">czas${row.times.length===1?"":"y"} zbioru: ${times}</span></div></div><span class="garden-race-label">${escapeHtml(label)}</span></div>`;
+      return `<div class="garden-race-row ${index===0&&resultSort==="time"?"leader":""}"><div class="garden-race-main"><strong>${escapeHtml(item.plant)} · ☀️${item.sun}% 💧${item.water}% pH ${Number(item.ph).toFixed(1)}</strong><div class="garden-race-meta"><span>${summary}${row.direct?` · ${row.direct} z czasem podanym przez grę`:""}</span><span class="garden-result-times">czas${row.times.length===1?"":"y"} zbioru: ${times}</span></div></div><span class="garden-race-label">${escapeHtml(label)}</span></div>`;
     }).join("")}</div>`;
     host.querySelectorAll("[data-garden-result-plant]").forEach(button=>button.addEventListener("click",()=>{
       gardenResultsSelectedPlant=String(button.dataset.gardenResultPlant||"");
@@ -15117,7 +15120,7 @@ function setupAdmin() {
     const lines = [];
 
     if (result) {
-      const manualHint = String(result.startSource || "").toUpperCase() === "MANUAL"
+      const manualHint = result.modelVersion==="GAME_TIME" ? ` <small class="garden-manual-hint">czas wzrostu przepisany z gry</small>` : String(result.startSource || "").toUpperCase() === "MANUAL"
         ? ` <small class="garden-manual-hint">🟡 start wpisany ręcznie</small>`
         : "";
       if (gardenUsesAutoModel(result)) {
@@ -15326,6 +15329,26 @@ function setupAdmin() {
     const nick = String(entered || "").trim();
     if (nick) localStorage.setItem(NICK_KEY,nick);
     return nick;
+  }
+
+  async function gardenRecordGameTime(event) {
+    event.preventDefault();
+    const status=el("garden-result-status"),button=el("garden-result-save");
+    if(button.disabled)return;
+    const hours=Number(el("garden-result-hours").value),minutes=Number(el("garden-result-minutes").value);
+    const durationMs=(hours*60+minutes)*60000;
+    if(!Number.isSafeInteger(hours)||!Number.isSafeInteger(minutes)||hours<0||minutes<0||minutes>59||durationMs<60000||durationMs>30*86400000){status.textContent="Podaj czas od 1 minuty do 720 godzin.";return;}
+    button.disabled=true;
+    try {
+      const nick=await gardenResolveNick();if(!nick)return;
+      status.textContent="Zapisuję wynik…";
+      await gardenPostAction("gardenResult",{nick,plant:el("garden-result-plant").value,
+        sun:Number(el("garden-result-sun").value),water:Number(el("garden-result-water").value),ph:Number(el("garden-result-ph").value),durationMs});
+      status.textContent=`✅ Zapisano czas z gry: ${gardenFormatDuration(durationMs)}.`;
+      gardenResultsSelectedPlant=el("garden-result-plant").value;
+      await gardenFetchData({force:true});
+    }catch(err){status.textContent=`❌ ${err.message||"Nie udało się zapisać wyniku."}`;}
+    finally{button.disabled=false;}
   }
 
   async function gardenStartCultivation() {
@@ -15585,6 +15608,7 @@ function setupAdmin() {
     });
 
     el("garden-start")?.addEventListener("click",gardenStartCultivation);
+    el("garden-result-form")?.addEventListener("submit",gardenRecordGameTime);
     el("garden-finish")?.addEventListener("click",gardenFinishCultivation);
     el("garden-cancel")?.addEventListener("click",gardenCancelCultivation);
     el("garden-open-phase-picker")?.addEventListener("click",()=>{
