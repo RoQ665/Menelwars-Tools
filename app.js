@@ -14048,11 +14048,11 @@ function setupAdmin() {
   }
 
   function gardenAtlasForPlant(plant) {
+    if (plant==="Rzeżucha") return "cress-growth-atlas-20261121.png?v=24.88";
     return /ziemniak/i.test(String(plant||"")) ? "potato-growth-atlas-v4.png?v=21.60" : "onion-growth-atlas.png?v=21.09";
   }
 
   function gardenFrameSpriteHtml(frame,className="garden-phase-sprite",plant="Cebula") {
-    if (plant==="Rzeżucha") return `<span class="${className} garden-cress-placeholder" role="img" aria-label="Rzeżucha — grafika tymczasowa, etap ${gardenDisplayStage(frame)||1}"><span>🌱</span><small>Etap ${gardenDisplayStage(frame)||1}/10</small></span>`;
     const number=Number(frame);
     if (!Number.isInteger(number) || number<0 || number>9) return "";
     return `<span class="${className}" style="--garden-frame:${number};--garden-atlas:url('${gardenAtlasForPlant(plant)}')" aria-label="Etap ${gardenDisplayStage(number)}"></span>`;
@@ -14376,7 +14376,7 @@ function setupAdmin() {
     // sensowna obserwacja porównawcza zaczyna się od etapu 2.
     const canAskForCheck=frame>0 && frame<=9;
     const check=canAskForCheck ? gardenCheckForFrame(summary,frame) : null;
-    const sprite=gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant)+(own.plant==="Rzeżucha"?`<div class="muted">Grafiki etapów są tymczasowe. Czas wzrostu Rzeżuchy jest szacunkiem eksperymentalnym; bez pomiarów przyjmujemy domyślnie 52 godziny. Potwierdzaj etapy według gry, aby poprawiać model.</div>`:"");
+    const sprite=gardenFrameSpriteHtml(frame,"garden-phase-sprite",own.plant)+(own.plant==="Rzeżucha"?`<div class="muted">Czas wzrostu Rzeżuchy jest szacunkiem eksperymentalnym; bez pomiarów przyjmujemy domyślnie 52 godziny. Potwierdzaj etapy według gry, aby poprawiać model.</div>`:"");
     const stats=gardenCheckStats(own,summary);
     const estimatedReadyAt=Number(own.startedAt||0)+gardenDynamicDurationMs(own);
     const modelRemaining=Math.max(0,estimatedReadyAt-Date.now());
@@ -15417,7 +15417,7 @@ function setupAdmin() {
       // stanu „rośnie”, dzięki czemu nie da się kliknąć drugi raz zanim
       // użytkownik zobaczy sadzonkę.
       await gardenFetchData({force:true});
-      if (status) status.textContent = combo.plant==="Rzeżucha" ? "✅ Zapisano zasadzenie Rzeżuchy. Etapy pokazują placeholdery; czas jest szacunkiem eksperymentalnym." : "✅ Posadzono. Narzędzie pokazuje etap 1 i będzie zmieniać go automatycznie.";
+      if (status) status.textContent = combo.plant==="Rzeżucha" ? "✅ Zapisano zasadzenie Rzeżuchy. Czas wzrostu jest szacunkiem eksperymentalnym." : "✅ Posadzono. Narzędzie pokazuje etap 1 i będzie zmieniać go automatycznie.";
       if(combo.plant!=="Rzeżucha") achievementTrack([/ziemniak/i.test(combo.plant)?"garden_plant_potato":"garden_plant_onion"]);
       gardenRenderPlots();
       gardenRenderEditor();
