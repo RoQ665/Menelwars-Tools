@@ -16493,7 +16493,24 @@ function setupAdmin() {
       description:"Profil szacowany na podstawie bazowych statystyk i modelu atrybutów NPC. HP potwierdzone; ATK, DEF, szanse, odporności i współczynnik obrony są przybliżeniem. Wynik służy do porównywania buildów, nie gwarantuje wyniku w grze."
     });
     const bossCatalogue=["Menel Igor","Mietek magister","Żul Artur","Zdzichu złota rączka","Pijus Dawid","Młody lump Sławek","Cyber Piotrek","Marek „Amant”","Andrzej","Krzysztof Jarzyna","Geralt z Rumii","Damian Wąsik","Kamil Zdun","Nagła Śmierć","Pan Paweł","Mateusz Rowerzysta","Adrian Puchacki","Janusz Tracz","Silnoręki","Sułtan Meneli","Rzezimieszek Heniek","Baron Blokowiska","Portier Stefan","Ochroniarz Mirek „Byk”","Cwaniak Zenek","Cinkciarz Wiesiek","Bimbrownik Kazik","Doktor Spirytus","Gwardzista Cesarza","Cesarz Meneli","Komornik Wiesław","Prezes Wysypiska","Ojciec Chrzestny Melin","Burmistrz Ryszard „Układ”","Deweloper Bogdan „Beton”"];
-    bossCatalogue.push("Hrabia Działek","Król Kaucji","Inspektor Sanepidu");
+    // Later bosses share the catalogue attribute template. Combat parameters
+    // remain estimates; only level and battle HP are confirmed by reports.
+    const lateBossTemplate=out.find(b=>b.id==="boss-38-inspektor-sanepidu");
+    for(const late of [
+      {id:"boss-36-deweloper-mirek",name:"Deweloper Mirek",level:39,attack:2158,defense:2502,hp:12124,defenseK:700},
+      {id:"boss-40-minister-spraw-melin",name:"Minister Spraw Melin",level:40,attack:2252,defense:2525,hp:12245,defenseK:725}
+    ]){
+      out.push({
+        id:late.id,name:`${late.name} · Lvl ${late.level} · Boss · profil szacowany`,
+        authorNick:"MenelWars · Bossowie",ownerNick:"",public:false,boss:true,level:late.level,
+        attributes:{...lateBossTemplate.attributes},perks:{},profile:{},bonuses:[],
+        estimatedCombat:{level:late.level,defenseK:late.defenseK,
+          primary:{attack:late.attack,defense:late.defense,hp:late.hp},
+          stats:{...lateBossTemplate.estimatedCombat.stats}},
+        description:"Profil szacowany na podstawie bazowych statystyk i modelu atrybutów NPC. Poziom i HP potwierdzone; ATK, DEF, szanse, odporności i współczynnik obrony są przybliżeniem. Wynik służy do porównywania buildów, nie gwarantuje wyniku w grze."
+      });
+    }
+    bossCatalogue.push("Hrabia Działek","Król Kaucji","Inspektor Sanepidu","Deweloper Mirek","Minister Spraw Melin");
     const bossNameKey=name=>String(name).split(' · ')[0].replace(/[„”"]/g,'').toLocaleLowerCase('pl');
     const knownBosses=new Map(out.filter(x=>x.boss).map(x=>[bossNameKey(x.name),x]));
     const orderedBosses=bossCatalogue.map((name,index)=>{
