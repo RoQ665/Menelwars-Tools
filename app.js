@@ -15198,6 +15198,14 @@ function setupAdmin() {
 
     el("garden-start").hidden = Boolean(own);
     el("garden-finish").hidden = !own;
+    const finishTime=el("garden-finish-time");
+    if(finishTime){
+      finishTime.hidden=!own;
+      if(finishTime.dataset.experimentId!==String(own?.id||"")){
+        el("garden-finish-hours").value="";el("garden-finish-minutes").value="";
+        finishTime.dataset.experimentId=String(own?.id||"");
+      }
+    }
     el("garden-cancel").hidden = !own;
     el("garden-active-time").hidden = !own;
     gardenRefreshStartTimeControls();
@@ -15455,6 +15463,16 @@ function setupAdmin() {
   async function gardenFinishCultivation() {
     const own = gardenOwnExperimentForPlot(gardenSelectedPlot);
     if (!own) return;
+    const hoursInput=el("garden-finish-hours"),minutesInput=el("garden-finish-minutes");
+    const hasGameTime=Boolean(hoursInput?.value||minutesInput?.value);
+    let gameDurationMs;
+    if(hasGameTime){
+      const hours=Number(hoursInput.value||0),minutes=Number(minutesInput.value||0);
+      gameDurationMs=(hours*60+minutes)*60000;
+      if(!hoursInput.reportValidity()||!minutesInput.reportValidity()||!Number.isSafeInteger(hours)||!Number.isSafeInteger(minutes)||gameDurationMs<60000||gameDurationMs>30*86400000){
+        el("garden-action-status").textContent="Podaj czas wzrostu od 1 minuty do 720 godzin.";return;
+      }
+    }
     if (!window.confirm("Potwierdź, że roślina w grze już wyrosła i została zebrana.")) return;
 
     const status = el("garden-action-status");
@@ -15468,6 +15486,7 @@ function setupAdmin() {
     try {
       const result = await gardenPostAction("gardenFinish",{
         id:own.id,
+        ...(hasGameTime?{gameDurationMs}:{}),
         ownerToken:own.ownerToken || "",
         sessionToken:playerAccountSessionToken() || ""
       });
